@@ -199,7 +199,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std:
         return MWLinkerMap::Error::RegexFail;
 
       this->push_back(std::move(std::make_unique<NodeUnused>(
-          std::stol(match.str(1), nullptr, 16), std::move(match.str(2)), std::move(match.str(3)),
+          std::stoul(match.str(1), nullptr, 16), std::move(match.str(2)), std::move(match.str(3)),
           std::move(match.str(4)))));
     }
     else if (BasicStringContains(line, "(entry of "))
@@ -211,9 +211,9 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std:
         return MWLinkerMap::Error::RegexFail;
 
       this->push_back(std::move(std::make_unique<NodeEntry>(
-          std::stol(match.str(1), nullptr, 16), std::stol(match.str(2), nullptr, 16),
-          std::stol(match.str(3), nullptr, 16), 0, std::move(match.str(4)), std::move(match.str(5)),
-          std::move(match.str(6)), std::move(match.str(7)))));
+          std::stoul(match.str(1), nullptr, 16), std::stoul(match.str(2), nullptr, 16),
+          std::stoul(match.str(3), nullptr, 16), 0, std::move(match.str(4)),
+          std::move(match.str(5)), std::move(match.str(6)), std::move(match.str(7)))));
     }
     else
     {
@@ -223,8 +223,8 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std:
         return MWLinkerMap::Error::RegexFail;
 
       this->push_back(std::move(std::make_unique<NodeNormal>(
-          std::stol(match.str(1), nullptr, 16), std::stol(match.str(2), nullptr, 16),
-          std::stol(match.str(3), nullptr, 16), 0, std::stol(match.str(4), nullptr, 10),
+          std::stoul(match.str(1), nullptr, 16), std::stoul(match.str(2), nullptr, 16),
+          std::stoul(match.str(3), nullptr, 16), 0, std::stoul(match.str(4), nullptr, 10),
           std::move(match.str(5)), std::move(match.str(6)), std::move(match.str(7)))));
     }
   }
