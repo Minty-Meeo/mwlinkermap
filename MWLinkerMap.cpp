@@ -53,6 +53,15 @@ MWLinkerMap::Error MWLinkerMap::ReadLines(std::vector<std::string>& lines, std::
     std::string& line = lines[line_number];
     if (line.length() == 0)  // Blank line (TODO: tolerate whitespace lines?)
       continue;
+    if (BasicStringContains(line, "Link map of "))
+    {
+      auto part = std::make_unique<LinkMap>();
+      MWLinkerMap::Error err = part->ReadLines(lines, line_number);
+      if (err != MWLinkerMap::Error::None)
+        return err;
+      m_list.push_back(std::move(part));
+      continue;
+    }
     if (BasicStringContains(line, " section layout"))
     {
       auto part = std::make_unique<SectionLayout>();
@@ -69,11 +78,53 @@ MWLinkerMap::Error MWLinkerMap::ReadLines(std::vector<std::string>& lines, std::
   return MWLinkerMap::Error::None;
 }
 
+MWLinkerMap::Error MWLinkerMap::LinkMap::ReadLines(std::vector<std::string>& lines,
+                                                   std::size_t& line_number)
+{
+  std::smatch match;
+  {
+    static const std::regex re("Link map of (" SYM_NAME ")$");
+    if (!std::regex_search(lines[line_number], match, re))
+      return MWLinkerMap::Error::RegexFail;
+    ++line_number;
+  }
+
+  // TODO: Handle potential EOF
+
+  for (; line_number < lines.size(); ++line_number)
+  {
+    std::string& line = lines[line_number];
+    if (line.length() == 0) [[unlikely]]  // Blank line (TODO: tolerate whitespace lines?)
+    {
+      ++line_number;
+      return MWLinkerMap::Error::None;
+    }
+
+    if (BasicStringContains(line, "found as"))
+    {
+      static const std::regex re("(\\d+)\\] (.+) found as linker generated symbol$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
+      this->push_back(std::move(std::make_unique<NodeLinkerGenerated>(std::move(match.str(2)))));
+    }
+    else
+    {
+      static const std::regex re("(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.+)?$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
+      this->push_back(std::move(std::make_unique<NodeNormal>(
+          std::move(match.str(2)), std::move(match.str(3)), std::move(match.str(4)),
+          std::move(match.str(5)), std::move(match.str(6)))));
+    }
+  }
+  return MWLinkerMap::Error::None;
+}
+
 MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines(std::vector<std::string>& lines,
                                                          std::size_t& line_number)
 {
-  static const std::regex re("(" SYM_NAME ") section layout");
   std::smatch match;
+  static const std::regex re("(" SYM_NAME ") section layout$");
   if (!std::regex_search(lines[line_number], match, re))
     return MWLinkerMap::Error::RegexFail;
   ++line_number;
@@ -130,106 +181,53 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines(std::vector<std::string
 MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std::string>& lines,
                                                                 std::size_t& line_number)
 {
+  std::smatch match;
   for (; line_number < lines.size(); ++line_number)
   {
     std::string& line = lines[line_number];
-    if (line.length() == 0)  // Blank line (TODO: tolerate whitespace lines?)
+    if (line.length() == 0) [[unlikely]]  // Blank line (TODO: tolerate whitespace lines?)
     {
       ++line_number;
       return MWLinkerMap::Error::None;
     }
 
-    std::unique_ptr<Node> node;
     if (BasicStringContains(line, "UNUSED  "))
-      node = std::make_unique<NodeUnused>();
-    else if (BasicStringContains(line, " (entry of "))
-      node = std::make_unique<NodeEntry>();
+    {
+      static const std::regex re("UNUSED   (" HEX ") \\.\\.\\.\\.\\.\\.\\.\\. (" SYM_NAME ") "
+                                 "(" WIN32_FILENAME ") (" WIN32_FILENAME ")?$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
+
+      this->push_back(std::move(std::make_unique<NodeUnused>(
+          std::stol(match.str(1), nullptr, 16), std::move(match.str(2)), std::move(match.str(3)),
+          std::move(match.str(4)))));
+    }
+    else if (BasicStringContains(line, "(entry of "))
+    {
+      static const std::regex re("(" HEX ") (" HEX ") (" HEX ") (" SYM_NAME
+                                 ") \\(entry of (" SYM_NAME ")\\) \t(" WIN32_FILENAME
+                                 ") (" WIN32_FILENAME ")$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
+
+      this->push_back(std::move(std::make_unique<NodeEntry>(
+          std::stol(match.str(1), nullptr, 16), std::stol(match.str(2), nullptr, 16),
+          std::stol(match.str(3), nullptr, 16), 0, std::move(match.str(4)), std::move(match.str(5)),
+          std::move(match.str(6)), std::move(match.str(7)))));
+    }
     else
-      node = std::make_unique<NodeNormal>();
+    {
+      static const std::regex re("(" HEX ") (" HEX ") (" HEX ")  ?(" DEC ") (" SYM_NAME ") \t"
+                                 "(" WIN32_FILENAME ") (" WIN32_FILENAME ")?$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
 
-    MWLinkerMap::Error err = node->ReadLine3Column(line);
-    if (err != MWLinkerMap::Error::None)
-      return err;
-    this->push_back(std::move(node));
+      this->push_back(std::move(std::make_unique<NodeNormal>(
+          std::stol(match.str(1), nullptr, 16), std::stol(match.str(2), nullptr, 16),
+          std::stol(match.str(3), nullptr, 16), 0, std::stol(match.str(4), nullptr, 10),
+          std::move(match.str(5)), std::move(match.str(6)), std::move(match.str(7)))));
+    }
   }
-  return MWLinkerMap::Error::None;
-}
-
-MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLine3Column(std::string& line)
-{
-  static const std::regex re("(" HEX ") (" HEX ") (" HEX ")  ?(" DEC ") (" SYM_NAME ") \t"
-                             "(" WIN32_FILENAME ") (" WIN32_FILENAME ")?$");
-  std::smatch match;
-  if (!std::regex_search(line, match, re))
-    return MWLinkerMap::Error::RegexFail;
-
-  uint32_t saddress = std::stol(match.str(1), nullptr, 16);
-  uint32_t size = std::stol(match.str(2), nullptr, 16);
-  uint32_t vaddress = std::stol(match.str(3), nullptr, 16);
-  uint32_t alignment = std::stol(match.str(4), nullptr, 10);
-  std::string name = std::move(match.str(5));
-  std::string module = std::move(match.str(6));
-  std::string file = std::move(match.str(7));
-
-  MWLinkerMap::SectionLayout::NodeNormal a = {{}, saddress, size, vaddress, alignment, 0, name, module, file};
-  // this->push_back();
-
-  return MWLinkerMap::Error::None;
-}
-
-MWLinkerMap::Error MWLinkerMap::SectionLayout::NodeNormal::ReadLine3Column(std::string& line)
-{
-  static const std::regex re("(" HEX ") (" HEX ") (" HEX ")  ?(" DEC ") (" SYM_NAME ") \t"
-                             "(" WIN32_FILENAME ") (" WIN32_FILENAME ")?$");
-  std::smatch match;
-  if (!std::regex_search(line, match, re))
-    return MWLinkerMap::Error::RegexFail;
-
-  saddress = std::stol(match.str(1), nullptr, 16);
-  size = std::stol(match.str(2), nullptr, 16);
-  vaddress = std::stol(match.str(3), nullptr, 16);
-  alignment = std::stol(match.str(4), nullptr, 10);
-  name = std::move(match.str(5));
-  module = std::move(match.str(6));
-  file = std::move(match.str(7));
-
-  return MWLinkerMap::Error::None;
-}
-
-MWLinkerMap::Error MWLinkerMap::SectionLayout::NodeUnused::ReadLine3Column(std::string& line)
-{
-  static const std::regex re("UNUSED   (" HEX ") \\.\\.\\.\\.\\.\\.\\.\\. (" SYM_NAME ") "
-                             "(" WIN32_FILENAME ") (" WIN32_FILENAME ")?$");
-  std::smatch match;
-  if (!std::regex_search(line, match, re))
-    return MWLinkerMap::Error::RegexFail;
-
-  size = std::stol(match.str(1), nullptr, 16);
-  name = std::move(match.str(2));
-  module = std::move(match.str(3));
-  file = std::move(match.str(4));
-
-  return MWLinkerMap::Error::None;
-}
-
-MWLinkerMap::Error MWLinkerMap::SectionLayout::NodeEntry::ReadLine3Column(std::string& line)
-{
-  static const std::regex re("(" HEX ") (" HEX ") (" HEX ") (" SYM_NAME ") \\(entry of (" SYM_NAME
-                             ")"
-                             "\\) \t(" WIN32_FILENAME ") (" WIN32_FILENAME ")$");
-  std::smatch match;
-  if (!std::regex_search(line, match, re))
-    return MWLinkerMap::Error::RegexFail;
-
-  saddress = std::stol(match.str(1), nullptr, 16);
-  size = std::stol(match.str(2), nullptr, 16);
-  ;
-  vaddress = std::stol(match.str(3), nullptr, 16);
-  name = std::move(match.str(4));
-  entry_of_name = std::move(match.str(5));
-  module = std::move(match.str(6));
-  file = std::move(match.str(7));
-
   return MWLinkerMap::Error::None;
 }
 
