@@ -65,7 +65,7 @@ MWLinkerMap::Error MWLinkerMap::ReadLines(std::vector<std::string>& lines, std::
       auto part = std::make_unique<LinkMap>();
       if (const auto err = part->ReadLines(lines, line_number); err != MWLinkerMap::Error::None)
         return err;
-      m_list.push_back(std::move(part));
+      m_parts.push_back(std::move(part));
       continue;
     }
     if (BasicStringContains(line, " section layout"))
@@ -73,7 +73,7 @@ MWLinkerMap::Error MWLinkerMap::ReadLines(std::vector<std::string>& lines, std::
       auto part = std::make_unique<SectionLayout>();
       if (const auto err = part->ReadLines(lines, line_number); err != MWLinkerMap::Error::None)
         return err;
-      m_list.push_back(std::move(part));
+      m_parts.push_back(std::move(part));
       continue;
     }
     if (line == "Memory map:")
@@ -81,7 +81,7 @@ MWLinkerMap::Error MWLinkerMap::ReadLines(std::vector<std::string>& lines, std::
       auto part = std::make_unique<MemoryMap>();
       if (const auto err = part->ReadLines(lines, line_number); err != MWLinkerMap::Error::None)
         return err;
-      m_list.push_back(std::move(part));
+      m_parts.push_back(std::move(part));
       continue;
     }
     if (line == "Linker generated symbols:")
@@ -106,7 +106,7 @@ MWLinkerMap::Error MWLinkerMap::LinkMap::ReadLines(std::vector<std::string>& lin
     ++line_number;
   }
 
-  std::string entry_point_name = std::move(match.str(1));
+  std::string entry_point_name = match.str(1);
 
   // TODO: Handle potential EOF
 
@@ -132,7 +132,7 @@ MWLinkerMap::Error MWLinkerMap::LinkMap::ReadLines(std::vector<std::string>& lin
         return MWLinkerMap::Error::LinkMapLayerSkip;
       ++line_number;
 
-      auto node = std::make_unique<NodeLinkerGenerated>(std::move(match.str(2)));
+      auto node = std::make_unique<NodeLinkerGenerated>(match.str(2));
 
       MWLinkerMap::LinkMap::NodeBase* parent = hierarchy_history[curr_level - 1];
       hierarchy_history[curr_level] = node.get();
@@ -150,9 +150,8 @@ MWLinkerMap::Error MWLinkerMap::LinkMap::ReadLines(std::vector<std::string>& lin
         return MWLinkerMap::Error::LinkMapLayerSkip;
       ++line_number;
 
-      auto node = std::make_unique<NodeNormal>(std::move(match.str(2)), std::move(match.str(3)),
-                                               std::move(match.str(4)), std::move(match.str(5)),
-                                               std::move(match.str(6)));
+      auto node = std::make_unique<NodeNormal>(match.str(2), match.str(3), match.str(4),
+                                               match.str(5), match.str(6));
 
       if (line_number < lines.size() && BasicStringContains(lines[line_number], ">>>"))
       {
@@ -210,8 +209,7 @@ MWLinkerMap::LinkMap::NodeNormal::ReadLinesUnrefDups(std::vector<std::string>& l
     if (std::stol(match.str(1)) != curr_level)
       return MWLinkerMap::Error::LinkMapUnrefDupsLevelMismatch;
 
-    this->unref_dups.emplace_back(std::move(match.str(2)), std::move(match.str(3)),
-                                  std::move(match.str(4)), std::move(match.str(5)));
+    this->unref_dups.emplace_back(match.str(2), match.str(3), match.str(4), match.str(5));
   }
   return MWLinkerMap::Error::None;
 }
@@ -220,7 +218,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines(std::vector<std::string
                                                          std::size_t& line_number)
 {
   std::smatch match;
-  static const std::regex re("(" SYM_NAME ") section layout$");
+  static const std::regex re("(.+) section layout$");
   if (!std::regex_search(lines[line_number], match, re))
     return MWLinkerMap::Error::RegexFail;
   ++line_number;
@@ -291,7 +289,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std:
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
-      this->units.push_back(std::make_unique<UnitUnused>(  //
+      this->m_units.push_back(std::make_unique<UnitUnused>(  //
           match.str(2), match.str(3), match.str(4), xstoul(match.str(1))));
     }
     else if (BasicStringContains(line, "(entry of "))
@@ -302,7 +300,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std:
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
-      this->units.push_back(std::make_unique<UnitEntry>(  //
+      this->m_units.push_back(std::make_unique<UnitEntry>(  //
           match.str(4), match.str(6), match.str(7), xstoul(match.str(2)), xstoul(match.str(1)),
           xstoul(match.str(3)), 0, match.str(5)));
     }
@@ -313,9 +311,9 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std:
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
-      this->units.push_back(std::make_unique<UnitNormal>(  //
+      this->m_units.push_back(std::make_unique<UnitNormal>(  //
           match.str(5), match.str(6), match.str(7), xstoul(match.str(2)), xstoul(match.str(1)),
-          xstoul(match.str(3)), 0, xstoul(match.str(4))));
+          xstoul(match.str(3)), 0, stoul(match.str(4))));
     }
   }
   return MWLinkerMap::Error::None;
@@ -379,25 +377,25 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines3Column(std::vector<std::str
     if (line.substr(19, 8) == "        ")
     {
       // "  %15s           %06x %08x"
-      static const std::regex re(" {2,17}(.+)           (" HEX6 ") (" HEX8 ")$");
+      static const std::regex re("   *(.+)           (" HEX6 ") (" HEX8 ")$");
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
-      this->units.push_back(std::make_unique<UnitInfo>(  //
+      this->m_units.push_back(std::make_unique<UnitInfo>(  //
           match.str(1), xstoul(match.str(2)), xstoul(match.str(3))));
     }
     else
     {
       // "  %15s  %08x %08x %08x"
-      static const std::regex re(" {2,17}(.+)  (" HEX8 ") (" HEX8 ") (" HEX8 ")$");
+      static const std::regex re("   *(.+)  (" HEX8 ") (" HEX8 ") (" HEX8 ")$");
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
-      this->units.push_back(std::make_unique<UnitAllocated>(  //
+      this->m_units.push_back(std::make_unique<UnitAllocated>(  //
           match.str(1), xstoul(match.str(3)), xstoul(match.str(4)), xstoul(match.str(2)), 0, 0));
     }
   }
-  return MWLinkerMap::Error::Unimplemented;
+  return MWLinkerMap::Error::None;
 }
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines5Column(std::vector<std::string>& lines,

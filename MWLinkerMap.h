@@ -74,7 +74,6 @@ struct MWLinkerMap
       std::string bind;
       std::string module;
       std::string file;
-
       std::list<UnreferencedDuplicate> unref_dups;
     };
     struct NodeLinkerGenerated final : NodeBase
@@ -96,24 +95,19 @@ struct MWLinkerMap
   {
     struct UnitBase
     {
-      std::string name;
-      std::string module;  // ELF object or static library name
-      std::string file;    // Static library STT_FILE symbol name (optional)
-      std::uint32_t size;
-
       UnitBase() = default;
       UnitBase(std::string name_, std::string module_, std::string file_, std::uint32_t size_)
           : name(std::move(name_)), module(std::move(module_)), file(std::move(file_)),
             size(size_){};
       virtual ~UnitBase() = default;
+
+      std::string name;
+      std::string module;  // ELF object or static library name
+      std::string file;    // Static library STT_FILE symbol name (optional)
+      std::uint32_t size;
     };
     struct UnitNormal final : UnitBase
     {
-      std::uint32_t saddress;
-      std::uint32_t vaddress;
-      std::uint32_t foffset;
-      std::uint32_t alignment;
-
       UnitNormal() = default;
       UnitNormal(std::string name_, std::string module_, std::string file_, std::uint32_t size_,
                  std::uint32_t saddress_, std::uint32_t vaddress_, std::uint32_t foffset_,
@@ -121,6 +115,11 @@ struct MWLinkerMap
           : UnitBase(std::move(name_), std::move(module_), std::move(file_), size_),
             saddress(saddress_), vaddress(vaddress_), foffset(foffset_), alignment(alignment_){};
       virtual ~UnitNormal() = default;
+
+      std::uint32_t saddress;
+      std::uint32_t vaddress;
+      std::uint32_t foffset;
+      std::uint32_t alignment;
     };
     struct UnitUnused final : UnitBase
     {
@@ -131,11 +130,6 @@ struct MWLinkerMap
     };
     struct UnitEntry final : UnitBase
     {
-      std::uint32_t saddress;
-      std::uint32_t vaddress;
-      std::uint32_t foffset;
-      std::string entry_of_name;  // (entry of _____)
-
       UnitEntry() = default;
       UnitEntry(std::string name_, std::string module_, std::string file_, std::uint32_t size_,
                 std::uint32_t saddress_, std::uint32_t vaddress_, std::uint32_t foffset_,
@@ -144,6 +138,11 @@ struct MWLinkerMap
             saddress(saddress_), vaddress(vaddress_), foffset(foffset_),
             entry_of_name(std::move(entry_of_name_)){};
       virtual ~UnitEntry() = default;
+
+      std::uint32_t saddress;
+      std::uint32_t vaddress;
+      std::uint32_t foffset;
+      std::string entry_of_name;  // (entry of _____)
     };
 
     SectionLayout() = default;
@@ -153,20 +152,11 @@ struct MWLinkerMap
     Error ReadLines3Column(std::vector<std::string>&, std::size_t&);
     Error ReadLines4Column(std::vector<std::string>&, std::size_t&);
 
-    std::list<std::unique_ptr<UnitBase>> units;
+    std::list<std::unique_ptr<UnitBase>> m_units;
   };
 
   struct MemoryMap final : PartBase
   {
-    // "                   Starting Size     File     ROM      RAM Buffer\r\n"
-    // "                   address           Offset   Address  Address\r\n"
-    // "  %15s  %08x %08x %08x %08x %08x\r\n"
-
-    // "                   Starting Size     File\r\n"
-    // "                   address           Offset\r\n"
-    // "  %15s  %08x %08x %08x\r\n"
-    // "  %15s           %06x %08x\r\n"
-
     // TODO: make list of names of sections which are not allocated
     // .debug_srcinfo / .debug_sfnames / .debug / .line)
     // Check ELF format SH_TYPE (Section Header) or whatever, I think that is the clue.
@@ -215,13 +205,14 @@ struct MWLinkerMap
     Error ReadLines3Column(std::vector<std::string>&, std::size_t&);
     Error ReadLines5Column(std::vector<std::string>&, std::size_t&);
 
-    std::list<std::unique_ptr<UnitBase>> units;
+    std::list<std::unique_ptr<UnitBase>> m_units;
   };
 
   MWLinkerMap() = default;
-
-  std::list<std::unique_ptr<PartBase>> m_list;
+  ~MWLinkerMap() = default;
 
   Error ReadLines(std::vector<std::string>&, std::size_t&);
   Error ReadStream(std::istream&, std::size_t&);
+
+  std::list<std::unique_ptr<PartBase>> m_parts;
 };
