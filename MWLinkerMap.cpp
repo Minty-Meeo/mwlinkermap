@@ -226,8 +226,6 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines(std::vector<std::string
   if (!(line_number + 2 < lines.size()))
     return MWLinkerMap::Error::SectionLayoutBadHeader;
 
-  bool pre_2_7;  // TODO: was this the version it changed?
-
   if (lines[line_number] == "  Starting        Virtual")
   {
     ++line_number;
@@ -235,7 +233,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines(std::vector<std::string
     {
       ++line_number;
       if (lines[line_number] == "  -----------------------")
-        pre_2_7 = true;
+        this->m_pre_2_7 = true;
       else
         return MWLinkerMap::Error::SectionLayoutBadHeader;
     }
@@ -251,7 +249,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines(std::vector<std::string
     {
       ++line_number;
       if (lines[line_number] == "  ---------------------------------")
-        pre_2_7 = false;
+        this->m_pre_2_7 = false;
       else
         return MWLinkerMap::Error::SectionLayoutBadHeader;
     }
@@ -266,7 +264,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines(std::vector<std::string
   }
   ++line_number;
 
-  if (pre_2_7)
+  if (this->m_pre_2_7)
     return ReadLines3Column(lines, line_number);
   else
     return ReadLines4Column(lines, line_number);
@@ -333,13 +331,11 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines(std::vector<std::string>& l
   if (!(line_number + 1 < lines.size()))
     return MWLinkerMap::Error::MemoryMapBadHeader;
 
-  bool extra_info;  // TODO: What causes this??
-
   if (lines[line_number] == "                   Starting Size     File")
   {
     ++line_number;
     if (lines[line_number] == "                   address           Offset")
-      extra_info = false;
+      this->m_extra_info = false;
     else
       return MWLinkerMap::Error::MemoryMapBadHeader;
   }
@@ -348,7 +344,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines(std::vector<std::string>& l
   {
     ++line_number;
     if (lines[line_number] == "                   address           Offset   Address  Address")
-      extra_info = true;
+      this->m_extra_info = true;
     else
       return MWLinkerMap::Error::MemoryMapBadHeader;
   }
@@ -358,7 +354,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines(std::vector<std::string>& l
   }
   ++line_number;
 
-  if (extra_info)
+  if (this->m_extra_info)
     return ReadLines5Column(lines, line_number);
   else
     return ReadLines3Column(lines, line_number);

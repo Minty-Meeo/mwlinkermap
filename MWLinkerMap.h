@@ -153,6 +153,7 @@ struct MWLinkerMap
     Error ReadLines4Column(std::vector<std::string>&, std::size_t&);
 
     std::list<std::unique_ptr<UnitBase>> m_units;
+    bool m_pre_2_7;  // TODO: was this the version it changed?
   };
 
   struct MemoryMap final : PartBase
@@ -206,6 +207,7 @@ struct MWLinkerMap
     Error ReadLines5Column(std::vector<std::string>&, std::size_t&);
 
     std::list<std::unique_ptr<UnitBase>> m_units;
+    bool m_extra_info;  // TODO: What causes MWLD(EPPC) to emit this??
   };
 
   MWLinkerMap() = default;
