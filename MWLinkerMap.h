@@ -4,6 +4,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct MWLinkerMap
@@ -49,16 +50,16 @@ struct MWLinkerMap
     {
       struct UnreferencedDuplicate
       {
-        std::string type;
-        std::string bind;
-        std::string module;
-        std::string file;
-
         UnreferencedDuplicate() = default;
         UnreferencedDuplicate(std::string type_, std::string bind_, std::string module_,
                               std::string file_)
             : type(std::move(type_)), bind(std::move(bind_)), module(std::move(module_)),
               file(std::move(file_)){};
+
+        std::string type;
+        std::string bind;
+        std::string module;
+        std::string file;
       };
 
       NodeNormal() = default;
@@ -95,54 +96,72 @@ struct MWLinkerMap
   {
     struct UnitBase
     {
-      UnitBase() = default;
-      UnitBase(std::string name_, std::string module_, std::string file_, std::uint32_t size_)
-          : name(std::move(name_)), module(std::move(module_)), file(std::move(file_)),
-            size(size_){};
       virtual ~UnitBase() = default;
-
-      std::string name;
-      std::string module;  // ELF object or static library name
-      std::string file;    // Static library STT_FILE symbol name (optional)
-      std::uint32_t size;
     };
     struct UnitNormal final : UnitBase
     {
-      UnitNormal() = default;
-      UnitNormal(std::string name_, std::string module_, std::string file_, std::uint32_t size_,
-                 std::uint32_t saddress_, std::uint32_t vaddress_, std::uint32_t foffset_,
-                 std::uint32_t alignment_)
-          : UnitBase(std::move(name_), std::move(module_), std::move(file_), size_),
-            saddress(saddress_), vaddress(vaddress_), foffset(foffset_), alignment(alignment_){};
+      UnitNormal(std::uint32_t saddress_, std::uint32_t size_, std::uint32_t vaddress_,
+                 std::uint32_t foffset_, std::uint32_t alignment_, std::string name_,
+                 std::string module_, std::string file_)
+          : saddress(saddress_), size(size_), vaddress(vaddress_), foffset(foffset_),
+            alignment(alignment_), name(std::move(name_)), module(std::move(module_)),
+            file(std::move(file_)){};
       virtual ~UnitNormal() = default;
 
       std::uint32_t saddress;
+      std::uint32_t size;
       std::uint32_t vaddress;
       std::uint32_t foffset;
       std::uint32_t alignment;
+      std::string name;
+      std::string module;  // ELF object or static library name
+      std::string file;    // Static library STT_FILE symbol name (optional)
     };
     struct UnitUnused final : UnitBase
     {
-      UnitUnused() = default;
-      UnitUnused(std::string name_, std::string module_, std::string file_, std::uint32_t size_)
-          : UnitBase(std::move(name_), std::move(module_), std::move(file_), size_){};
+      UnitUnused(std::uint32_t size_, std::string name_, std::string module_, std::string file_)
+          : size(size_), name(std::move(name_)), module(std::move(module_)),
+            file(std::move(file_)){};
       virtual ~UnitUnused() = default;
+
+      std::uint32_t size;
+      std::string name;
+      std::string module;  // ELF object or static library name
+      std::string file;    // Static library STT_FILE symbol name (optional)
     };
     struct UnitEntry final : UnitBase
     {
       UnitEntry() = default;
-      UnitEntry(std::string name_, std::string module_, std::string file_, std::uint32_t size_,
-                std::uint32_t saddress_, std::uint32_t vaddress_, std::uint32_t foffset_,
-                std::string entry_of_name_)
-          : UnitBase(std::move(name_), std::move(module_), std::move(file_), size_),
-            saddress(saddress_), vaddress(vaddress_), foffset(foffset_),
-            entry_of_name(std::move(entry_of_name_)){};
+      UnitEntry(std::uint32_t saddress_, std::uint32_t size_, std::uint32_t vaddress_,
+                std::uint32_t foffset_, std::string name_, std::string entry_of_name_,
+                std::string module_, std::string file_)
+          : saddress(saddress_), size(size_), vaddress(vaddress_), foffset(foffset_),
+            name(std::move(name_)), entry_of_name(std::move(entry_of_name_)),
+            module(std::move(module_)), file(std::move(file_)){};
       virtual ~UnitEntry() = default;
 
       std::uint32_t saddress;
+      std::uint32_t size;
       std::uint32_t vaddress;
       std::uint32_t foffset;
+      std::string name;
       std::string entry_of_name;  // (entry of _____)
+      std::string module;         // ELF object or static library name
+      std::string file;           // Static library STT_FILE symbol name (optional)
+    };
+    struct UnitFill final : UnitBase
+    {
+      UnitFill(std::uint32_t saddress_, std::uint32_t size_, std::uint32_t vaddress_,
+               std::uint32_t foffset_, std::uint32_t alignment_)
+          : saddress(saddress_), size(size_), vaddress(vaddress_), foffset(foffset_),
+            alignment(alignment_){};
+      virtual ~UnitFill() = default;
+
+      std::uint32_t saddress;
+      std::uint32_t size;
+      std::uint32_t vaddress;
+      std::uint32_t foffset;
+      std::uint32_t alignment;
     };
 
     SectionLayout() = default;
@@ -166,7 +185,7 @@ struct MWLinkerMap
     {
       UnitBase() = default;
       UnitBase(std::string section_name_, std::uint32_t size_, std::uint32_t foffset_)
-          : section_name(section_name_), size(size_), foffset(foffset_){};
+          : section_name(std::move(section_name_)), size(size_), foffset(foffset_){};
       virtual ~UnitBase() = default;
 
       std::string section_name;
@@ -180,8 +199,8 @@ struct MWLinkerMap
       UnitAllocated() = default;
       UnitAllocated(std::string section_name_, std::uint32_t size_, std::uint32_t foffset_,
                     std::uint32_t saddress_, std::uint32_t rom_addr_, std::uint32_t ram_buff_addr_)
-          : UnitBase(section_name_, size_, foffset_), saddress(saddress_), rom_addr(rom_addr_),
-            ram_buff_addr(ram_buff_addr_){};
+          : UnitBase(std::move(section_name_), size_, foffset_), saddress(saddress_),
+            rom_addr(rom_addr_), ram_buff_addr(ram_buff_addr_){};
       virtual ~UnitAllocated() = default;
 
       std::uint32_t saddress;
@@ -195,7 +214,7 @@ struct MWLinkerMap
     {
       UnitInfo() = default;
       UnitInfo(std::string section_name_, std::uint32_t size_, std::uint32_t foffset_)
-          : UnitBase(section_name_, size_, foffset_){};
+          : UnitBase(std::move(section_name_), size_, foffset_){};
       virtual ~UnitInfo() = default;
     };
 
@@ -210,6 +229,25 @@ struct MWLinkerMap
     bool m_extra_info;  // TODO: What causes MWLD(EPPC) to emit this??
   };
 
+  struct LinkerGeneratedSymbols final : PartBase
+  {
+    struct Unit
+    {
+      std::string name;
+      std::uint32_t value;
+
+      Unit() = default;
+      Unit(std::string name_, std::uint32_t value_) : name(std::move(name_)), value(value_){};
+    };
+
+    LinkerGeneratedSymbols() = default;
+    virtual ~LinkerGeneratedSymbols() = default;
+
+    Error ReadLines(std::vector<std::string>&, std::size_t&);
+
+    std::list<std::unique_ptr<Unit>> m_units;
+  };
+
   MWLinkerMap() = default;
   ~MWLinkerMap() = default;
 
@@ -217,4 +255,5 @@ struct MWLinkerMap
   Error ReadStream(std::istream&, std::size_t&);
 
   std::list<std::unique_ptr<PartBase>> m_parts;
+  bool m_null_padding = false;
 };

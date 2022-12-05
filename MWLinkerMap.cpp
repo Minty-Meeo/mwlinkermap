@@ -40,6 +40,12 @@ constexpr static bool BasicStringContains(const std::basic_string<CharT, Traits>
 {
   return BasicStringContains(self, sv.data());
 }
+template <class CharT, class Traits>
+constexpr static bool BasicStringContains(const std::basic_string<CharT, Traits>& self,
+                                          const CharT c)
+{
+  return (self.find(c) != std::basic_string<CharT, Traits>::npos);
+}
 
 MWLinkerMap::Error MWLinkerMap::ReadStream(std::istream& stream, std::size_t& line_number)
 {
@@ -55,25 +61,28 @@ MWLinkerMap::Error MWLinkerMap::ReadStream(std::istream& stream, std::size_t& li
 
 MWLinkerMap::Error MWLinkerMap::ReadLines(std::vector<std::string>& lines, std::size_t& line_number)
 {
-  for (line_number = 0; line_number < lines.size(); ++line_number)
+  for (line_number = 0; line_number < lines.size();)
   {
     std::string& line = lines[line_number];
-    if (line.length() == 0)  // Blank line (TODO: tolerate whitespace lines?)
+    if (line.empty())
+    {
+      ++line_number;
       continue;
-    if (BasicStringContains(line, "Link map of "))
+    }
+    if (line.starts_with("Link map of "))
     {
       auto part = std::make_unique<LinkMap>();
       if (const auto err = part->ReadLines(lines, line_number); err != MWLinkerMap::Error::None)
         return err;
-      m_parts.push_back(std::move(part));
+      this->m_parts.push_back(std::move(part));
       continue;
     }
-    if (BasicStringContains(line, " section layout"))
+    if (line.ends_with(" section layout"))
     {
       auto part = std::make_unique<SectionLayout>();
       if (const auto err = part->ReadLines(lines, line_number); err != MWLinkerMap::Error::None)
         return err;
-      m_parts.push_back(std::move(part));
+      this->m_parts.push_back(std::move(part));
       continue;
     }
     if (line == "Memory map:")
@@ -81,11 +90,24 @@ MWLinkerMap::Error MWLinkerMap::ReadLines(std::vector<std::string>& lines, std::
       auto part = std::make_unique<MemoryMap>();
       if (const auto err = part->ReadLines(lines, line_number); err != MWLinkerMap::Error::None)
         return err;
-      m_parts.push_back(std::move(part));
+      this->m_parts.push_back(std::move(part));
       continue;
     }
     if (line == "Linker generated symbols:")
     {
+      auto part = std::make_unique<LinkerGeneratedSymbols>();
+      if (const auto err = part->ReadLines(lines, line_number); err != MWLinkerMap::Error::None)
+        return err;
+      this->m_parts.push_back(std::move(part));
+      continue;
+    }
+    if (BasicStringContains(line, '\0'))
+    {
+      // Some linker maps have padding to the next multiple of 32 bytes for... some reason.
+      // We shall assume this is always the end of the file if such a thing is found.
+      // TODO: Why??
+      this->m_null_padding = true;
+      break;
     }
     // This will be reached if something strange has been found
     return MWLinkerMap::Error::GarbageFound;
@@ -118,7 +140,7 @@ MWLinkerMap::Error MWLinkerMap::LinkMap::ReadLines(std::vector<std::string>& lin
   for (; line_number < lines.size();)
   {
     std::string& line = lines[line_number];
-    if (line.length() == 0) [[unlikely]]  // Blank line (TODO: tolerate whitespace lines?)
+    if (line.empty() || BasicStringContains(line, '\0')) [[unlikely]]
       return MWLinkerMap::Error::None;
 
     if (BasicStringContains(line, "found as"))
@@ -192,13 +214,14 @@ MWLinkerMap::LinkMap::NodeNormal::ReadLinesUnrefDups(std::vector<std::string>& l
     ++line_number;
   }
 
-  if (line_number >= lines.size() || lines[line_number].length() == 0) [[unlikely]]
+  if (line_number >= lines.size() || lines[line_number].empty() ||
+      BasicStringContains(lines[line_number], '\0')) [[unlikely]]
     return MWLinkerMap::Error::LinkMapUnrefDupsEmpty;
 
   for (; line_number < lines.size(); ++line_number)
   {
     std::string& line = lines[line_number];
-    if (line.length() == 0) [[unlikely]]  // Blank line (TODO: tolerate whitespace lines?)
+    if (line.empty() || BasicStringContains(line, '\0')) [[unlikely]]
       return MWLinkerMap::Error::None;
     if (!BasicStringContains(line, ">>>"))  // End of UNREFERENCED DUPLICATEs
       return MWLinkerMap::Error::None;
@@ -277,41 +300,39 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std:
   for (; line_number < lines.size(); ++line_number)
   {
     std::string& line = lines[line_number];
-    if (line.length() == 0) [[unlikely]]  // Blank line (TODO: tolerate whitespace lines?)
+    if (line.empty() || BasicStringContains(line, '\0')) [[unlikely]]
       return MWLinkerMap::Error::None;
 
     if (BasicStringContains(line, "UNUSED  "))
     {
-      static const std::regex re("UNUSED   (" HEX ") \\.\\.\\.\\.\\.\\.\\.\\. (" SYM_NAME ") "
-                                 "(" WIN32_FILENAME ") (" WIN32_FILENAME ")?$");
+      static const std::regex re("^  UNUSED   ([0-9a-f]{6}) \\.{8} (.+) (.+) (.+)?$");
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
       this->m_units.push_back(std::make_unique<UnitUnused>(  //
-          match.str(2), match.str(3), match.str(4), xstoul(match.str(1))));
+          xstoul(match.str(1)), match.str(2), match.str(3), match.str(4)));
     }
     else if (BasicStringContains(line, "(entry of "))
     {
-      static const std::regex re("(" HEX ") (" HEX ") (" HEX ") (" SYM_NAME
-                                 ") \\(entry of (" SYM_NAME ")\\) \t(" WIN32_FILENAME
-                                 ") (" WIN32_FILENAME ")$");
+      static const std::regex re(
+          "^  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.+) \\(entry of (.+)\\) \t(.+) (.+)?$");
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
       this->m_units.push_back(std::make_unique<UnitEntry>(  //
-          match.str(4), match.str(6), match.str(7), xstoul(match.str(2)), xstoul(match.str(1)),
-          xstoul(match.str(3)), 0, match.str(5)));
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
+          match.str(5), match.str(6), match.str(7)));
     }
     else
     {
-      static const std::regex re("(" HEX ") (" HEX ") (" HEX ")  ?(" DEC ") (" SYM_NAME ") \t"
-                                 "(" WIN32_FILENAME ") (" WIN32_FILENAME ")?$");
+      static const std::regex re(
+          "^  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.+)?$");
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
       this->m_units.push_back(std::make_unique<UnitNormal>(  //
-          match.str(5), match.str(6), match.str(7), xstoul(match.str(2)), xstoul(match.str(1)),
-          xstoul(match.str(3)), 0, stoul(match.str(4))));
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, stoul(match.str(4)),
+          match.str(5), match.str(6), match.str(7)));
     }
   }
   return MWLinkerMap::Error::None;
@@ -320,7 +341,57 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std:
 MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines4Column(std::vector<std::string>& lines,
                                                                 std::size_t& line_number)
 {
-  return MWLinkerMap::Error::Unimplemented;
+  std::smatch match;
+  for (; line_number < lines.size(); ++line_number)
+  {
+    std::string& line = lines[line_number];
+    if (line.empty()) [[unlikely]]
+      return MWLinkerMap::Error::None;
+
+    if (line.starts_with("  UNUSED"))
+    {
+      static const std::regex re("^  UNUSED   ([0-9a-f]{6}) \\.{8} \\.{8}    (.+) (.+) (.+)?$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
+
+      this->m_units.push_back(std::make_unique<UnitUnused>(  //
+          xstoul(match.str(1)), match.str(2), match.str(3), match.str(4)));
+    }
+    else if (BasicStringContains(line, "(entry of "))
+    {
+      static const std::regex re("^  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})    "
+                                 "(.+) \\(entry of (.+)\\) \t(.+) (.+)?$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
+
+      this->m_units.push_back(std::make_unique<UnitEntry>(
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
+          match.str(5), match.str(6), match.str(7), match.str(8)));
+    }
+    else if (line.ends_with("*fill*"))
+    {
+      static const std::regex re(
+          "^  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) \\*fill\\*$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
+
+      this->m_units.push_back(std::make_unique<UnitFill>(  //
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
+          stoul(match.str(5))));
+    }
+    else
+    {
+      static const std::regex re(
+          "^  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.+)?$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
+
+      this->m_units.push_back(std::make_unique<UnitNormal>(
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
+          stoul(match.str(5)), match.str(6), match.str(7), match.str(8)));
+    }
+  }
+  return MWLinkerMap::Error::None;
 }
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines(std::vector<std::string>& lines,
@@ -367,13 +438,13 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines3Column(std::vector<std::str
   for (; line_number < lines.size(); ++line_number)
   {
     std::string& line = lines[line_number];
-    if (line.length() == 0) [[unlikely]]  // Blank line (TODO: tolerate whitespace lines?)
+    if (line.empty() || BasicStringContains(line, '\0')) [[unlikely]]
       return MWLinkerMap::Error::None;
 
     if (line.substr(19, 8) == "        ")
     {
       // "  %15s           %06x %08x"
-      static const std::regex re("   *(.+)           (" HEX6 ") (" HEX8 ")$");
+      static const std::regex re("^   *(.+)           ([0-9a-f]{6,8}) ([0-9a-f]{8})$");
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
@@ -383,7 +454,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines3Column(std::vector<std::str
     else
     {
       // "  %15s  %08x %08x %08x"
-      static const std::regex re("   *(.+)  (" HEX8 ") (" HEX8 ") (" HEX8 ")$");
+      static const std::regex re("^   *(.+)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})$");
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
@@ -399,4 +470,27 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines5Column(std::vector<std::str
 {
   // "  %15s  %08x %08x %08x %08x %08x"
   return MWLinkerMap::Error::Unimplemented;
+}
+
+MWLinkerMap::Error MWLinkerMap::LinkerGeneratedSymbols::ReadLines(std::vector<std::string>& lines,
+                                                                  std::size_t& line_number)
+{
+  ++line_number;  // Already know this line says "Linker generated symbols:"
+
+  std::smatch match;
+  for (; line_number < lines.size(); ++line_number)
+  {
+    std::string& line = lines[line_number];
+    if (line.empty() || BasicStringContains(line, '\0')) [[unlikely]]
+      return MWLinkerMap::Error::None;
+
+    // "%25s %08x"
+    static const std::regex re("^ *(.+) ([0-9a-f]{8})$");
+    if (!std::regex_search(line, match, re))
+      return MWLinkerMap::Error::RegexFail;
+
+    this->m_units.push_back(std::make_unique<Unit>(  //
+        match.str(1), xstoul(match.str(2))));
+  }
+  return MWLinkerMap::Error::None;
 }
