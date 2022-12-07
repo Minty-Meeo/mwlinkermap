@@ -18,13 +18,6 @@
 
 #include "MWLinkerMap.h"
 
-#define WIN32_FILENAME "[^/\\\?%\\*:|\"<>,;= ]+"
-#define HEX "[0-9A-Fa-f]+"
-#define HEX8 "[0-9A-Fa-f]{8}"
-#define HEX6 "[0-9A-Fa-f]{6}"
-#define DEC "\\d+"
-#define SYM_NAME "[\\w@$\\.<>,]+"
-
 #define xstoul(__str) std::stoul(__str, nullptr, 16)
 
 // TODO C++23: std::basic_string 'contains' method
@@ -120,36 +113,33 @@ MWLinkerMap::Error MWLinkerMap::LinkMap::ReadLines(std::vector<std::string>& lin
                                                    std::size_t& line_number)
 {
   std::smatch match;
-
   {
-    static const std::regex re("Link map of (.+)$");
+    static const std::regex re("^Link map of (.+)$");
     if (!std::regex_search(lines[line_number], match, re))
       return MWLinkerMap::Error::RegexFail;
     ++line_number;
+
+    this->entry_point_name = match.str(1);
   }
 
-  std::string entry_point_name = match.str(1);
-
-  // TODO: Handle potential EOF
-
-  std::map<int, MWLinkerMap::LinkMap::NodeBase*> hierarchy_history = {
-      std::make_pair(0, &this->root)};
   int prev_level = 0;
-  int curr_level = 0;
+  std::map<int, MWLinkerMap::LinkMap::NodeBase*> hierarchy_history = {
+      std::make_pair(prev_level, &this->root)};
 
-  for (; line_number < lines.size();)
+  while (line_number < lines.size())
   {
     std::string& line = lines[line_number];
     if (line.empty() || BasicStringContains(line, '\0')) [[unlikely]]
-      return MWLinkerMap::Error::None;
+      break;
 
     if (BasicStringContains(line, "found as"))
     {
-      static const std::regex re("(\\d+)\\] (.+) found as linker generated symbol$");
+      // " ", "%i] ", "%s found as linker generated symbol\r\n"
+      static const std::regex re("^ +(\\d+)\\] (.+) found as linker generated symbol$");
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
-      curr_level = std::stol(match.str(1));
+      int curr_level = std::stol(match.str(1));
       if (curr_level - 1 > prev_level)
         return MWLinkerMap::Error::LinkMapLayerSkip;
       ++line_number;
@@ -160,14 +150,30 @@ MWLinkerMap::Error MWLinkerMap::LinkMap::ReadLines(std::vector<std::string>& lin
       hierarchy_history[curr_level] = node.get();
       node->parent = parent;
       parent->children.push_back(std::move(node));
+      prev_level = curr_level;
+    }
+    else if (line.starts_with(">>>"))
+    {
+      // ">>> SYMBOL NOT FOUND: %s"
+      static const std::regex re("^>>> SYMBOL NOT FOUND: (.+)$");
+      if (!std::regex_search(line, match, re))
+        return MWLinkerMap::Error::RegexFail;
+      ++line_number;
+
+      auto node = std::make_unique<NodeNotFound>(match.str(1));
+
+      MWLinkerMap::LinkMap::NodeBase* parent = hierarchy_history[prev_level];
+      // It shouldn't be possible to have children, so it is not recorded in the hierarchy history.
+      node->parent = parent;
+      parent->children.push_back(std::move(node));
     }
     else
     {
-      static const std::regex re("(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.+)?$");
+      static const std::regex re("^ +(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.+)?$");
       if (!std::regex_search(line, match, re))
         return MWLinkerMap::Error::RegexFail;
 
-      curr_level = std::stol(match.str(1));
+      int curr_level = std::stol(match.str(1));
       if (curr_level - 1 > prev_level)
         return MWLinkerMap::Error::LinkMapLayerSkip;
       ++line_number;
@@ -175,7 +181,7 @@ MWLinkerMap::Error MWLinkerMap::LinkMap::ReadLines(std::vector<std::string>& lin
       auto node = std::make_unique<NodeNormal>(match.str(2), match.str(3), match.str(4),
                                                match.str(5), match.str(6));
 
-      if (line_number < lines.size() && BasicStringContains(lines[line_number], ">>>"))
+      if (line_number < lines.size() && BasicStringContains(lines[line_number], "] >>>"))
       {
         if (const auto err = node->ReadLinesUnrefDups(lines, line_number, curr_level);
             err != MWLinkerMap::Error::None)
@@ -186,13 +192,12 @@ MWLinkerMap::Error MWLinkerMap::LinkMap::ReadLines(std::vector<std::string>& lin
       hierarchy_history[curr_level] = node.get();
       node->parent = parent;
       parent->children.push_back(std::move(node));
+      prev_level = curr_level;
     }
-
-    prev_level = curr_level;
   }
 
   if (this->root.children.size() > 0)
-    if (this->root.children.front()->name != entry_point_name)
+    if (this->root.children.front()->name != this->entry_point_name)
       return MWLinkerMap::Error::LinkMapEntryPointNameMismatch;
 
   return MWLinkerMap::Error::None;
@@ -204,7 +209,7 @@ MWLinkerMap::LinkMap::NodeNormal::ReadLinesUnrefDups(std::vector<std::string>& l
 {
   std::smatch match;
   {
-    static const std::regex re("(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)$");
+    static const std::regex re("^ +(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)$");
     if (!std::regex_search(lines[line_number], match, re))
       return MWLinkerMap::Error::RegexFail;
     if (std::stol(match.str(1)) != curr_level)
@@ -218,19 +223,20 @@ MWLinkerMap::LinkMap::NodeNormal::ReadLinesUnrefDups(std::vector<std::string>& l
       BasicStringContains(lines[line_number], '\0')) [[unlikely]]
     return MWLinkerMap::Error::LinkMapUnrefDupsEmpty;
 
-  for (; line_number < lines.size(); ++line_number)
+  while (line_number < lines.size())
   {
     std::string& line = lines[line_number];
     if (line.empty() || BasicStringContains(line, '\0')) [[unlikely]]
-      return MWLinkerMap::Error::None;
-    if (!BasicStringContains(line, ">>>"))  // End of UNREFERENCED DUPLICATEs
-      return MWLinkerMap::Error::None;
+      break;
+    if (!BasicStringContains(line, "] >>>"))  // End of UNREFERENCED DUPLICATEs
+      break;
 
-    static const std::regex re("(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.+)?$");
+    static const std::regex re("^ +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.+)?$");
     if (!std::regex_search(line, match, re))
       return MWLinkerMap::Error::RegexFail;
     if (std::stol(match.str(1)) != curr_level)
       return MWLinkerMap::Error::LinkMapUnrefDupsLevelMismatch;
+    ++line_number;
 
     this->unref_dups.emplace_back(match.str(2), match.str(3), match.str(4), match.str(5));
   }
@@ -241,7 +247,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines(std::vector<std::string
                                                          std::size_t& line_number)
 {
   std::smatch match;
-  static const std::regex re("(.+) section layout$");
+  static const std::regex re("^(.+) section layout$");
   if (!std::regex_search(lines[line_number], match, re))
     return MWLinkerMap::Error::RegexFail;
   ++line_number;
@@ -331,8 +337,8 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines3Column(std::vector<std:
         return MWLinkerMap::Error::RegexFail;
 
       this->m_units.push_back(std::make_unique<UnitNormal>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, stoul(match.str(4)),
-          match.str(5), match.str(6), match.str(7)));
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
+          std::stoul(match.str(4)), match.str(5), match.str(6), match.str(7)));
     }
   }
   return MWLinkerMap::Error::None;
@@ -377,7 +383,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines4Column(std::vector<std:
 
       this->m_units.push_back(std::make_unique<UnitFill>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-          stoul(match.str(5))));
+          std::stoul(match.str(5))));
     }
     else
     {
@@ -388,7 +394,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadLines4Column(std::vector<std:
 
       this->m_units.push_back(std::make_unique<UnitNormal>(
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-          stoul(match.str(5)), match.str(6), match.str(7), match.str(8)));
+          std::stoul(match.str(5)), match.str(6), match.str(7), match.str(8)));
     }
   }
   return MWLinkerMap::Error::None;
@@ -475,7 +481,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadLines5Column(std::vector<std::str
 MWLinkerMap::Error MWLinkerMap::LinkerGeneratedSymbols::ReadLines(std::vector<std::string>& lines,
                                                                   std::size_t& line_number)
 {
-  ++line_number;  // Already know this line says "Linker generated symbols:"
+  ++line_number;  // We already know this line says "Linker generated symbols:"
 
   std::smatch match;
   for (; line_number < lines.size(); ++line_number)

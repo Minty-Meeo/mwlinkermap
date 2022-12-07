@@ -37,7 +37,7 @@ struct MWLinkerMap
   {
     struct NodeBase
     {
-      NodeBase() = default;
+      NodeBase() = default;  // Necessary for root node
       NodeBase(std::string name_) : name(std::move(name_)){};
       virtual ~NodeBase() = default;
 
@@ -46,11 +46,11 @@ struct MWLinkerMap
 
       std::string name;
     };
+
     struct NodeNormal final : NodeBase
     {
       struct UnreferencedDuplicate
       {
-        UnreferencedDuplicate() = default;
         UnreferencedDuplicate(std::string type_, std::string bind_, std::string module_,
                               std::string file_)
             : type(std::move(type_)), bind(std::move(bind_)), module(std::move(module_)),
@@ -62,7 +62,6 @@ struct MWLinkerMap
         std::string file;
       };
 
-      NodeNormal() = default;
       NodeNormal(std::string name_, std::string type_, std::string bind_, std::string module_,
                  std::string file_)
           : NodeBase(std::move(name_)), type(std::move(type_)), bind(std::move(bind_)),
@@ -77,18 +76,27 @@ struct MWLinkerMap
       std::string file;
       std::list<UnreferencedDuplicate> unref_dups;
     };
+
     struct NodeLinkerGenerated final : NodeBase
     {
-      NodeLinkerGenerated() = default;
       NodeLinkerGenerated(std::string name_) : NodeBase(std::move(name_)){};
       virtual ~NodeLinkerGenerated() = default;
     };
+
+    struct NodeNotFound final : NodeBase
+    {
+      NodeNotFound(std::string name_) : NodeBase(std::move(name_)){};
+      virtual ~NodeNotFound() = default;
+    };
+
+    // TODO: ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s"
 
     LinkMap() = default;
     virtual ~LinkMap() = default;
 
     Error ReadLines(std::vector<std::string>&, std::size_t&);
 
+    std::string entry_point_name;
     NodeBase root;
   };
 
