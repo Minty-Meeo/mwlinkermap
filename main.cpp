@@ -7,17 +7,16 @@
 
 #include "MWLinkerMap.h"
 
-int main(const int argc, const char** argv)
+void tempfunc(const char* name)
 {
-  if (argc != 2)
-  {
-    std::cout << "Provide the name" << std::endl;
-    return 1;
-  }
+  std::cout << name << std::endl;
 
-  std::ifstream infile(argv[1]);
+  std::ifstream infile(name);
   if (!infile.is_open())
-    return 1;
+  {
+    std::cout << "Could not open!" << std::endl;
+    return;
+  }
 
   MWLinkerMap linker_map;
   std::size_t line_number;
@@ -33,8 +32,19 @@ int main(const int argc, const char** argv)
 #endif
   err = linker_map.ReadStream(stream, line_number);
 
-
   std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(err) << std::endl;
+}
+
+int main(const int argc, const char** argv)
+{
+  if (argc < 2)
+  {
+    std::cout << "Provide the name" << std::endl;
+    return 1;
+  }
+
+  for (int i = 1; i < argc; ++i)
+    tempfunc(argv[i]);
 
   return 0;
 }

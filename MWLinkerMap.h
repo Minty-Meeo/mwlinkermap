@@ -89,8 +89,6 @@ struct MWLinkerMap
       virtual ~NodeNotFound() = default;
     };
 
-    // TODO: ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s"
-
     LinkMap() = default;
     virtual ~LinkMap() = default;
 
@@ -100,8 +98,24 @@ struct MWLinkerMap
     NodeBase root;
   };
 
+  // TODO: This linker map part apparently existed since as late as 4.2 build 60320 (CodeWarrior for
+  // Nintendo GameCube 3.0).  What is it?
+  struct BranchIslands final : PartBase
+  {
+    BranchIslands() = default;
+    virtual ~BranchIslands() = default;
+
+    Error ReadLines(std::vector<std::string>&, std::size_t&);
+  };
+
   struct SectionLayout final : PartBase
   {
+    enum class Style
+    {
+      Pre_2_7,
+      Post_2_7,
+      LoZ_TP,
+    };
     struct UnitBase
     {
       virtual ~UnitBase() = default;
@@ -175,12 +189,14 @@ struct MWLinkerMap
     SectionLayout() = default;
     virtual ~SectionLayout() = default;
 
-    Error ReadLines(std::vector<std::string>&, std::size_t&);
+    Error ReadLines(std::vector<std::string>&, std::size_t&, bool = false);
     Error ReadLines3Column(std::vector<std::string>&, std::size_t&);
     Error ReadLines4Column(std::vector<std::string>&, std::size_t&);
+    Error ReadLinesLoZTP(std::vector<std::string>&, std::size_t&);
 
     std::list<std::unique_ptr<UnitBase>> m_units;
-    bool m_pre_2_7;  // TODO: was this the version it changed?
+    Style style;
+    bool m_pre_2_7;
   };
 
   struct MemoryMap final : PartBase
