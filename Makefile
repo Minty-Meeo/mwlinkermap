@@ -1,5 +1,5 @@
 CXX=g++
-CXX_FLAGS=-c -g -std=c++20 -fno-exceptions
+CXX_FLAGS=-c -g -O3 -std=c++20 -fno-exceptions
 
 all: main.o MWLinkerMap.o MWLinkerMap2.o
 	$(CXX) -o test main.o MWLinkerMap.o MWLinkerMap2.o

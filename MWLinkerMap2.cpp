@@ -51,9 +51,9 @@ auto MWLinkerMap2::Read(std::string::const_iterator head, const std::string::con
     this->m_pieces.push_back(std::move(piece));
   }
 
-  // Branch Islands second(?)
+  // TODO: Branch Islands
 
-  // Where tf are Mixed Mode Islands?
+  // TODO: Mixed Mode Islands
 
   while (head < tail)
   {
