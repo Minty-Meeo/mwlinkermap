@@ -95,11 +95,11 @@ auto MWLinkerMap2::Read(std::string::const_iterator head, const std::string::con
   }
   if (head < tail)
   {
-    // Some linker maps have padding to the next multiple of 32 bytes for... some reason.
-    // TODO: Why??
-    if (std::all_of(head, tail, [](const char c) { return c == '\0'; }))
-      this->m_null_padding = true;
-    else
+    // Gamecube ISO Tool is a tool that can extract and rebuild *.GCM images. This tool has a bug
+    // that appends null byte padding to the next multiple of 32 bytes at the end of any file it
+    // extracts. During my research, I ran into a lot of linker maps afflicted by this bug, enough
+    // to justify a special case for it. http://www.wiibackupmanager.co.uk/gcit.html
+    if (std::any_of(head, tail, [](const char c) { return c != '\0'; }))
       return Error::GarbageFound;
   }
 

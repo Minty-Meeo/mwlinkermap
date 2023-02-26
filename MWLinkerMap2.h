@@ -289,5 +289,4 @@ struct MWLinkerMap2
   Error Read(std::istream&, std::size_t&);
 
   std::list<std::unique_ptr<PieceBase>> m_pieces;
-  bool m_null_padding = false;
 };
