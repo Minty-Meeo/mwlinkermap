@@ -6,6 +6,7 @@
 #include <string>
 
 #include "MWLinkerMap.h"
+#include "MWLinkerMap2.h"
 
 void tempfunc(const char* name)
 {
@@ -18,19 +19,11 @@ void tempfunc(const char* name)
     return;
   }
 
-  MWLinkerMap linker_map;
+  MWLinkerMap2 linker_map;
   std::size_t line_number;
-  MWLinkerMap::Error err;
+  MWLinkerMap2::Error err;
 
-  std::stringstream stream;
-  stream << infile.rdbuf();
-  infile.close();
-#ifndef _WIN32  // MWLDEPPC generates CRLF line endings, but *nix streams lack a Windows text mode
-  std::string temp = std::move(stream).str();
-  temp.erase(std::remove(temp.begin(), temp.end(), '\r'), temp.end());
-  stream.str(std::move(temp));
-#endif
-  err = linker_map.ReadStream(stream, line_number);
+  err = linker_map.Read(infile, line_number);
 
   std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(err) << std::endl;
 }
