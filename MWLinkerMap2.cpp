@@ -19,15 +19,30 @@ auto MWLinkerMap2::Read(std::istream& stream, std::size_t& line_number) -> Error
   return this->Read(string.begin(), string.end(), line_number);
 }
 
+static const std::regex re_link_map_header{
+    "Link map of (.+)\r\n"};  ///////////////////////////////////////
+//  "Link map of %s\r\n"  ///////////////////////////////////////////
+static const std::regex re_linktime_size_increasing_optimizations_header{
+    "\r\nLinktime size-increasing optimizations\r\n"};  /////////////
+//  "\r\nLinktime size-increasing optimizations\r\n"  ///////////////
+static const std::regex re_linktime_size_decreasing_optimizations_header{
+    "\r\nLinktime size-decreasing optimizations\r\n"};  /////////////
+//  "\r\nLinktime size-decreasing optimizations\r\n"  ///////////////
 static const std::regex re_mixed_mode_islands_header{
     "\r\nMixed Mode Islands\r\n"};  /////////////////////////////////
-//  "" TODO
+//  "\r\nMixed Mode Islands\r\n"  ///////////////////////////////////
 static const std::regex re_branch_islands_header{
     "\r\nBranch Islands\r\n"};  /////////////////////////////////////
-//  "" TODO
+//  "\r\nBranch Islands\r\n"  ///////////////////////////////////////
 static const std::regex re_section_layout_header{
     "\r\n\r\n(.+) section layout\r\n"};  ////////////////////////////
 //  "\r\n\r\n%s section layout\r\n"  ////////////////////////////////
+static const std::regex re_section_layout_header_modified_a{
+    "\r\n(.+) section layout\r\n"};  ////////////////////////////////
+//  "\r\n%s section layout\r\n"  ////////////////////////////////////
+static const std::regex re_section_layout_header_modified_b{
+    "(.+) section layout\r\n"};  ////////////////////////////////////
+//  "%s section layout\r\n"  ////////////////////////////////////////
 static const std::regex re_memory_map_header{
     "\r\n\r\nMemory map:\r\n"};  ////////////////////////////////////
 //  "\r\n\r\nMemory map:\r\n"  //////////////////////////////////////
@@ -42,8 +57,15 @@ auto MWLinkerMap2::Read(std::string::const_iterator head, const std::string::con
   DECLARE_DEBUG_STRING_VIEW;
   line_number = 0;
 
+  if (std::regex_search(head, tail, match, re_link_map_header,
+                        std::regex_constants::match_continuous))
   {
-    auto piece = std::make_unique<LinkMap>();
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+
+    // Normally this would always be present; its absence would be an early sign that the file is
+    // not a MetroWerks linker map. However, I have elected to support certain modified linker maps
+    // from retail games that are almost on-spec but are missing the Link Map portion.
+    auto piece = std::make_unique<LinkMap>(match.str(1));
     const auto error = piece->Read(head, tail, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
@@ -51,23 +73,81 @@ auto MWLinkerMap2::Read(std::string::const_iterator head, const std::string::con
     this->m_pieces.push_back(std::move(piece));
   }
 
-  // TODO: Branch Islands
+  if (std::regex_search(head, tail, match, re_linktime_size_increasing_optimizations_header,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    // TODO
+  }
+  if (std::regex_search(head, tail, match, re_linktime_size_decreasing_optimizations_header,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    // TODO
+  }
 
-  // TODO: Mixed Mode Islands
+  if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    // TODO
+  }
+  if (std::regex_search(head, tail, match, re_branch_islands_header,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    // TODO
+  }
 
   while (head < tail)
   {
-    if (!std::regex_search(head, tail, match, re_section_layout_header,
-                           std::regex_constants::match_continuous))
-      break;
-    line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      if (std::regex_search(head, tail, match, re_section_layout_header,
+                            std::regex_constants::match_continuous))
+      {
+      line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
-    auto piece = std::make_unique<SectionLayout>(match.str(1));
-    const auto error = piece->Read(head, tail, line_number);
-    UPDATE_DEBUG_STRING_VIEW;
-    if (error != Error::None)
-      return error;
-    this->m_pieces.push_back(std::move(piece));
+      auto piece = std::make_unique<SectionLayout>(match.str(1));
+      const auto error = piece->Read(head, tail, line_number);
+      UPDATE_DEBUG_STRING_VIEW;
+      if (error != Error::None)
+        return error;
+      this->m_pieces.push_back(std::move(piece));
+      continue;
+      }
+      if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
+                            std::regex_constants::match_continuous))
+      {
+      line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+
+      // Linker maps from Animal Crossing (foresta.map and static.map) and Doubutsu no Mori e+
+      // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
+      // modified to strip out the Link Map portion and UNUSED symbols, though the way it was done
+      // also removed one of the Section Layout header's preceding newlines.
+      auto piece = std::make_unique<SectionLayout>(match.str(1));
+      const auto error = piece->Read(head, tail, line_number);
+      UPDATE_DEBUG_STRING_VIEW;
+      if (error != Error::None)
+        return error;
+      this->m_pieces.push_back(std::move(piece));
+      continue;
+      }
+      if (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
+                            std::regex_constants::match_continuous))
+      {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+
+      // Linker maps from Doubutsu no Mori + (foresta.map2 and static.map2) are modified similarly
+      // to their counterparts in Doubutsu no Mori e+, though now with no preceding newlines. The
+      // unmodified linker maps were also left on the disc, so maybe just use those instead?
+      auto piece = std::make_unique<SectionLayout>(match.str(1));
+      const auto error = piece->Read(head, tail, line_number);
+      UPDATE_DEBUG_STRING_VIEW;
+      if (error != Error::None)
+        return error;
+      this->m_pieces.push_back(std::move(piece));
+      continue;
+      }
+      break;
   }
   if (std::regex_search(head, tail, match, re_memory_map_header,
                         std::regex_constants::match_continuous))
@@ -106,21 +186,54 @@ auto MWLinkerMap2::Read(std::string::const_iterator head, const std::string::con
   return Error::None;
 }
 
-static const std::regex re_link_map_header{
-    "Link map of (.+)\r\n"};  ///////////////////////////////////////
-//  "Link map of %s\r\n"  ///////////////////////////////////////////
 static const std::regex re_link_map_node_normal{
-    " +(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  //
-//  "%s (%s,%s) found in %s %s\r\n"  ///////////////////////////////
-static const std::regex re_link_map_unit_normal_unref_dup_header{
-    " +(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)\r\n"};  ///////////
-//  ">>> UNREFERENCED DUPLICATE %s\r\n"  ///////////////////////////
-static const std::regex re_link_map_unit_normal_unref_dups{
-    " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  ///
-//  ">>> (%s,%s) found in %s %s\r\n"  //////////////////////////////
+    " +(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  /////////////
+//  "%s (%s,%s) found in %s %s\r\n"  //////////////////////////////////////////
+static const std::regex re_link_map_node_normal_unref_dup_header{
+    " +(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)\r\n"};  //////////////////////
+//  ">>> UNREFERENCED DUPLICATE %s\r\n"  //////////////////////////////////////
+static const std::regex re_link_map_node_normal_unref_dups{
+    " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  //////////////
+//  ">>> (%s,%s) found in %s %s\r\n"  /////////////////////////////////////////
 static const std::regex re_link_map_node_linker_generated{
-    " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};  /////
-//  "%s found as linker generated symbol\r\n"  /////////////////////
+    " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};  ////////////////
+//  "%s found as linker generated symbol\r\n"  ////////////////////////////////
+static const std::regex re_link_map_node_not_found{
+    ">>> SYMBOL NOT FOUND: (.+)\r\n"};  ///////////////////////////////////////
+//  ">>> SYMBOL NOT FOUND: %s\r\n"  ///////////////////////////////////////////
+static const std::regex re_link_map_node_excluded{
+    ">>> EXCLUDED SYMBOL (.+) \\((.+),(.+)\\) found in (.+) (.+)\r\n"};  //////
+//  ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s\r\n"  //////////////////////
+static const std::regex re_link_map_unit_duplicate{
+    "--> duplicated code: symbol (.+) is duplicated by (.+), size = (\\d+) \r\n\r\n"};
+//  "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
+static const std::regex re_link_map_unit_replace{
+    "--> the function (.+) will be replaced by a branch to (.+)\r\n\r\n\r\n"};
+//  "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"  /////
+static const std::regex re_link_map_unit_interchange{
+    "--> the function (.+) was interchanged with (.+), size=(\\d+) \r\n"};  ///
+//  "--> the function %s was interchanged with %s, size=%d \r\n"  /////////////
+static const std::regex re_link_map_unit_code_fold{
+    "\r\n\r\n\r\nCode folded in file: (.+) \r\n"};  ///////////////////////////
+//  "\r\n\r\n\r\nCode folded in file: %s \r\n"  ///////////////////////////////
+static const std::regex re_link_map_unit_code_fold_duplicate{
+    "--> (.+) is duplicated by (.+), size = (\\d+) \r\n\r\n"};  ///////////////
+//  "--> %s is duplicated by %s, size = %d \r\n\r\n"  /////////////////////////
+static const std::regex re_link_map_unit_code_fold_duplicate_new_branch{
+    "--> (.+) is duplicated by (.+), size = (\\d+), new branch function (.+) \r\n\r\n"};
+//  "--> %s is duplicated by %s, size = %d, new branch function %s \r\n\r\n"
+static const std::regex re_link_map_unit_code_fold_address_range{
+    "  (.+)/ (.+)\\(\\)/ (.+) - address not in near addressing range \r\n"};
+//  "  %s/ %s()/ %s - address not in near addressing range \r\n"  /////////////
+static const std::regex re_link_map_unit_code_fold_address_not_computed{
+    "  (.+)/ (.+)\\(\\)/ (.+) - final address not yet computed \r\n"};  ///////
+//  "  %s/ %s()/ %s - final address not yet computed \r\n"  ///////////////////
+static const std::regex re_link_map_unit_code_fold_address_optimize{
+    "! (.+)/ (.+)\\(\\)/ (.+) - optimized addressing \r\n"};  /////////////////
+//  "! %s/ %s()/ %s - optimized addressing \r\n"  /////////////////////////////
+static const std::regex re_link_map_unit_code_fold_disassemble_error{
+    "  (.+)/ (.+)\\(\\) - error disassembling function \r\n"};  ///////////////
+//  "  %s/ %s() - error disassembling function \r\n"  /////////////////////////
 
 auto MWLinkerMap2::LinkMap::Read(std::string::const_iterator& head,
                                  const std::string::const_iterator tail, std::size_t& line_number)
@@ -128,13 +241,6 @@ auto MWLinkerMap2::LinkMap::Read(std::string::const_iterator& head,
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
-
-  if (!std::regex_search(head, tail, match, re_link_map_header,
-                         std::regex_constants::match_continuous))
-    return Error::Fail;
-  line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-  this->entry_point_name = match.str(1);
 
   int prev_level = 0;
   std::map<int, NodeBase*> hierarchy_history = {std::make_pair(prev_level, &this->root)};
@@ -152,7 +258,7 @@ auto MWLinkerMap2::LinkMap::Read(std::string::const_iterator& head,
       auto node = std::make_unique<NodeNormal>(match.str(2), match.str(3), match.str(4),
                                                match.str(5), match.str(6));
 
-      if (std::regex_search(head, tail, match, re_link_map_unit_normal_unref_dup_header,
+      if (std::regex_search(head, tail, match, re_link_map_node_normal_unref_dup_header,
                             std::regex_constants::match_continuous))
       {
         if (std::stol(match.str(1)) != curr_level)
@@ -163,7 +269,7 @@ auto MWLinkerMap2::LinkMap::Read(std::string::const_iterator& head,
 
         while (head < tail)
         {
-          if (!std::regex_search(head, tail, match, re_link_map_unit_normal_unref_dups,
+          if (!std::regex_search(head, tail, match, re_link_map_node_normal_unref_dups,
                                  std::regex_constants::match_continuous))
             break;
 
@@ -202,23 +308,110 @@ auto MWLinkerMap2::LinkMap::Read(std::string::const_iterator& head,
       prev_level = curr_level;
       continue;
     }
+    if (std::regex_search(head, tail, match, re_link_map_node_not_found,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+
+      auto node = std::make_unique<NodeNotFound>(match.str(1));
+
+      // Because no hierarchy level is given, it is impossible to be certain what the parent of a
+      // SYMBOL NOT FOUND is without analyzing code.  An indeterminate hierarchy is not a feature of
+      // a tree structure, though, so the best we can do is store it in the most recent parent.
+      // A SYMBOL NOT FOUND can never have children, so it is not recorded in the hierarchy history.
+      LinkMap::NodeBase* parent = hierarchy_history[prev_level];
+      node->parent = parent;
+      parent->children.push_back(std::move(node));
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_node_excluded,
+                          std::regex_constants::match_continuous))
+    {
+      // TODO: wtf is this
+      return Error::Unimplemented;
+      continue;
+    }
+    break;
+  }
+  while (head < tail)
+  {
+    if (std::regex_search(head, tail, match, re_link_map_unit_duplicate,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_unit_replace,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_unit_interchange,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_unit_code_fold,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 4, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_unit_code_fold_duplicate,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_unit_code_fold_duplicate_new_branch,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_unit_code_fold_address_range,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_unit_code_fold_address_not_computed,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_unit_code_fold_address_optimize,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_link_map_unit_code_fold_disassemble_error,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
     break;
   }
 
   return Error::None;
 }
 
-static const std::regex re_section_layout_3_column_prologue_a{
+static const std::regex re_section_layout_3_column_prologue_1{
     "  Starting        Virtual\r\n"};  ///////////////////////
-static const std::regex re_section_layout_3_column_prologue_b{
+static const std::regex re_section_layout_3_column_prologue_2{
     "  address  Size   address\r\n"};  ///////////////////////
-static const std::regex re_section_layout_3_column_prologue_c{
+static const std::regex re_section_layout_3_column_prologue_3{
     "  -----------------------\r\n"};  ///////////////////////
-static const std::regex re_section_layout_4_column_prologue_a{
+static const std::regex re_section_layout_4_column_prologue_1{
     "  Starting        Virtual  File\r\n"};  /////////////////
-static const std::regex re_section_layout_4_column_prologue_b{
+static const std::regex re_section_layout_4_column_prologue_2{
     "  address  Size   address  offset\r\n"};  ///////////////
-static const std::regex re_section_layout_4_column_prologue_c{
+static const std::regex re_section_layout_4_column_prologue_3{
     "  ---------------------------------\r\n"};  /////////////
 
 auto MWLinkerMap2::SectionLayout::Read(std::string::const_iterator& head,
@@ -228,15 +421,15 @@ auto MWLinkerMap2::SectionLayout::Read(std::string::const_iterator& head,
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_a,
+  if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_1,
                         std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_b,
+    if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_c,
+      if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_3,
                             std::regex_constants::match_continuous))
       {
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -252,15 +445,15 @@ auto MWLinkerMap2::SectionLayout::Read(std::string::const_iterator& head,
       return Error::SectionLayoutBadHeader;
     }
   }
-  else if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_a,
+  else if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_1,
                              std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_b,
+    if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_c,
+      if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_3,
                             std::regex_constants::match_continuous))
       {
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -344,8 +537,11 @@ static const std::regex re_section_layout_4_column_unit_entry{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})    (.+) \\(entry of (.+)\\) \t(.+) "
     "(.+)?\r\n"};
 
-static const std::regex re_section_layout_4_column_unit_fill{
+static const std::regex re_section_layout_4_column_unit_fill_a{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) \\*fill\\*\r\n"};
+
+static const std::regex re_section_layout_4_column_unit_fill_b{
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) \\*\\*fill\\*\\*\r\n"};
 
 auto MWLinkerMap2::SectionLayout::Read4Column(std::string::const_iterator& head,
                                               const std::string::const_iterator tail,
@@ -373,12 +569,21 @@ auto MWLinkerMap2::SectionLayout::Read4Column(std::string::const_iterator& head,
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_fill,
+    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_fill_a,
                           std::regex_constants::match_continuous))
     {
       this->m_units.push_back(std::make_unique<UnitFill>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-          std::stoul(match.str(5))));
+          std::stoul(match.str(5)), false));
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_fill_b,
+                          std::regex_constants::match_continuous))
+    {
+      this->m_units.push_back(std::make_unique<UnitFill>(  //
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
+          std::stoul(match.str(5)), true));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
@@ -396,16 +601,22 @@ auto MWLinkerMap2::SectionLayout::Read4Column(std::string::const_iterator& head,
   return Error::None;
 }
 
-static const std::regex re_memory_map_2_column_prologue_a{
+static const std::regex re_memory_map_3_column_prologue_1a{
     "                   Starting Size     File\r\n"};  ////////////////////////
 //  "                   Starting Size     File\r\n"  //////////////////////////
-static const std::regex re_memory_map_2_column_prologue_b{
+static const std::regex re_memory_map_3_column_prologue_2a{
     "                   address           Offset\r\n"};
 //  "                   address           Offset\r\n"
-static const std::regex re_memory_map_4_column_prologue_a{
+static const std::regex re_memory_map_3_column_prologue_1b{
+    "                       Starting Size     File\r\n"};  ////////////////////
+//  "                       Starting Size     File\r\n"  //////////////////////
+static const std::regex re_memory_map_3_column_prologue_2b{
+    "                       address           Offset\r\n"};  //////////////////
+//  "                       address           Offset\r\n"  ////////////////////
+static const std::regex re_memory_map_5_column_prologue_1{
     "                   Starting Size     File     ROM      RAM Buffer\r\n"};
 //  "                   Starting Size     File     ROM      RAM Buffer\r\n"  //
-static const std::regex re_memory_map_4_column_prologue_b{
+static const std::regex re_memory_map_5_column_prologue_2{
     "                   address           Offset   Address  Address\r\n"};  ///
 //  "                   address           Offset   Address  Address\r\n"  /////
 
@@ -416,11 +627,11 @@ auto MWLinkerMap2::MemoryMap::Read(std::string::const_iterator& head,
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  if (std::regex_search(head, tail, match, re_memory_map_2_column_prologue_a,
+  if (std::regex_search(head, tail, match, re_memory_map_3_column_prologue_1a,
                         std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_memory_map_2_column_prologue_b,
+    if (std::regex_search(head, tail, match, re_memory_map_3_column_prologue_2a,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -432,11 +643,28 @@ auto MWLinkerMap2::MemoryMap::Read(std::string::const_iterator& head,
       return Error::MemoryMapBadPrologue;
     }
   }
-  else if (std::regex_search(head, tail, match, re_memory_map_4_column_prologue_a,
+  else if (std::regex_search(head, tail, match, re_memory_map_3_column_prologue_1b,
                              std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_memory_map_4_column_prologue_b,
+    if (std::regex_search(head, tail, match, re_memory_map_3_column_prologue_2b,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      this->m_extra_info = false;
+      this->SetMinVersion(LDVersion::version_4_2_build_142);
+      return Read3Column(head, tail, line_number);
+    }
+    else
+    {
+      return Error::MemoryMapBadPrologue;
+    }
+  }
+  else if (std::regex_search(head, tail, match, re_memory_map_5_column_prologue_1,
+                             std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    if (std::regex_search(head, tail, match, re_memory_map_5_column_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -454,12 +682,18 @@ auto MWLinkerMap2::MemoryMap::Read(std::string::const_iterator& head,
   }
 }
 
-static const std::regex re_memory_map_unit_allocated{
+static const std::regex re_memory_map_unit_allocated_a{
     "   *(.+)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  //////////////
 //  "  %15s  %08x %08x %08x\r\n"  /////////////////////////////////////////////
-static const std::regex re_memory_map_unit_info{
+static const std::regex re_memory_map_unit_info_a{
     "   *(.+)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r\n"};  /////////////////
 //  "  %15s           %06x %08x\r\n"  /////////////////////////////////////////
+static const std::regex re_memory_map_unit_allocated_b{
+    "   *(.+) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  ///////////////
+//  "  %20s %08x %08x %08x\r\n"  //////////////////////////////////////////////
+static const std::regex re_memory_map_unit_info_b{
+    "   *(.+)          ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  /////////////////
+//  "  %20s          %08x %08x\r\n"
 
 auto MWLinkerMap2::MemoryMap::Read3Column(std::string::const_iterator& head,
                                           const std::string::const_iterator tail,
@@ -470,7 +704,7 @@ auto MWLinkerMap2::MemoryMap::Read3Column(std::string::const_iterator& head,
 
   while (head < tail)
   {
-    if (std::regex_search(head, tail, match, re_memory_map_unit_allocated,
+    if (std::regex_search(head, tail, match, re_memory_map_unit_allocated_a,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -478,7 +712,27 @@ auto MWLinkerMap2::MemoryMap::Read3Column(std::string::const_iterator& head,
           match.str(1), xstoul(match.str(3)), xstoul(match.str(4)), xstoul(match.str(2)), 0, 0));
       continue;
     }
-    if (std::regex_search(head, tail, match, re_memory_map_unit_info,
+    if (std::regex_search(head, tail, match, re_memory_map_unit_info_a,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      this->m_units.push_back(std::make_unique<UnitInfo>(  //
+          match.str(1), xstoul(match.str(2)), xstoul(match.str(3))));
+      continue;
+    }
+    break;
+  }
+  while (head < tail)
+  {
+    if (std::regex_search(head, tail, match, re_memory_map_unit_allocated_b,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      this->m_units.push_back(std::make_unique<UnitAllocated>(  //
+          match.str(1), xstoul(match.str(3)), xstoul(match.str(4)), xstoul(match.str(2)), 0, 0));
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_memory_map_unit_info_b,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;

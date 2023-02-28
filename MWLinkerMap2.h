@@ -54,7 +54,10 @@ struct MWLinkerMap2
     PieceBase() = default;
     virtual ~PieceBase() = default;
 
-    void SetMinVersion(LDVersion version) { m_min_version = std::max(m_min_version, version); }
+    void SetMinVersion(const LDVersion version)
+    {
+      m_min_version = std::max(m_min_version, version);
+    }
 
     LDVersion m_min_version = LDVersion::version_2_3_3_build_126;
   };
@@ -113,7 +116,7 @@ struct MWLinkerMap2
       virtual ~NodeNotFound() = default;
     };
 
-    LinkMap() = default;
+    LinkMap(std::string entry_point_name_) : entry_point_name(entry_point_name_){};
     virtual ~LinkMap() = default;
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
@@ -186,9 +189,9 @@ struct MWLinkerMap2
     struct UnitFill final : UnitBase
     {
       UnitFill(std::uint32_t saddress_, std::uint32_t size_, std::uint32_t vaddress_,
-               std::uint32_t foffset_, std::uint32_t alignment_)
+               std::uint32_t foffset_, std::uint32_t alignment_, bool emphasized_)
           : saddress(saddress_), size(size_), vaddress(vaddress_), foffset(foffset_),
-            alignment(alignment_){};
+            alignment(alignment_), emphasized(emphasized_){};
       virtual ~UnitFill() = default;
 
       std::uint32_t saddress;
@@ -196,6 +199,7 @@ struct MWLinkerMap2
       std::uint32_t vaddress;
       std::uint32_t foffset;
       std::uint32_t alignment;
+      bool emphasized;
     };
 
     SectionLayout(std::string name_) : name(std::move(name_)){};
