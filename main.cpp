@@ -6,7 +6,6 @@
 #include <string>
 
 #include "MWLinkerMap.h"
-#include "MWLinkerMap2.h"
 
 void tempfunc(const char* name)
 {
