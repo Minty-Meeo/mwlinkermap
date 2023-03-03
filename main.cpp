@@ -18,13 +18,13 @@ void tempfunc(const char* name)
     return;
   }
 
-  MWLinkerMap2 linker_map;
+  MWLinkerMap linker_map;
   std::size_t line_number;
-  MWLinkerMap2::Error err;
+  MWLinkerMap::Error error;
 
-  err = linker_map.Read(infile, line_number);
+  error = linker_map.Read(infile, line_number);
 
-  std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(err) << std::endl;
+  std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(error) << std::endl;
 }
 
 int main(const int argc, const char** argv)
