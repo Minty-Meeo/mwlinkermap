@@ -16,14 +16,16 @@ struct MWLinkerMap2
 
     RegexFail,
 
-    LinkMapLayerSkip,
-    LinkMapUnrefDupsLevelMismatch,
-    LinkMapUnrefDupsNameMismatch,
-    LinkMapUnrefDupsEmpty,
+    LinkTreeLayerSkip,
+    LinkTreeUnrefDupsLevelMismatch,
+    LinkTreeUnrefDupsNameMismatch,
+    LinkTreeUnrefDupsEmpty,
 
     SectionLayoutBadHeader,
 
     MemoryMapBadPrologue,
+
+    SymbolNotFound,
   };
 
   enum class LDVersion
@@ -62,7 +64,7 @@ struct MWLinkerMap2
     LDVersion m_min_version = LDVersion::version_2_3_3_build_126;
   };
 
-  struct LinkMap final : PieceBase
+  struct LinkTree final : PieceBase
   {
     struct NodeBase
     {
@@ -97,6 +99,9 @@ struct MWLinkerMap2
             module(std::move(module_)), file(std::move(file_)){};
       virtual ~NodeNormal() = default;
 
+      Error ReadUnrefDups(std::string::const_iterator&, const std::string::const_iterator, int,
+                          std::size_t&);
+
       std::string type;
       std::string bind;
       std::string module;
@@ -110,19 +115,33 @@ struct MWLinkerMap2
       virtual ~NodeLinkerGenerated() = default;
     };
 
-    struct NodeNotFound final : NodeBase
-    {
-      NodeNotFound(std::string name_) : NodeBase(std::move(name_)){};
-      virtual ~NodeNotFound() = default;
-    };
+    LinkTree() = default;
+    virtual ~LinkTree() = default;
 
-    LinkMap(std::string entry_point_name_) : entry_point_name(entry_point_name_){};
-    virtual ~LinkMap() = default;
+    Error Read(std::string::const_iterator&, std::string::const_iterator, std::list<std::string>&,
+               std::size_t&);
+    Error Read2(std::string::const_iterator&, const std::string::const_iterator, NodeBase*, int,
+                std::size_t&);
+
+    NodeBase root;
+  };
+
+  struct EPPC_PatternMatching final : PieceBase
+  {
+    EPPC_PatternMatching() = default;
+    virtual ~EPPC_PatternMatching() = default;
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+    Error ReadAnalysis(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+    Error ReadSummary(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+  };
 
-    std::string entry_point_name;
-    NodeBase root;
+  struct LinkerOpts final : PieceBase
+  {
+    LinkerOpts() = default;
+    virtual ~LinkerOpts() = default;
+
+    Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
   };
 
   struct SectionLayout final : PieceBase
@@ -292,5 +311,7 @@ struct MWLinkerMap2
   Error Read(std::string::const_iterator, std::string::const_iterator, std::size_t&);
   Error Read(std::istream&, std::size_t&);
 
+  std::string entry_point_name;
+  std::list<std::string> m_unresolved_symbols;
   std::list<std::unique_ptr<PieceBase>> m_pieces;
 };
