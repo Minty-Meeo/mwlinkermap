@@ -64,8 +64,8 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
   line_number = 0;
 
   // Normally this would always be present; its absence would be an early sign that the file is
-  // not a MetroWerks linker map. However, I have elected to support certain modified linker maps
-  // from retail games that are almost on-spec but are missing it.
+  // not a MetroWerks linker map. However, I have decided to support certain modified linker maps
+  // that are almost on-spec but are missing this portion, among other things.
   if (std::regex_search(head, tail, match, re_entry_point_name,
                         std::regex_constants::match_continuous))
   {
@@ -85,22 +85,22 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
     break;
   }
   {
-    auto piece = std::make_unique<LinkTree>();
-    const auto error = piece->Read(head, tail, this->m_unresolved_symbols, line_number);
+    auto portion = std::make_unique<LinkTree>();
+    const auto error = portion->Read(head, tail, this->m_unresolved_symbols, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
     // TODO: don't add empty ones
-    this->m_pieces.push_back(std::move(piece));
+    this->m_portions.push_back(std::move(portion));
   }
   {
-    auto piece = std::make_unique<EPPC_PatternMatching>();
-    const auto error = piece->Read(head, tail, line_number);
+    auto portion = std::make_unique<EPPC_PatternMatching>();
+    const auto error = portion->Read(head, tail, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
     // TODO: don't add empty ones
-    this->m_pieces.push_back(std::move(piece));
+    this->m_portions.push_back(std::move(portion));
   }
   while (head < tail)
   {
@@ -116,27 +116,14 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
     break;
   }
   {
-    auto piece = std::make_unique<LinkerOpts>();
-    const auto error = piece->Read(head, tail, line_number);
+    auto portion = std::make_unique<LinkerOpts>();
+    const auto error = portion->Read(head, tail, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
     // TODO: don't add empty ones
-    this->m_pieces.push_back(std::move(piece));
+    this->m_portions.push_back(std::move(portion));
   }
-  if (std::regex_search(head, tail, match, re_linktime_size_increasing_optimizations_header,
-                        std::regex_constants::match_continuous))
-  {
-    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    // TODO
-  }
-  if (std::regex_search(head, tail, match, re_linktime_size_decreasing_optimizations_header,
-                        std::regex_constants::match_continuous))
-  {
-    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    // TODO
-  }
-
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
                         std::regex_constants::match_continuous))
   {
@@ -149,6 +136,18 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
     line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
     // TODO
   }
+  if (std::regex_search(head, tail, match, re_linktime_size_decreasing_optimizations_header,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    // TODO
+  }
+  if (std::regex_search(head, tail, match, re_linktime_size_increasing_optimizations_header,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    // TODO
+  }
   while (head < tail)
   {
     if (std::regex_search(head, tail, match, re_section_layout_header,
@@ -156,12 +155,12 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
     {
       line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
-      auto piece = std::make_unique<SectionLayout>(match.str(1));
-      const auto error = piece->Read(head, tail, line_number);
+      auto portion = std::make_unique<SectionLayout>(match.str(1));
+      const auto error = portion->Read(head, tail, line_number);
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
         return error;
-      this->m_pieces.push_back(std::move(piece));
+      this->m_portions.push_back(std::move(portion));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
@@ -173,12 +172,12 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
       // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
       // modified to strip out the Link Map portion and UNUSED symbols, though the way it was done
       // also removed one of the Section Layout header's preceding newlines.
-      auto piece = std::make_unique<SectionLayout>(match.str(1));
-      const auto error = piece->Read(head, tail, line_number);
+      auto portion = std::make_unique<SectionLayout>(match.str(1));
+      const auto error = portion->Read(head, tail, line_number);
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
         return error;
-      this->m_pieces.push_back(std::move(piece));
+      this->m_portions.push_back(std::move(portion));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
@@ -189,12 +188,12 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
       // Linker maps from Doubutsu no Mori + (foresta.map2 and static.map2) are modified similarly
       // to their counterparts in Doubutsu no Mori e+, though now with no preceding newlines. The
       // unmodified linker maps were also left on the disc, so maybe just use those instead?
-      auto piece = std::make_unique<SectionLayout>(match.str(1));
-      const auto error = piece->Read(head, tail, line_number);
+      auto portion = std::make_unique<SectionLayout>(match.str(1));
+      const auto error = portion->Read(head, tail, line_number);
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
         return error;
-      this->m_pieces.push_back(std::move(piece));
+      this->m_portions.push_back(std::move(portion));
       continue;
     }
     break;
@@ -204,24 +203,24 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
   {
     line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
-    auto piece = std::make_unique<MemoryMap>();
-    const auto error = piece->Read(head, tail, line_number);
+    auto portion = std::make_unique<MemoryMap>();
+    const auto error = portion->Read(head, tail, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    this->m_pieces.push_back(std::move(piece));
+    this->m_portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_linker_generated_symbols_header,
                         std::regex_constants::match_continuous))
   {
     line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
-    auto piece = std::make_unique<LinkerGeneratedSymbols>();
-    const auto error = piece->Read(head, tail, line_number);
+    auto portion = std::make_unique<LinkerGeneratedSymbols>();
+    const auto error = portion->Read(head, tail, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    this->m_pieces.push_back(std::move(piece));
+    this->m_portions.push_back(std::move(portion));
   }
   if (head < tail)
   {

@@ -51,10 +51,10 @@ struct MWLinkerMap
     version_4_3_build_213,    // Wii 1.7                        (Sep  5 2011 13:02:03)
   };
 
-  struct PieceBase
+  struct PortionBase
   {
-    PieceBase() = default;
-    virtual ~PieceBase() = default;
+    PortionBase() = default;
+    virtual ~PortionBase() = default;
 
     void SetMinVersion(const LDVersion version)
     {
@@ -64,7 +64,7 @@ struct MWLinkerMap
     LDVersion m_min_version = LDVersion::version_2_3_3_build_126;
   };
 
-  struct LinkTree final : PieceBase
+  struct LinkTree final : PortionBase
   {
     struct NodeBase
     {
@@ -126,7 +126,7 @@ struct MWLinkerMap
     NodeBase root;
   };
 
-  struct EPPC_PatternMatching final : PieceBase
+  struct EPPC_PatternMatching final : PortionBase
   {
     EPPC_PatternMatching() = default;
     virtual ~EPPC_PatternMatching() = default;
@@ -136,7 +136,7 @@ struct MWLinkerMap
     Error ReadSummary(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
   };
 
-  struct LinkerOpts final : PieceBase
+  struct LinkerOpts final : PortionBase
   {
     LinkerOpts() = default;
     virtual ~LinkerOpts() = default;
@@ -144,7 +144,7 @@ struct MWLinkerMap
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
   };
 
-  struct SectionLayout final : PieceBase
+  struct SectionLayout final : PortionBase
   {
     struct UnitBase
     {
@@ -232,7 +232,7 @@ struct MWLinkerMap
     std::list<std::unique_ptr<UnitBase>> m_units;
   };
 
-  struct MemoryMap final : PieceBase
+  struct MemoryMap final : PortionBase
   {
     // TODO: make list of names of sections which are not allocated
     // .debug_srcinfo / .debug_sfnames / .debug / .line)
@@ -286,7 +286,7 @@ struct MWLinkerMap
     bool m_extra_info;  // TODO: What causes MWLD(EPPC) to emit this??
   };
 
-  struct LinkerGeneratedSymbols final : PieceBase
+  struct LinkerGeneratedSymbols final : PortionBase
   {
     struct Unit
     {
@@ -313,5 +313,5 @@ struct MWLinkerMap
 
   std::string entry_point_name;
   std::list<std::string> m_unresolved_symbols;
-  std::list<std::unique_ptr<PieceBase>> m_pieces;
+  std::list<std::unique_ptr<PortionBase>> m_portions;
 };
