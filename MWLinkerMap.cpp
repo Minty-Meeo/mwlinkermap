@@ -15,7 +15,12 @@ auto MWLinkerMap::Read(std::istream& stream, std::size_t& line_number) -> Error
 {
   std::stringstream sstream;
   sstream << stream.rdbuf();
-  std::string string = std::move(sstream).str();
+  const std::string string = std::move(sstream).str();
+  return this->Read(string, line_number);
+}
+
+auto MWLinkerMap::Read(const std::string& string, std::size_t& line_number) -> Error
+{
   return this->Read(string.begin(), string.end(), line_number);
 }
 
@@ -70,7 +75,8 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
                         std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->entry_point_name = match.str(1);
+    auto portion = std::make_unique<EntryPoint>(match.str(1));
+    this->portions.push_back(std::move(portion));  // TODO: emplace_back
   }
   while (head < tail)
   {
@@ -78,20 +84,20 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_unresolved_symbols.push_back(match.str(1));
+      this->unresolved_symbols.push_back(match.str(1));
       // TODO: min version if this is pre-printed
       continue;
     }
     break;
   }
   {
-    auto portion = std::make_unique<LinkTree>();
-    const auto error = portion->Read(head, tail, this->m_unresolved_symbols, line_number);
+    auto portion = std::make_unique<SymbolClosure>();
+    const auto error = portion->Read(head, tail, this->unresolved_symbols, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
     // TODO: don't add empty ones
-    this->m_portions.push_back(std::move(portion));
+    this->portions.push_back(std::move(portion));
   }
   {
     auto portion = std::make_unique<EPPC_PatternMatching>();
@@ -100,7 +106,7 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
     if (error != Error::None)
       return error;
     // TODO: don't add empty ones
-    this->m_portions.push_back(std::move(portion));
+    this->portions.push_back(std::move(portion));
   }
   while (head < tail)
   {
@@ -109,7 +115,7 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_unresolved_symbols.push_back(match.str(1));
+      this->unresolved_symbols.push_back(match.str(1));
       // TODO: min version if this is post-printed
       continue;
     }
@@ -122,7 +128,7 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
     if (error != Error::None)
       return error;
     // TODO: don't add empty ones
-    this->m_portions.push_back(std::move(portion));
+    this->portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
                         std::regex_constants::match_continuous))
@@ -160,7 +166,7 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
         return error;
-      this->m_portions.push_back(std::move(portion));
+      this->portions.push_back(std::move(portion));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
@@ -177,7 +183,7 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
         return error;
-      this->m_portions.push_back(std::move(portion));
+      this->portions.push_back(std::move(portion));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
@@ -193,7 +199,7 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
         return error;
-      this->m_portions.push_back(std::move(portion));
+      this->portions.push_back(std::move(portion));
       continue;
     }
     break;
@@ -208,7 +214,7 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    this->m_portions.push_back(std::move(portion));
+    this->portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_linker_generated_symbols_header,
                         std::regex_constants::match_continuous))
@@ -220,7 +226,7 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    this->m_portions.push_back(std::move(portion));
+    this->portions.push_back(std::move(portion));
   }
   if (head < tail)
   {
@@ -235,39 +241,39 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
   return Error::None;
 }
 
-static const std::regex re_link_tree_node_prefix{
+static const std::regex re_symbol_closure_node_prefix{
     " +(\\d+)] "};  ///////////////////////////////////////////////
 //  "%i] "
-static const std::regex re2_link_tree_node_normal{
+static const std::regex re2_symbol_closure_node_normal{
     "(.+) \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  /////////////
 //  "%s (%s,%s) found in %s %s\r\n"
-static const std::regex re2_link_tree_node_normal_unref_dup_header{
+static const std::regex re2_symbol_closure_node_normal_unref_dup_header{
     " +(\\d+)] >>> UNREFERENCED DUPLICATE (.+)\r\n"};  ////////////////////////
-static const std::regex re2_link_tree_node_normal_unref_dups{
+static const std::regex re2_symbol_closure_node_normal_unref_dups{
     " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  //////////////
 //  ">>> (%s,%s) found in %s %s\r\n"  /////////////////////////////////////////
-static const std::regex re2_link_tree_node_linker_generated{
+static const std::regex re2_symbol_closure_node_linker_generated{
     " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};  ////////////////
 //  "%s found as linker generated symbol\r\n"  ////////////////////////////////
 
-auto MWLinkerMap::LinkTree::Read2(std::string::const_iterator& head,
-                                  const std::string::const_iterator tail,
-                                  NodeBase* const parent_node, const int curr_level,
-                                  std::size_t& line_number) -> Error
+auto MWLinkerMap::SymbolClosure::Read2(std::string::const_iterator& head,
+                                       const std::string::const_iterator tail,
+                                       NodeBase* const parent_node, const int curr_level,
+                                       std::size_t& line_number) -> Error
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   while (head < tail)
   {
-    if (std::regex_search(head, tail, match, re_link_tree_node_prefix,
+    if (std::regex_search(head, tail, match, re_symbol_closure_node_prefix,
                           std::regex_constants::match_continuous))
     {
       const int next_level = std::stoi(match.str(1));
       if (next_level == curr_level)
       {
         const auto prefix_length = match.length();
-        if (std::regex_search(head + prefix_length, tail, match, re2_link_tree_node_normal,
+        if (std::regex_search(head + prefix_length, tail, match, re2_symbol_closure_node_normal,
                               std::regex_constants::match_continuous))
         {
           line_number += 1, head += prefix_length + match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -275,30 +281,30 @@ auto MWLinkerMap::LinkTree::Read2(std::string::const_iterator& head,
           auto node = std::make_unique<NodeNormal>(match.str(2), match.str(3), match.str(4),
                                                    match.str(5), match.str(6));
 
-          if (std::regex_search(head, tail, match, re2_link_tree_node_normal_unref_dup_header,
+          if (std::regex_search(head, tail, match, re2_symbol_closure_node_normal_unref_dup_header,
                                 std::regex_constants::match_continuous))
           {
             if (std::stoi(match.str(1)) != curr_level)
-              return Error::LinkTreeUnrefDupsLevelMismatch;
+              return Error::SymbolClosureUnrefDupsLevelMismatch;
             if (match.str(2) != node->name)
-              return Error::LinkTreeUnrefDupsNameMismatch;
+              return Error::SymbolClosureUnrefDupsNameMismatch;
             line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
             while (head < tail)
             {
-              if (!std::regex_search(head, tail, match, re2_link_tree_node_normal_unref_dups,
+              if (!std::regex_search(head, tail, match, re2_symbol_closure_node_normal_unref_dups,
                                      std::regex_constants::match_continuous))
                 break;
 
               if (std::stoi(match.str(1)) != curr_level)
-                return Error::LinkTreeUnrefDupsLevelMismatch;
+                return Error::SymbolClosureUnrefDupsLevelMismatch;
               line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
               node->unref_dups.emplace_back(match.str(2), match.str(3), match.str(4), match.str(5));
             }
             if (node->unref_dups.size() == 0)
-              return Error::LinkTreeUnrefDupsEmpty;
-            this->SetMinVersion(LDVersion::version_2_3_3_build_137);
+              return Error::SymbolClosureUnrefDupsEmpty;
+            this->SetMinVersion(MWLinkerVersion::version_2_3_3_build_137);
           }
 
           node->parent = parent_node;
@@ -307,7 +313,7 @@ auto MWLinkerMap::LinkTree::Read2(std::string::const_iterator& head,
           continue;
         }
         if (std::regex_search(head + prefix_length, tail, match,
-                              re2_link_tree_node_linker_generated,
+                              re2_symbol_closure_node_linker_generated,
                               std::regex_constants::match_continuous))
         {
           /* code */
@@ -315,7 +321,7 @@ auto MWLinkerMap::LinkTree::Read2(std::string::const_iterator& head,
       }
       else if (next_level > curr_level)
       {
-        return Error::LinkTreeLayerSkip;
+        return Error::SymbolClosureHierarchySkip;
       }
       else
       {
@@ -325,23 +331,23 @@ auto MWLinkerMap::LinkTree::Read2(std::string::const_iterator& head,
   }
 }
 
-static const std::regex re_link_tree_node_normal{
+static const std::regex re_symbol_closure_node_normal{
     " +(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  /////////////
 //  "%s (%s,%s) found in %s %s\r\n"  //////////////////////////////////////////
-static const std::regex re_link_tree_node_normal_unref_dup_header{
+static const std::regex re_symbol_closure_node_normal_unref_dup_header{
     " +(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)\r\n"};  //////////////////////
 //  ">>> UNREFERENCED DUPLICATE %s\r\n"  //////////////////////////////////////
-static const std::regex re_link_tree_node_normal_unref_dups{
+static const std::regex re_symbol_closure_node_normal_unref_dups{
     " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  //////////////
 //  ">>> (%s,%s) found in %s %s\r\n"  /////////////////////////////////////////
-static const std::regex re_link_tree_node_linker_generated{
+static const std::regex re_symbol_closure_node_linker_generated{
     " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};  ////////////////
 //  "%s found as linker generated symbol\r\n"  ////////////////////////////////
 
-auto MWLinkerMap::LinkTree::Read(std::string::const_iterator& head,
-                                 const std::string::const_iterator tail,
-                                 std::list<std::string>& unresolved_symbols,
-                                 std::size_t& line_number) -> Error
+auto MWLinkerMap::SymbolClosure::Read(std::string::const_iterator& head,
+                                      const std::string::const_iterator tail,
+                                      std::list<std::string>& unresolved_symbols,
+                                      std::size_t& line_number) -> Error
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -351,46 +357,46 @@ auto MWLinkerMap::LinkTree::Read(std::string::const_iterator& head,
 
   while (head < tail)
   {
-    if (std::regex_search(head, tail, match, re_link_tree_node_normal,
+    if (std::regex_search(head, tail, match, re_symbol_closure_node_normal,
                           std::regex_constants::match_continuous))
     {
       int curr_level = std::stoi(match.str(1));
       if (curr_level - 1 > prev_level)
-        return Error::LinkTreeLayerSkip;
+        return Error::SymbolClosureHierarchySkip;
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
       auto node = std::make_unique<NodeNormal>(match.str(2), match.str(3), match.str(4),
                                                match.str(5), match.str(6));
 
-      if (std::regex_search(head, tail, match, re_link_tree_node_normal_unref_dup_header,
+      if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
                             std::regex_constants::match_continuous))
       {
         if (std::stoi(match.str(1)) != curr_level)
-          return Error::LinkTreeUnrefDupsLevelMismatch;
+          return Error::SymbolClosureUnrefDupsLevelMismatch;
         if (match.str(2) != node->name)
-          return Error::LinkTreeUnrefDupsNameMismatch;
+          return Error::SymbolClosureUnrefDupsNameMismatch;
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
         while (head < tail)
         {
-          if (!std::regex_search(head, tail, match, re_link_tree_node_normal_unref_dups,
+          if (!std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                  std::regex_constants::match_continuous))
             break;
 
           if (std::stoi(match.str(1)) != curr_level)
-            return Error::LinkTreeUnrefDupsLevelMismatch;
+            return Error::SymbolClosureUnrefDupsLevelMismatch;
           line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
           node->unref_dups.emplace_back(match.str(2), match.str(3), match.str(4), match.str(5));
         }
         if (node->unref_dups.size() == 0)
-          return Error::LinkTreeUnrefDupsEmpty;
-        this->SetMinVersion(LDVersion::version_2_3_3_build_137);
+          return Error::SymbolClosureUnrefDupsEmpty;
+        this->SetMinVersion(MWLinkerVersion::version_2_3_3_build_137);
       }
 
       if (node->name == "_dtors$99")
       {
-        this->SetMinVersion(LDVersion::version_3_0_4);
+        this->SetMinVersion(MWLinkerVersion::version_3_0_4);
         // Though I do not understand it, the following is a normal occurrence:
         // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
         // "    3] .text (section,local) found in xyz.cpp lib.a"
@@ -411,17 +417,17 @@ auto MWLinkerMap::LinkTree::Read(std::string::const_iterator& head,
 
       continue;
     }
-    if (std::regex_search(head, tail, match, re_link_tree_node_linker_generated,
+    if (std::regex_search(head, tail, match, re_symbol_closure_node_linker_generated,
                           std::regex_constants::match_continuous))
     {
       int curr_level = std::stoi(match.str(1));
       if (curr_level - 1 > prev_level)
-        return Error::LinkTreeLayerSkip;
+        return Error::SymbolClosureHierarchySkip;
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
       auto node = std::make_unique<NodeLinkerGenerated>(match.str(2));
 
-      LinkTree::NodeBase* parent = hierarchy_history[curr_level - 1];
+      SymbolClosure::NodeBase* parent = hierarchy_history[curr_level - 1];
       hierarchy_history[curr_level] = node.get();
       node->parent = parent;
       parent->children.push_back(std::move(node));
@@ -629,12 +635,12 @@ auto MWLinkerMap::SectionLayout::Read(std::string::const_iterator& head,
       }
       else
       {
-        return Error::SectionLayoutBadHeader;
+        return Error::SectionLayoutBadPrologue;
       }
     }
     else
     {
-      return Error::SectionLayoutBadHeader;
+      return Error::SectionLayoutBadPrologue;
     }
   }
   else if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_1,
@@ -649,22 +655,22 @@ auto MWLinkerMap::SectionLayout::Read(std::string::const_iterator& head,
                             std::regex_constants::match_continuous))
       {
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-        this->SetMinVersion(LDVersion::version_3_0_4);
+        this->SetMinVersion(MWLinkerVersion::version_3_0_4);
         return this->Read4Column(head, tail, line_number);
       }
       else
       {
-        return Error::SectionLayoutBadHeader;
+        return Error::SectionLayoutBadPrologue;
       }
     }
     else
     {
-      return Error::SectionLayoutBadHeader;
+      return Error::SectionLayoutBadPrologue;
     }
   }
   else
   {
-    return Error::SectionLayoutBadHeader;
+    return Error::SectionLayoutBadPrologue;
   }
 }
 
@@ -690,7 +696,7 @@ auto MWLinkerMap::SectionLayout::Read3Column(std::string::const_iterator& head,
     if (std::regex_search(head, tail, match, re_section_layout_3_column_unit_normal,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.push_back(std::make_unique<UnitNormal>(  //
+      this->units.push_back(std::make_unique<UnitNormal>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
           std::stoul(match.str(4)), match.str(5), match.str(6), match.str(7)));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -699,16 +705,15 @@ auto MWLinkerMap::SectionLayout::Read3Column(std::string::const_iterator& head,
     if (std::regex_search(head, tail, match, re_section_layout_3_column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.push_back(std::make_unique<UnitUnused>(  //
+      this->units.push_back(std::make_unique<UnitUnused>(  //
           xstoul(match.str(1)), match.str(2), match.str(3), match.str(4)));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->SetMinVersion(LDVersion::version_2_3_3_build_137);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3_column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.push_back(std::make_unique<UnitEntry>(  //
+      this->units.push_back(std::make_unique<UnitEntry>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
           match.str(5), match.str(6), match.str(7)));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -747,7 +752,7 @@ auto MWLinkerMap::SectionLayout::Read4Column(std::string::const_iterator& head,
     if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_normal,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.push_back(std::make_unique<UnitNormal>(  //
+      this->units.push_back(std::make_unique<UnitNormal>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
           std::stoul(match.str(5)), match.str(6), match.str(7), match.str(8)));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -756,7 +761,7 @@ auto MWLinkerMap::SectionLayout::Read4Column(std::string::const_iterator& head,
     if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.push_back(std::make_unique<UnitUnused>(  //
+      this->units.push_back(std::make_unique<UnitUnused>(  //
           xstoul(match.str(1)), match.str(2), match.str(3), match.str(4)));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
@@ -764,7 +769,7 @@ auto MWLinkerMap::SectionLayout::Read4Column(std::string::const_iterator& head,
     if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_fill_a,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.push_back(std::make_unique<UnitFill>(  //
+      this->units.push_back(std::make_unique<UnitFill>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
           std::stoul(match.str(5)), false));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -773,7 +778,7 @@ auto MWLinkerMap::SectionLayout::Read4Column(std::string::const_iterator& head,
     if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_fill_b,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.push_back(std::make_unique<UnitFill>(  //
+      this->units.push_back(std::make_unique<UnitFill>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
           std::stoul(match.str(5)), true));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -782,7 +787,7 @@ auto MWLinkerMap::SectionLayout::Read4Column(std::string::const_iterator& head,
     if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.push_back(std::make_unique<UnitEntry>(  //
+      this->units.push_back(std::make_unique<UnitEntry>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
           match.str(5), match.str(6), match.str(7), match.str(8)));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -827,8 +832,8 @@ auto MWLinkerMap::MemoryMap::Read(std::string::const_iterator& head,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_extra_info = false;
-      return Read3Column(head, tail, line_number);
+      this->extra_info = false;
+      return Read3ColumnA(head, tail, line_number);
     }
     else
     {
@@ -843,9 +848,9 @@ auto MWLinkerMap::MemoryMap::Read(std::string::const_iterator& head,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_extra_info = false;
-      this->SetMinVersion(LDVersion::version_4_2_build_142);
-      return Read3Column(head, tail, line_number);
+      this->extra_info = false;
+      this->SetMinVersion(MWLinkerVersion::version_4_2_build_142);
+      return Read3ColumnB(head, tail, line_number);
     }
     else
     {
@@ -860,7 +865,7 @@ auto MWLinkerMap::MemoryMap::Read(std::string::const_iterator& head,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_extra_info = true;
+      this->extra_info = true;
       return Read5Column(head, tail, line_number);
     }
     else
@@ -880,16 +885,10 @@ static const std::regex re_memory_map_unit_allocated_a{
 static const std::regex re_memory_map_unit_info_a{
     "   *(.+)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r\n"};  /////////////////
 //  "  %15s           %06x %08x\r\n"  /////////////////////////////////////////
-static const std::regex re_memory_map_unit_allocated_b{
-    "   *(.+) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  ///////////////
-//  "  %20s %08x %08x %08x\r\n"  //////////////////////////////////////////////
-static const std::regex re_memory_map_unit_info_b{
-    "   *(.+)          ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  /////////////////
-//  "  %20s          %08x %08x\r\n"
 
-auto MWLinkerMap::MemoryMap::Read3Column(std::string::const_iterator& head,
-                                         const std::string::const_iterator tail,
-                                         std::size_t& line_number) -> Error
+auto MWLinkerMap::MemoryMap::Read3ColumnA(std::string::const_iterator& head,
+                                          const std::string::const_iterator tail,
+                                          std::size_t& line_number) -> Error
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -900,7 +899,7 @@ auto MWLinkerMap::MemoryMap::Read3Column(std::string::const_iterator& head,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_units.push_back(std::make_unique<UnitAllocated>(  //
+      this->units.push_back(std::make_unique<UnitAllocated>(  //
           match.str(1), xstoul(match.str(3)), xstoul(match.str(4)), xstoul(match.str(2)), 0, 0));
       continue;
     }
@@ -908,19 +907,36 @@ auto MWLinkerMap::MemoryMap::Read3Column(std::string::const_iterator& head,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_units.push_back(std::make_unique<UnitInfo>(  //
+      this->units.push_back(std::make_unique<UnitInfo>(  //
           match.str(1), xstoul(match.str(2)), xstoul(match.str(3))));
       continue;
     }
     break;
   }
+  return Error::None;
+}
+
+static const std::regex re_memory_map_unit_allocated_b{
+    "   *(.+) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  ///////////////
+//  "  %20s %08x %08x %08x\r\n"  //////////////////////////////////////////////
+static const std::regex re_memory_map_unit_info_b{
+    "   *(.+)          ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  /////////////////
+//  "  %20s          %08x %08x\r\n"
+
+auto MWLinkerMap::MemoryMap::Read3ColumnB(std::string::const_iterator& head,
+                                          const std::string::const_iterator tail,
+                                          std::size_t& line_number) -> Error
+{
+  std::smatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+
   while (head < tail)
   {
     if (std::regex_search(head, tail, match, re_memory_map_unit_allocated_b,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_units.push_back(std::make_unique<UnitAllocated>(  //
+      this->units.push_back(std::make_unique<UnitAllocated>(  //
           match.str(1), xstoul(match.str(3)), xstoul(match.str(4)), xstoul(match.str(2)), 0, 0));
       continue;
     }
@@ -928,7 +944,7 @@ auto MWLinkerMap::MemoryMap::Read3Column(std::string::const_iterator& head,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_units.push_back(std::make_unique<UnitInfo>(  //
+      this->units.push_back(std::make_unique<UnitInfo>(  //
           match.str(1), xstoul(match.str(2)), xstoul(match.str(3))));
       continue;
     }
@@ -961,7 +977,7 @@ auto MWLinkerMap::LinkerGeneratedSymbols::Read(std::string::const_iterator& head
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->m_units.push_back(std::make_unique<Unit>(  //
+      this->units.push_back(std::make_unique<Unit>(  //
           match.str(1), xstoul(match.str(2))));
       continue;
     }

@@ -5,6 +5,31 @@
 #include <memory>
 #include <string>
 
+enum class MWLinkerVersion
+{
+  Unknown,
+
+  // Metrowerks, Inc
+  version_2_3_3_build_126,  // Codewarrior for GCN 1.0   (May 21 2000 19:00:24)
+  version_2_3_3_build_137,  // CodeWarrior for GCN 1.1   (Feb  7 2001 12:15:53)
+  version_2_4_1_build_47,   // CodeWarrior for GCN 1.2.5 (Jun 12 2001 11:53:24)
+
+  // Metrowerks Corporation
+  version_2_4_2_build_81,   // CodeWarrior for GCN 1.3.2 (May  7 2002 23:43:34)
+  version_2_4_7_build_92,   // CodeWarrior for GCN 2.0   (Sep 16 2002 15:15:26)
+  version_2_4_7_build_102,  // CodeWarrior for GCN 2.5   (Nov  7 2002 12:45:57)
+  version_2_4_7_build_107,  // CodeWarrior for GCN 2.6   (Jul 14 2003 14:20:31)
+  version_3_0_4,            // CodeWarrior for GCN 2.7   (Aug 13 2004 10:40:59)
+  version_4_1_build_51213,  // CodeWarrior for GCN 3.0a3 (Dec 13 2005 17:41:17)
+
+  // Freescale Semiconductor, Inc
+  version_4_2_build_60320,  // CodeWarrior for GCN 3.0   (Mar 20 2006 23:19:16)
+  version_4_2_build_142,    // CodeWarrior for Wii 1.0   (Aug 26 2008 02:33:56)
+  version_4_3_build_151,    // CodeWarrior for Wii 1.1   (Apr  2 2009 15:05:36)
+  version_4_3_build_172,    // CodeWarrior for Wii 1.3   (Apr 23 2010 11:39:30)
+  version_4_3_build_213,    // CodeWarrior for Wii 1.7   (Sep  5 2011 13:02:03)
+};
+
 struct MWLinkerMap
 {
   enum class Error
@@ -16,39 +41,16 @@ struct MWLinkerMap
 
     RegexFail,
 
-    LinkTreeLayerSkip,
-    LinkTreeUnrefDupsLevelMismatch,
-    LinkTreeUnrefDupsNameMismatch,
-    LinkTreeUnrefDupsEmpty,
+    SymbolClosureHierarchySkip,
+    SymbolClosureUnrefDupsLevelMismatch,
+    SymbolClosureUnrefDupsNameMismatch,
+    SymbolClosureUnrefDupsEmpty,
 
-    SectionLayoutBadHeader,
+    SectionLayoutBadPrologue,
 
     MemoryMapBadPrologue,
 
     SymbolNotFound,
-  };
-
-  enum class LDVersion
-  {
-    // Metrowerks, Inc
-    version_2_3_3_build_126,  // Codewarrior for Dolphin  1.0   (May 21 2000 19:00:24)
-    version_2_3_3_build_137,  // CodeWarrior for GAMECUBE 1.1   (Feb  7 2001 12:15:53)
-    version_2_4_1_build_47,   // CodeWarrior for GAMECUBE 1.2.5 (Jun 12 2001 11:53:24)
-
-    // Metrowerks Corporation
-    version_2_4_2_build_81,   // CodeWarrior for GAMECUBE 1.3.2 (May  7 2002 23:43:34)
-    version_2_4_7_build_92,   // CodeWarrior for GAMECUBE 2.0   (Sep 16 2002 15:15:26)
-    version_2_4_7_build_102,  // CodeWarrior for GAMECUBE 2.5   (Nov  7 2002 12:45:57)
-    version_2_4_7_build_107,  // CodeWarrior for GAMECUBE 2.6   (Jul 14 2003 14:20:31)
-    version_3_0_4,            // CodeWarrior for GAMECUBE 2.7   (Aug 13 2004 10:40:59)
-    version_4_1_build_51213,  // CodeWarrior for GAMECUBE 3.0a3 (Dec 13 2005 17:41:17)
-
-    // Freescale Semiconductor, Inc
-    version_4_2_build_60320,  // CodeWarrior for GAMECUBE 3.0   (Mar 20 2006 23:19:16)
-    version_4_2_build_142,    // Wii 1.0                        (Aug 26 2008 02:33:56)
-    version_4_3_build_151,    // Wii 1.1                        (Apr  2 2009 15:05:36)
-    version_4_3_build_172,    // Wii 1.3                        (Apr 23 2010 11:39:30)
-    version_4_3_build_213,    // Wii 1.7                        (Sep  5 2011 13:02:03)
   };
 
   struct PortionBase
@@ -56,15 +58,28 @@ struct MWLinkerMap
     PortionBase() = default;
     virtual ~PortionBase() = default;
 
-    void SetMinVersion(const LDVersion version)
+    void SetMinVersion(const MWLinkerVersion version)
     {
-      m_min_version = std::max(m_min_version, version);
+      min_version = std::max(min_version, version);
     }
 
-    LDVersion m_min_version = LDVersion::version_2_3_3_build_126;
+    MWLinkerVersion min_version = MWLinkerVersion::Unknown;
   };
 
-  struct LinkTree final : PortionBase
+  struct EntryPoint final : PortionBase
+  {
+    EntryPoint(std::string name) : entry_point_name(name) {}
+    ~EntryPoint() = default;
+
+    std::string entry_point_name;
+  };
+
+  // CodeWarrior for GCN 1.1
+  //  - Added UNREFERENCED DUPLICATE info.
+  // CodeWarrior for GCN 2.7
+  //  - Symbol closure became optional with '-[no]listclosure', off by default.
+  //  - Added _ctors$99 and _dtors$99, among other things.
+  struct SymbolClosure final : PortionBase
   {
     struct NodeBase
     {
@@ -115,8 +130,8 @@ struct MWLinkerMap
       virtual ~NodeLinkerGenerated() = default;
     };
 
-    LinkTree() = default;
-    virtual ~LinkTree() = default;
+    SymbolClosure() { min_version = MWLinkerVersion::version_2_3_3_build_126; };
+    virtual ~SymbolClosure() = default;
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::list<std::string>&,
                std::size_t&);
@@ -126,24 +141,35 @@ struct MWLinkerMap
     NodeBase root;
   };
 
+  // CodeWarrior for Wii 1.0
+  //  - Added EPPC_PatternMatching
   struct EPPC_PatternMatching final : PortionBase
   {
-    EPPC_PatternMatching() = default;
+    EPPC_PatternMatching()
+    {
+      this->min_version = MWLinkerVersion::version_4_2_build_142;
+    };
     virtual ~EPPC_PatternMatching() = default;
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
-    Error ReadAnalysis(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
     Error ReadSummary(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
   };
 
+  // CodeWarrior for Wii 1.0
+  //  - Added LinkerOpts
   struct LinkerOpts final : PortionBase
   {
-    LinkerOpts() = default;
+    LinkerOpts()
+    {
+      this->min_version = MWLinkerVersion::version_4_2_build_142;
+    };
     virtual ~LinkerOpts() = default;
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
   };
 
+  // CodeWarrior for GCN 2.7
+  //  - Changed to four column info, added *fill* symbols.
   struct SectionLayout final : PortionBase
   {
     struct UnitBase
@@ -229,9 +255,11 @@ struct MWLinkerMap
     Error Read4Column(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
 
     std::string name;
-    std::list<std::unique_ptr<UnitBase>> m_units;
+    std::list<std::unique_ptr<UnitBase>> units;
   };
 
+  // CodeWarrior for Wii 1.0
+  //  - Added four spaces to left, removed one padding space in middle.
   struct MemoryMap final : PortionBase
   {
     // TODO: make list of names of sections which are not allocated
@@ -279,11 +307,12 @@ struct MWLinkerMap
     virtual ~MemoryMap() = default;
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
-    Error Read3Column(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+    Error Read3ColumnA(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+    Error Read3ColumnB(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
     Error Read5Column(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
 
-    std::list<std::unique_ptr<UnitBase>> m_units;
-    bool m_extra_info;  // TODO: What causes MWLD(EPPC) to emit this??
+    std::list<std::unique_ptr<UnitBase>> units;
+    bool extra_info;  // TODO: What causes MWLD(EPPC) to emit this??
   };
 
   struct LinkerGeneratedSymbols final : PortionBase
@@ -302,16 +331,16 @@ struct MWLinkerMap
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
 
-    std::list<std::unique_ptr<Unit>> m_units;
+    std::list<std::unique_ptr<Unit>> units;
   };
 
   MWLinkerMap() = default;
   ~MWLinkerMap() = default;
 
-  Error Read(std::string::const_iterator, std::string::const_iterator, std::size_t&);
   Error Read(std::istream&, std::size_t&);
+  Error Read(const std::string&, std::size_t&);
+  Error Read(std::string::const_iterator, std::string::const_iterator, std::size_t&);
 
-  std::string entry_point_name;
-  std::list<std::string> m_unresolved_symbols;
-  std::list<std::unique_ptr<PortionBase>> m_portions;
+  std::list<std::unique_ptr<PortionBase>> portions;
+  std::list<std::string> unresolved_symbols;
 };
