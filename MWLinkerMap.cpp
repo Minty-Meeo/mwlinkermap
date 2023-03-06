@@ -24,42 +24,44 @@ auto MWLinkerMap::Read(const std::string& string, std::size_t& line_number) -> E
   return this->Read(string.begin(), string.end(), line_number);
 }
 
+// clang-format off
 static const std::regex re_entry_point_name{
-    "Link map of (.+)\r\n"};  ///////////////////////////////////////
-//  "Link map of %s\r\n"  ///////////////////////////////////////////
+//  "Link map of %s\r\n"
+    "Link map of (.+)\r\n"};
 static const std::regex re_unresolved_symbol{
-    ">>> SYMBOL NOT FOUND: (.+)\r\n"};  ///////////////////////////////////////
-//  ">>> SYMBOL NOT FOUND: %s\r\n"  ///////////////////////////////////////////
+//  ">>> SYMBOL NOT FOUND: %s\r\n"
+    ">>> SYMBOL NOT FOUND: (.+)\r\n"};
 static const std::regex re_excluded_symbol{
-    ">>> EXCLUDED SYMBOL (.+) \\((.+),(.+)\\) found in (.+) (.+)\r\n"};  //////
-//  ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s\r\n"  //////////////////////
+//  ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s\r\n"
+    ">>> EXCLUDED SYMBOL (.+) \\((.+),(.+)\\) found in (.+) (.+)\r\n"};
 static const std::regex re_linktime_size_increasing_optimizations_header{
-    "\r\nLinktime size-increasing optimizations\r\n"};  /////////////
-//  "\r\nLinktime size-increasing optimizations\r\n"  ///////////////
+//  "\r\nLinktime size-increasing optimizations\r\n"
+    "\r\nLinktime size-increasing optimizations\r\n"};
 static const std::regex re_linktime_size_decreasing_optimizations_header{
-    "\r\nLinktime size-decreasing optimizations\r\n"};  /////////////
-//  "\r\nLinktime size-decreasing optimizations\r\n"  ///////////////
+//  "\r\nLinktime size-decreasing optimizations\r\n"
+    "\r\nLinktime size-decreasing optimizations\r\n"};
 static const std::regex re_mixed_mode_islands_header{
-    "\r\nMixed Mode Islands\r\n"};  /////////////////////////////////
-//  "\r\nMixed Mode Islands\r\n"  ///////////////////////////////////
+//  "\r\nMixed Mode Islands\r\n"
+    "\r\nMixed Mode Islands\r\n"};
 static const std::regex re_branch_islands_header{
-    "\r\nBranch Islands\r\n"};  /////////////////////////////////////
-//  "\r\nBranch Islands\r\n"  ///////////////////////////////////////
+//  "\r\nBranch Islands\r\n"
+    "\r\nBranch Islands\r\n"};
 static const std::regex re_section_layout_header{
-    "\r\n\r\n(.+) section layout\r\n"};  ////////////////////////////
-//  "\r\n\r\n%s section layout\r\n"  ////////////////////////////////
+//  "\r\n\r\n%s section layout\r\n"
+    "\r\n\r\n(.+) section layout\r\n"};
 static const std::regex re_section_layout_header_modified_a{
-    "\r\n(.+) section layout\r\n"};  ////////////////////////////////
-//  "\r\n%s section layout\r\n"  ////////////////////////////////////
+//  "\r\n%s section layout\r\n"
+    "\r\n(.+) section layout\r\n"};
 static const std::regex re_section_layout_header_modified_b{
-    "(.+) section layout\r\n"};  ////////////////////////////////////
-//  "%s section layout\r\n"  ////////////////////////////////////////
+//  "%s section layout\r\n"
+    "(.+) section layout\r\n"};
 static const std::regex re_memory_map_header{
-    "\r\n\r\nMemory map:\r\n"};  ////////////////////////////////////
-//  "\r\n\r\nMemory map:\r\n"  //////////////////////////////////////
+//  "\r\n\r\nMemory map:\r\n"
+    "\r\n\r\nMemory map:\r\n"};
 static const std::regex re_linker_generated_symbols_header{
-    "\r\n\r\nLinker generated symbols:\r\n"};  //////////////////////
-//  "\r\n\r\nLinker generated symbols:\r\n"  ////////////////////////
+//  "\r\n\r\nLinker generated symbols:\r\n"
+    "\r\n\r\nLinker generated symbols:\r\n"};
+// clang-format on
 
 auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::const_iterator tail,
                        std::size_t& line_number) -> Error
@@ -241,20 +243,22 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
   return Error::None;
 }
 
+// clang-format off
 static const std::regex re_symbol_closure_node_prefix{
-    " +(\\d+)] "};  ///////////////////////////////////////////////
 //  "%i] "
+    " +(\\d+)] "};
 static const std::regex re2_symbol_closure_node_normal{
-    "(.+) \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  /////////////
 //  "%s (%s,%s) found in %s %s\r\n"
+    "(.+) \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
 static const std::regex re2_symbol_closure_node_normal_unref_dup_header{
-    " +(\\d+)] >>> UNREFERENCED DUPLICATE (.+)\r\n"};  ////////////////////////
+    " +(\\d+)] >>> UNREFERENCED DUPLICATE (.+)\r\n"};
 static const std::regex re2_symbol_closure_node_normal_unref_dups{
-    " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  //////////////
-//  ">>> (%s,%s) found in %s %s\r\n"  /////////////////////////////////////////
+//  ">>> (%s,%s) found in %s %s\r\n"
+    " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
 static const std::regex re2_symbol_closure_node_linker_generated{
-    " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};  ////////////////
-//  "%s found as linker generated symbol\r\n"  ////////////////////////////////
+//  "%s found as linker generated symbol\r\n"
+    " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};
+// clang-format on
 
 auto MWLinkerMap::SymbolClosure::Read2(std::string::const_iterator& head,
                                        const std::string::const_iterator tail,
@@ -331,18 +335,20 @@ auto MWLinkerMap::SymbolClosure::Read2(std::string::const_iterator& head,
   }
 }
 
+// clang-format off
 static const std::regex re_symbol_closure_node_normal{
-    " +(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  /////////////
-//  "%s (%s,%s) found in %s %s\r\n"  //////////////////////////////////////////
+//  "%s (%s,%s) found in %s %s\r\n"
+    " +(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
 static const std::regex re_symbol_closure_node_normal_unref_dup_header{
-    " +(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)\r\n"};  //////////////////////
-//  ">>> UNREFERENCED DUPLICATE %s\r\n"  //////////////////////////////////////
+//  ">>> UNREFERENCED DUPLICATE %s\r\n"
+    " +(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)\r\n"};
 static const std::regex re_symbol_closure_node_normal_unref_dups{
-    " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.+)?\r\n"};  //////////////
-//  ">>> (%s,%s) found in %s %s\r\n"  /////////////////////////////////////////
+//  ">>> (%s,%s) found in %s %s\r\n"
+    " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
 static const std::regex re_symbol_closure_node_linker_generated{
-    " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};  ////////////////
-//  "%s found as linker generated symbol\r\n"  ////////////////////////////////
+//  "%s found as linker generated symbol\r\n"
+    " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};
+// clang-format on
 
 auto MWLinkerMap::SymbolClosure::Read(std::string::const_iterator& head,
                                       const std::string::const_iterator tail,
@@ -457,18 +463,20 @@ auto MWLinkerMap::SymbolClosure::Read(std::string::const_iterator& head,
   return Error::None;
 }
 
+// clang-format off
 static const std::regex re_code_fold_analysis_unit_duplicate{
-    "--> duplicated code: symbol (.+) is duplicated by (.+), size = (\\d+) \r\n\r\n"};
 //  "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
+    "--> duplicated code: symbol (.+) is duplicated by (.+), size = (\\d+) \r\n\r\n"};
 static const std::regex re_code_fold_analysis_unit_replace{
+//  "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
     "--> the function (.+) will be replaced by a branch to (.+)\r\n\r\n\r\n"};
-//  "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"  /////
 static const std::regex re_code_fold_analysis_unit_interchange{
-    "--> the function (.+) was interchanged with (.+), size=(\\d+) \r\n"};  ///
-//  "--> the function %s was interchanged with %s, size=%d \r\n"  /////////////
+//  "--> the function %s was interchanged with %s, size=%d \r\n"
+    "--> the function (.+) was interchanged with (.+), size=(\\d+) \r\n"};
 static const std::regex re_code_fold_summary_header{
-    "\r\n\r\n\r\nCode folded in file: (.+) \r\n"};  ///////////////////////////
-//  "\r\n\r\n\r\nCode folded in file: %s \r\n"  ///////////////////////////////
+//  "\r\n\r\n\r\nCode folded in file: %s \r\n"
+    "\r\n\r\n\r\nCode folded in file: (.+) \r\n"};
+// clang-format on
 
 auto MWLinkerMap::EPPC_PatternMatching::Read(std::string::const_iterator& head,
                                              const std::string::const_iterator tail,
@@ -515,12 +523,14 @@ auto MWLinkerMap::EPPC_PatternMatching::Read(std::string::const_iterator& head,
   return Error::None;
 }
 
+// clang-format off
 static const std::regex re_code_fold_summary_unit_duplicate{
-    "--> (.+) is duplicated by (.+), size = (\\d+) \r\n\r\n"};  ///////////////
-//  "--> %s is duplicated by %s, size = %d \r\n\r\n"  /////////////////////////
+//  "--> %s is duplicated by %s, size = %d \r\n\r\n"
+    "--> (.+) is duplicated by (.+), size = (\\d+) \r\n\r\n"};
 static const std::regex re_code_fold_summary_unit_duplicate_new_branch{
-    "--> (.+) is duplicated by (.+), size = (\\d+), new branch function (.+) \r\n\r\n"};
 //  "--> %s is duplicated by %s, size = %d, new branch function %s \r\n\r\n"
+    "--> (.+) is duplicated by (.+), size = (\\d+), new branch function (.+) \r\n\r\n"};
+// clang-format on
 
 auto MWLinkerMap::EPPC_PatternMatching::ReadSummary(std::string::const_iterator& head,
                                                     const std::string::const_iterator tail,
@@ -548,18 +558,20 @@ auto MWLinkerMap::EPPC_PatternMatching::ReadSummary(std::string::const_iterator&
   return Error::None;
 }
 
+// clang-format off
 static const std::regex re_linker_opts_unit_address_range{
+//  "  %s/ %s()/ %s - address not in near addressing range \r\n"
     "  (.+)/ (.+)\\(\\)/ (.+) - address not in near addressing range \r\n"};
-//  "  %s/ %s()/ %s - address not in near addressing range \r\n"  /////////////
 static const std::regex re_linker_opts_unit_address_not_computed{
-    "  (.+)/ (.+)\\(\\)/ (.+) - final address not yet computed \r\n"};  ///////
-//  "  %s/ %s()/ %s - final address not yet computed \r\n"  ///////////////////
+//  "  %s/ %s()/ %s - final address not yet computed \r\n"
+    "  (.+)/ (.+)\\(\\)/ (.+) - final address not yet computed \r\n"};
 static const std::regex re_linker_opts_unit_address_optimize{
-    "! (.+)/ (.+)\\(\\)/ (.+) - optimized addressing \r\n"};  /////////////////
-//  "! %s/ %s()/ %s - optimized addressing \r\n"  /////////////////////////////
+//  "! %s/ %s()/ %s - optimized addressing \r\n"
+    "! (.+)/ (.+)\\(\\)/ (.+) - optimized addressing \r\n"};
 static const std::regex re_linker_opts_unit_disassemble_error{
-    "  (.+)/ (.+)\\(\\) - error disassembling function \r\n"};  ///////////////
-//  "  %s/ %s() - error disassembling function \r\n"  /////////////////////////
+//  "  %s/ %s() - error disassembling function \r\n"
+    "  (.+)/ (.+)\\(\\) - error disassembling function \r\n"};
+// clang-format on
 
 auto MWLinkerMap::LinkerOpts::Read(std::string::const_iterator& head,
                                    const std::string::const_iterator tail, std::size_t& line_number)
@@ -599,18 +611,20 @@ auto MWLinkerMap::LinkerOpts::Read(std::string::const_iterator& head,
   return Error::None;
 }
 
+// clang-format off
 static const std::regex re_section_layout_3_column_prologue_1{
-    "  Starting        Virtual\r\n"};  ///////////////////////
+    "  Starting        Virtual\r\n"};
 static const std::regex re_section_layout_3_column_prologue_2{
-    "  address  Size   address\r\n"};  ///////////////////////
+    "  address  Size   address\r\n"};
 static const std::regex re_section_layout_3_column_prologue_3{
-    "  -----------------------\r\n"};  ///////////////////////
+    "  -----------------------\r\n"};
 static const std::regex re_section_layout_4_column_prologue_1{
-    "  Starting        Virtual  File\r\n"};  /////////////////
+    "  Starting        Virtual  File\r\n"};
 static const std::regex re_section_layout_4_column_prologue_2{
-    "  address  Size   address  offset\r\n"};  ///////////////
+    "  address  Size   address  offset\r\n"};
 static const std::regex re_section_layout_4_column_prologue_3{
-    "  ---------------------------------\r\n"};  /////////////
+    "  ---------------------------------\r\n"};
+// clang-format on
 
 auto MWLinkerMap::SectionLayout::Read(std::string::const_iterator& head,
                                       const std::string::const_iterator tail,
@@ -674,15 +688,17 @@ auto MWLinkerMap::SectionLayout::Read(std::string::const_iterator& head,
   }
 }
 
-// "  %08x %06x %08x %2i %s \t%s %s\r\n"
+// clang-format off
 static const std::regex re_section_layout_3_column_unit_normal{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.+)?\r\n"};
-// "  UNUSED   %06x ........ %s %s %s\r\n"
+//  "  %08x %06x %08x %2i %s \t%s %s\r\n"
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.*)\r\n"};
 static const std::regex re_section_layout_3_column_unit_unused{
-    "  UNUSED   ([0-9a-f]{6}) \\.{8} (.+) (.+) (.+)?\r\n"};
-// "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
+//  "  UNUSED   %06x ........ %s %s %s\r\n"
+    "  UNUSED   ([0-9a-f]{6}) \\.{8} (.+) (.+) (.*)\r\n"};
 static const std::regex re_section_layout_3_column_unit_entry{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.+) \\(entry of (.+)\\) \t(.+) (.+)?\r\n"};
+//  "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.+) \\(entry of (.+)\\) \t(.+) (.*)\r\n"};
+// clang-format on
 
 auto MWLinkerMap::SectionLayout::Read3Column(std::string::const_iterator& head,
                                              const std::string::const_iterator tail,
@@ -724,21 +740,20 @@ auto MWLinkerMap::SectionLayout::Read3Column(std::string::const_iterator& head,
   return Error::None;
 }
 
+// clang-format off
 static const std::regex re_section_layout_4_column_unit_normal{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.+)?\r\n"};
-
+//  "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.*)\r\n"};
 static const std::regex re_section_layout_4_column_unit_unused{
-    "  UNUSED   ([0-9a-f]{6}) \\.{8} \\.{8}    (.+) (.+) (.+)?\r\n"};
-
+//  "  UNUSED   %06x ........ ........    %s %s %s\r\n"
+    "  UNUSED   ([0-9a-f]{6}) \\.{8} \\.{8}    (.+) (.+) (.*)\r\n"};
 static const std::regex re_section_layout_4_column_unit_entry{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})    (.+) \\(entry of (.+)\\) \t(.+) "
-    "(.+)?\r\n"};
-
-static const std::regex re_section_layout_4_column_unit_fill_a{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) \\*fill\\*\r\n"};
-
-static const std::regex re_section_layout_4_column_unit_fill_b{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) \\*\\*fill\\*\\*\r\n"};
+//  "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})    (.+) \\(entry of (.+)\\) \t(.+) (.*)\r\n"};
+static const std::regex re_section_layout_4_column_unit_special{
+//  "  %08x %06x %08x %08x %2i %s\r\n"
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.+)\r\n"};
+// clang-format on
 
 auto MWLinkerMap::SectionLayout::Read4Column(std::string::const_iterator& head,
                                              const std::string::const_iterator tail,
@@ -766,24 +781,6 @@ auto MWLinkerMap::SectionLayout::Read4Column(std::string::const_iterator& head,
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_fill_a,
-                          std::regex_constants::match_continuous))
-    {
-      this->units.push_back(std::make_unique<UnitFill>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-          std::stoul(match.str(5)), false));
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_fill_b,
-                          std::regex_constants::match_continuous))
-    {
-      this->units.push_back(std::make_unique<UnitFill>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-          std::stoul(match.str(5)), true));
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      continue;
-    }
     if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_entry,
                           std::regex_constants::match_continuous))
     {
@@ -793,29 +790,41 @@ auto MWLinkerMap::SectionLayout::Read4Column(std::string::const_iterator& head,
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
+    // This regex is so overkill, it risks finding false positives.  TODO: irregularity post-checker
+    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_special,
+                          std::regex_constants::match_continuous))
+    {
+      this->units.push_back(std::make_unique<UnitSpecial>(  //
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
+          std::stoul(match.str(5)), match.str(6)));
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
     break;
   }
   return Error::None;
 }
 
+// clang-format off
 static const std::regex re_memory_map_3_column_prologue_1a{
-    "                   Starting Size     File\r\n"};  ////////////////////////
-//  "                   Starting Size     File\r\n"  //////////////////////////
+//  "                   Starting Size     File\r\n"
+    "                   Starting Size     File\r\n"};
 static const std::regex re_memory_map_3_column_prologue_2a{
-    "                   address           Offset\r\n"};
 //  "                   address           Offset\r\n"
+    "                   address           Offset\r\n"};
 static const std::regex re_memory_map_3_column_prologue_1b{
-    "                       Starting Size     File\r\n"};  ////////////////////
-//  "                       Starting Size     File\r\n"  //////////////////////
+//  "                       Starting Size     File\r\n"
+    "                       Starting Size     File\r\n"};
 static const std::regex re_memory_map_3_column_prologue_2b{
-    "                       address           Offset\r\n"};  //////////////////
-//  "                       address           Offset\r\n"  ////////////////////
+//  "                       address           Offset\r\n"
+    "                       address           Offset\r\n"};
 static const std::regex re_memory_map_5_column_prologue_1{
+//  "                   Starting Size     File     ROM      RAM Buffer\r\n"
     "                   Starting Size     File     ROM      RAM Buffer\r\n"};
-//  "                   Starting Size     File     ROM      RAM Buffer\r\n"  //
 static const std::regex re_memory_map_5_column_prologue_2{
-    "                   address           Offset   Address  Address\r\n"};  ///
-//  "                   address           Offset   Address  Address\r\n"  /////
+//  "                   address           Offset   Address  Address\r\n"
+    "                   address           Offset   Address  Address\r\n"};
+// clang-format on
 
 auto MWLinkerMap::MemoryMap::Read(std::string::const_iterator& head,
                                   const std::string::const_iterator tail, std::size_t& line_number)
@@ -879,12 +888,14 @@ auto MWLinkerMap::MemoryMap::Read(std::string::const_iterator& head,
   }
 }
 
+// clang-format off
 static const std::regex re_memory_map_unit_allocated_a{
-    "   *(.+)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  //////////////
-//  "  %15s  %08x %08x %08x\r\n"  /////////////////////////////////////////////
+//  "  %15s  %08x %08x %08x\r\n"
+    "   *(.+)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};
 static const std::regex re_memory_map_unit_info_a{
-    "   *(.+)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r\n"};  /////////////////
-//  "  %15s           %06x %08x\r\n"  /////////////////////////////////////////
+//  "  %15s           %06x %08x\r\n"
+    "   *(.+)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r\n"};
+// clang-format on
 
 auto MWLinkerMap::MemoryMap::Read3ColumnA(std::string::const_iterator& head,
                                           const std::string::const_iterator tail,
@@ -916,12 +927,14 @@ auto MWLinkerMap::MemoryMap::Read3ColumnA(std::string::const_iterator& head,
   return Error::None;
 }
 
+// clang-format off
 static const std::regex re_memory_map_unit_allocated_b{
-    "   *(.+) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  ///////////////
-//  "  %20s %08x %08x %08x\r\n"  //////////////////////////////////////////////
+//  "  %20s %08x %08x %08x\r\n"
+    "   *(.+) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};
 static const std::regex re_memory_map_unit_info_b{
-    "   *(.+)          ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};  /////////////////
 //  "  %20s          %08x %08x\r\n"
+    "   *(.+)          ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};
+// clang-format on
 
 auto MWLinkerMap::MemoryMap::Read3ColumnB(std::string::const_iterator& head,
                                           const std::string::const_iterator tail,
@@ -960,9 +973,11 @@ auto MWLinkerMap::MemoryMap::Read5Column(std::string::const_iterator& head,
   return Error::Unimplemented;
 }
 
+// clang-format off
 static const std::regex re_linker_generated_symbols_unit{
-    " *(.+) ([0-9a-f]{8})\r\n"};  /////////////////////////////////////////////
-//  "%25s %08x\r\n"  //////////////////////////////////////////////////////////
+//  "%25s %08x\r\n"
+    " *(.+) ([0-9a-f]{8})\r\n"};
+// clang-format on
 
 auto MWLinkerMap::LinkerGeneratedSymbols::Read(std::string::const_iterator& head,
                                                const std::string::const_iterator tail,

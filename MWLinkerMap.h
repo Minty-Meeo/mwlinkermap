@@ -145,10 +145,7 @@ struct MWLinkerMap
   //  - Added EPPC_PatternMatching
   struct EPPC_PatternMatching final : PortionBase
   {
-    EPPC_PatternMatching()
-    {
-      this->min_version = MWLinkerVersion::version_4_2_build_142;
-    };
+    EPPC_PatternMatching() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
     virtual ~EPPC_PatternMatching() = default;
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
@@ -159,10 +156,7 @@ struct MWLinkerMap
   //  - Added LinkerOpts
   struct LinkerOpts final : PortionBase
   {
-    LinkerOpts()
-    {
-      this->min_version = MWLinkerVersion::version_4_2_build_142;
-    };
+    LinkerOpts() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
     virtual ~LinkerOpts() = default;
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
@@ -231,20 +225,20 @@ struct MWLinkerMap
       std::string file;           // Static library STT_FILE symbol name (optional)
     };
 
-    struct UnitFill final : UnitBase
+    struct UnitSpecial final : UnitBase
     {
-      UnitFill(std::uint32_t saddress_, std::uint32_t size_, std::uint32_t vaddress_,
-               std::uint32_t foffset_, std::uint32_t alignment_, bool emphasized_)
+      UnitSpecial(std::uint32_t saddress_, std::uint32_t size_, std::uint32_t vaddress_,
+                  std::uint32_t foffset_, std::uint32_t alignment_, std::string name_)
           : saddress(saddress_), size(size_), vaddress(vaddress_), foffset(foffset_),
-            alignment(alignment_), emphasized(emphasized_){};
-      virtual ~UnitFill() = default;
+            alignment(alignment_), name(std::move(name_)){};
+      virtual ~UnitSpecial() = default;
 
       std::uint32_t saddress;
       std::uint32_t size;
       std::uint32_t vaddress;
       std::uint32_t foffset;
       std::uint32_t alignment;
-      bool emphasized;
+      std::string name;  // e.g. "*fill*" or "**fill**"
     };
 
     SectionLayout(std::string name_) : name(std::move(name_)){};
