@@ -343,124 +343,16 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read3(  //
     if (std::regex_search(head, tail, match, re_unresolved_symbol,
                           std::regex_constants::match_continuous))
     {
+      // Some versions of MWLDEPPC print unresolved symbols as the link tree is being walked and
+      // printed itself. This gives a good idea of what function was looking for that symbol, but
+      // because no hierarchy tier is given, it is impossible to be certain without analyzing code.
+      // TODO: min version if this is mid-printed
       do
       {
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
         unresolved_symbols.push_back(match.str(1));
       } while (std::regex_search(head, tail, match, re_unresolved_symbol,
                                  std::regex_constants::match_continuous));
-      continue;
-    }
-    break;
-  }
-  return Error::None;
-}
-
-MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::list<std::string>& unresolved_symbols, std::size_t& line_number)
-{
-  std::smatch match;
-  DECLARE_DEBUG_STRING_VIEW;
-
-  int prev_level = 0;
-  std::map<int, NodeBase*> hierarchy_history = {std::make_pair(prev_level, &this->root)};
-
-  while (head < tail)
-  {
-    if (std::regex_search(head, tail, match, re_symbol_closure_node_normal,
-                          std::regex_constants::match_continuous))
-    {
-      int curr_level = std::stoi(match.str(1));
-      if (curr_level - 1 > prev_level)
-        return Error::SymbolClosureHierarchySkip;
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-      auto node = std::make_unique<NodeNormal>(match.str(2), match.str(3), match.str(4),
-                                               match.str(5), match.str(6));
-
-      if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
-                            std::regex_constants::match_continuous))
-      {
-        if (std::stoi(match.str(1)) != curr_level)
-          return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-        if (match.str(2) != node->name)
-          return Error::SymbolClosureUnrefDupsNameMismatch;
-        line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-        while (head < tail)
-        {
-          if (!std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
-                                 std::regex_constants::match_continuous))
-            break;
-
-          if (std::stoi(match.str(1)) != curr_level)
-            return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-          line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-          node->unref_dups.emplace_back(match.str(2), match.str(3), match.str(4), match.str(5));
-        }
-        if (node->unref_dups.size() == 0)
-          return Error::SymbolClosureUnrefDupsEmpty;
-        this->SetMinVersion(MWLinkerVersion::version_2_3_3_build_137);
-      }
-
-      if (node->name == "_dtors$99")
-      {
-        this->SetMinVersion(MWLinkerVersion::version_3_0_4);
-        // Though I do not understand it, the following is a normal occurrence:
-        // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
-        // "    3] .text (section,local) found in xyz.cpp lib.a"
-        auto fake_node = std::make_unique<NodeBase>();
-        hierarchy_history[curr_level + 1] = fake_node.get();
-        fake_node->parent = node.get();
-        node->children.push_back(std::move(fake_node));
-        prev_level = curr_level + 1;
-      }
-      else
-      {
-        prev_level = curr_level;
-      }
-      NodeBase* parent = hierarchy_history[curr_level - 1];
-      hierarchy_history[curr_level] = node.get();
-      node->parent = parent;
-      parent->children.push_back(std::move(node));
-
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_symbol_closure_node_linker_generated,
-                          std::regex_constants::match_continuous))
-    {
-      int curr_level = std::stoi(match.str(1));
-      if (curr_level - 1 > prev_level)
-        return Error::SymbolClosureHierarchySkip;
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-      auto node = std::make_unique<NodeLinkerGenerated>(match.str(2));
-
-      SymbolClosure::NodeBase* parent = hierarchy_history[curr_level - 1];
-      hierarchy_history[curr_level] = node.get();
-      node->parent = parent;
-      parent->children.push_back(std::move(node));
-      prev_level = curr_level;
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_unresolved_symbol,
-                          std::regex_constants::match_continuous))
-    {
-      // Some versions of MWLDEPPC print unresolved symbols as the link tree is being walked and
-      // printed itself. This gives a good idea of what function was looking for that symbol, but
-      // because no hierarchy tier is given, it is impossible to be certain without analyzing code.
-      // TODO: min version if this is mid-printed
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      unresolved_symbols.push_back(match.str(1));
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_excluded_symbol,
-                          std::regex_constants::match_continuous))
-    {
-      // TODO: wtf is this
-      return Error::Unimplemented;
       continue;
     }
     break;

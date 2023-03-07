@@ -88,8 +88,6 @@ struct MWLinkerMap
       NodeBase(std::string name_) : name(std::move(name_)){};
       virtual ~NodeBase() = default;
 
-      Error Read(std::string::const_iterator&, const std::string::const_iterator, std::size_t&);
-
       NodeBase* parent = nullptr;
       std::list<std::unique_ptr<NodeBase>> children;
 
@@ -117,11 +115,6 @@ struct MWLinkerMap
             module(std::move(module_)), file(std::move(file_)){};
       virtual ~NodeNormal() = default;
 
-      Error Read(std::string::const_iterator&, std::string::const_iterator, unsigned long,
-                 std::size_t&);
-      Error ReadUnrefDups(std::string::const_iterator&, std::string::const_iterator, unsigned long,
-                          std::size_t&);
-
       std::string type;
       std::string bind;
       std::string module;
@@ -133,9 +126,6 @@ struct MWLinkerMap
     {
       NodeLinkerGenerated(std::string name_) : NodeBase(std::move(name_)){};
       virtual ~NodeLinkerGenerated() = default;
-
-      Error Read(std::string::const_iterator&, std::string::const_iterator, unsigned long,
-                 std::size_t&);
     };
 
     SymbolClosure() { min_version = MWLinkerVersion::version_2_3_3_build_126; };
@@ -143,8 +133,6 @@ struct MWLinkerMap
 
     Error Read(std::string::const_iterator&, std::string::const_iterator, std::list<std::string>&,
                std::size_t&);
-    Error Read2(std::string::const_iterator&, const std::string::const_iterator, NodeBase*, int,
-                std::size_t&);
     Error Read3(std::string::const_iterator&, const std::string::const_iterator,
                 std::list<std::string>&, std::size_t&);
 
