@@ -21,7 +21,7 @@ MWLinkerMap::Error MWLinkerMap::Read(std::istream& stream, std::size_t& line_num
 
 MWLinkerMap::Error MWLinkerMap::Read(const std::string& string, std::size_t& line_number)
 {
-  return this->Read(string.begin(), string.end(), line_number);
+  return this->Read(string.c_str(), string.c_str() + string.length(), line_number);
 }
 
 // clang-format off
@@ -64,13 +64,12 @@ static const std::regex re_linker_generated_symbols_header{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::Read(  //
-    std::string::const_iterator head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char* head, const char* const tail, std::size_t& line_number)
 {
-  if (head > tail)
+  if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
 
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
   line_number = 0;
 
@@ -252,10 +251,10 @@ static const std::regex re_symbol_closure_node_linker_generated{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::list<std::string>& unresolved_symbols, std::size_t& line_number)
+    const char*& head, const char* const tail, std::list<std::string>& unresolved_symbols,
+    std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   NodeBase* curr_node = &this->root;
@@ -376,10 +375,9 @@ static const std::regex re_code_fold_summary_header{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   while (head < tail)
@@ -430,10 +428,9 @@ static const std::regex re_code_fold_summary_unit_duplicate_new_branch{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::ReadSummary(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   while (head < tail)
@@ -471,11 +468,10 @@ static const std::regex re_linker_opts_unit_disassemble_error{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   while (head < tail)
@@ -525,10 +521,9 @@ static const std::regex re_section_layout_4_column_prologue_3{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SectionLayout::Read(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_1,
@@ -599,10 +594,9 @@ static const std::regex re_section_layout_3_column_unit_entry{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   while (head < tail)
@@ -654,10 +648,9 @@ static const std::regex re_section_layout_4_column_unit_special{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   while (head < tail)
@@ -725,10 +718,9 @@ static const std::regex re_memory_map_5_column_prologue_2{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::Read(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   if (std::regex_search(head, tail, match, re_memory_map_3_column_prologue_1a,
@@ -796,10 +788,9 @@ static const std::regex re_memory_map_unit_info_a{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::Read3ColumnA(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   while (head < tail)
@@ -835,10 +826,9 @@ static const std::regex re_memory_map_unit_info_b{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::Read3ColumnB(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   while (head < tail)
@@ -865,8 +855,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::Read3ColumnB(  //
 }
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::Read5Column(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
   return Error::Unimplemented;
 }
@@ -878,10 +867,9 @@ static const std::regex re_linker_generated_symbols_unit{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::LinkerGeneratedSymbols::Read(  //
-    std::string::const_iterator& head, const std::string::const_iterator tail,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number)
 {
-  std::smatch match;
+  std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
   while (head < tail)

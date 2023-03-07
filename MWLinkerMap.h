@@ -131,10 +131,7 @@ struct MWLinkerMap
     SymbolClosure() { min_version = MWLinkerVersion::version_2_3_3_build_126; };
     virtual ~SymbolClosure() = default;
 
-    Error Read(std::string::const_iterator&, std::string::const_iterator, std::list<std::string>&,
-               std::size_t&);
-    Error Read3(std::string::const_iterator&, const std::string::const_iterator,
-                std::list<std::string>&, std::size_t&);
+    Error Read(const char*&, const char*, std::list<std::string>&, std::size_t&);
 
     NodeBase root;
   };
@@ -146,8 +143,8 @@ struct MWLinkerMap
     EPPC_PatternMatching() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
     virtual ~EPPC_PatternMatching() = default;
 
-    Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
-    Error ReadSummary(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+    Error Read(const char*&, const char*, std::size_t&);
+    Error ReadSummary(const char*&, const char*, std::size_t&);
   };
 
   // CodeWarrior for Wii 1.0
@@ -157,7 +154,7 @@ struct MWLinkerMap
     LinkerOpts() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
     virtual ~LinkerOpts() = default;
 
-    Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+    Error Read(const char*&, const char*, std::size_t&);
   };
 
   // CodeWarrior for GCN 2.7
@@ -242,9 +239,9 @@ struct MWLinkerMap
     SectionLayout(std::string name_) : name(std::move(name_)){};
     virtual ~SectionLayout() = default;
 
-    Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
-    Error Read3Column(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
-    Error Read4Column(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+    Error Read(const char*&, const char*, std::size_t&);
+    Error Read3Column(const char*&, const char*, std::size_t&);
+    Error Read4Column(const char*&, const char*, std::size_t&);
 
     std::string name;
     std::list<std::unique_ptr<UnitBase>> units;
@@ -298,10 +295,10 @@ struct MWLinkerMap
     MemoryMap() = default;
     virtual ~MemoryMap() = default;
 
-    Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
-    Error Read3ColumnA(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
-    Error Read3ColumnB(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
-    Error Read5Column(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+    Error Read(const char*&, const char*, std::size_t&);
+    Error Read3ColumnA(const char*&, const char*, std::size_t&);
+    Error Read3ColumnB(const char*&, const char*, std::size_t&);
+    Error Read5Column(const char*&, const char*, std::size_t&);
 
     std::list<std::unique_ptr<UnitBase>> units;
     bool extra_info;  // TODO: What causes MWLD(EPPC) to emit this??
@@ -321,7 +318,7 @@ struct MWLinkerMap
     LinkerGeneratedSymbols() = default;
     virtual ~LinkerGeneratedSymbols() = default;
 
-    Error Read(std::string::const_iterator&, std::string::const_iterator, std::size_t&);
+    Error Read(const char*&, const char*, std::size_t&);
 
     std::list<std::unique_ptr<Unit>> units;
   };
@@ -331,7 +328,7 @@ struct MWLinkerMap
 
   Error Read(std::istream&, std::size_t&);
   Error Read(const std::string&, std::size_t&);
-  Error Read(std::string::const_iterator, std::string::const_iterator, std::size_t&);
+  Error Read(const char*, const char*, std::size_t&);
 
   std::list<std::unique_ptr<PortionBase>> portions;
   std::list<std::string> unresolved_symbols;
