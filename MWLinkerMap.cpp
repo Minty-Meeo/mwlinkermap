@@ -11,7 +11,7 @@
 #define UPDATE_DEBUG_STRING_VIEW _debug_string_view = {head, tail}
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
 
-auto MWLinkerMap::Read(std::istream& stream, std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::Read(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
   sstream << stream.rdbuf();
@@ -19,7 +19,7 @@ auto MWLinkerMap::Read(std::istream& stream, std::size_t& line_number) -> Error
   return this->Read(string, line_number);
 }
 
-auto MWLinkerMap::Read(const std::string& string, std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::Read(const std::string& string, std::size_t& line_number)
 {
   return this->Read(string.begin(), string.end(), line_number);
 }
@@ -92,7 +92,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
   }
   {
     auto portion = std::make_unique<SymbolClosure>();
-    const auto error = portion->Read3(head, tail, this->unresolved_symbols, line_number);
+    const auto error = portion->Read(head, tail, this->unresolved_symbols, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
@@ -251,7 +251,7 @@ static const std::regex re_symbol_closure_node_linker_generated{
     "   *(\\d+)\\] (.+) found as linker generated symbol\r\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read3(  //
+MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
     std::string::const_iterator& head, const std::string::const_iterator tail,
     std::list<std::string>& unresolved_symbols, std::size_t& line_number)
 {
@@ -470,9 +470,10 @@ static const std::regex re_linker_opts_unit_disassemble_error{
     "  (.+)/ (.+)\\(\\) - error disassembling function \r\n"};
 // clang-format on
 
-auto MWLinkerMap::LinkerOpts::Read(std::string::const_iterator& head,
-                                   const std::string::const_iterator tail, std::size_t& line_number)
-    -> Error
+MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
+
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -523,9 +524,9 @@ static const std::regex re_section_layout_4_column_prologue_3{
     "  ---------------------------------\r\n"};
 // clang-format on
 
-auto MWLinkerMap::SectionLayout::Read(std::string::const_iterator& head,
-                                      const std::string::const_iterator tail,
-                                      std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::SectionLayout::Read(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -597,9 +598,9 @@ static const std::regex re_section_layout_3_column_unit_entry{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.+) \\(entry of (.+)\\) \t(.+) (.*)\r\n"};
 // clang-format on
 
-auto MWLinkerMap::SectionLayout::Read3Column(std::string::const_iterator& head,
-                                             const std::string::const_iterator tail,
-                                             std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -652,9 +653,9 @@ static const std::regex re_section_layout_4_column_unit_special{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.+)\r\n"};
 // clang-format on
 
-auto MWLinkerMap::SectionLayout::Read4Column(std::string::const_iterator& head,
-                                             const std::string::const_iterator tail,
-                                             std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -723,9 +724,9 @@ static const std::regex re_memory_map_5_column_prologue_2{
     "                   address           Offset   Address  Address\r\n"};
 // clang-format on
 
-auto MWLinkerMap::MemoryMap::Read(std::string::const_iterator& head,
-                                  const std::string::const_iterator tail, std::size_t& line_number)
-    -> Error
+MWLinkerMap::Error MWLinkerMap::MemoryMap::Read(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -794,9 +795,9 @@ static const std::regex re_memory_map_unit_info_a{
     "   *(.+)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r\n"};
 // clang-format on
 
-auto MWLinkerMap::MemoryMap::Read3ColumnA(std::string::const_iterator& head,
-                                          const std::string::const_iterator tail,
-                                          std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::MemoryMap::Read3ColumnA(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -833,9 +834,9 @@ static const std::regex re_memory_map_unit_info_b{
     "   *(.+)          ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};
 // clang-format on
 
-auto MWLinkerMap::MemoryMap::Read3ColumnB(std::string::const_iterator& head,
-                                          const std::string::const_iterator tail,
-                                          std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::MemoryMap::Read3ColumnB(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -863,9 +864,9 @@ auto MWLinkerMap::MemoryMap::Read3ColumnB(std::string::const_iterator& head,
   return Error::None;
 }
 
-auto MWLinkerMap::MemoryMap::Read5Column(std::string::const_iterator& head,
-                                         const std::string::const_iterator tail,
-                                         std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::MemoryMap::Read5Column(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   return Error::Unimplemented;
 }
@@ -876,9 +877,9 @@ static const std::regex re_linker_generated_symbols_unit{
     " *(.+) ([0-9a-f]{8})\r\n"};
 // clang-format on
 
-auto MWLinkerMap::LinkerGeneratedSymbols::Read(std::string::const_iterator& head,
-                                               const std::string::const_iterator tail,
-                                               std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::LinkerGeneratedSymbols::Read(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
