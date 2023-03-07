@@ -63,9 +63,13 @@ static const std::regex re_linker_generated_symbols_header{
     "\r\n\r\nLinker generated symbols:\r\n"};
 // clang-format on
 
-auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::const_iterator tail,
-                       std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::Read(  //
+    std::string::const_iterator head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
+  if (head > tail)
+    return Error::Fail;
+
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
   line_number = 0;
@@ -77,24 +81,18 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
                         std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    auto portion = std::make_unique<EntryPoint>(match.str(1));
-    this->portions.push_back(std::move(portion));  // TODO: emplace_back
+    this->portions.push_back(std::make_unique<EntryPoint>(match.str(1)));  // TODO: emplace_back?
   }
-  while (head < tail)
+  while (std::regex_search(head, tail, match, re_unresolved_symbol,
+                           std::regex_constants::match_continuous))
   {
-    if (std::regex_search(head, tail, match, re_unresolved_symbol,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->unresolved_symbols.push_back(match.str(1));
-      // TODO: min version if this is pre-printed
-      continue;
-    }
-    break;
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    this->unresolved_symbols.push_back(match.str(1));
+    // TODO: min version if this is pre-printed
   }
   {
     auto portion = std::make_unique<SymbolClosure>();
-    const auto error = portion->Read(head, tail, this->unresolved_symbols, line_number);
+    const auto error = portion->Read3(head, tail, this->unresolved_symbols, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
@@ -110,18 +108,13 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
     // TODO: don't add empty ones
     this->portions.push_back(std::move(portion));
   }
-  while (head < tail)
+  // TODO: is this where SYMBOL NOT FOUND post-prints really go?  Double check Ghidra.
+  while (std::regex_search(head, tail, match, re_unresolved_symbol,
+                           std::regex_constants::match_continuous))
   {
-    // TODO: is this where SYMBOL NOT FOUND post-prints really go?  Double check Ghidra.
-    if (std::regex_search(head, tail, match, re_unresolved_symbol,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->unresolved_symbols.push_back(match.str(1));
-      // TODO: min version if this is post-printed
-      continue;
-    }
-    break;
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    this->unresolved_symbols.push_back(match.str(1));
+    // TODO: min version if this is post-printed
   }
   {
     auto portion = std::make_unique<LinkerOpts>();
@@ -244,116 +237,128 @@ auto MWLinkerMap::Read(std::string::const_iterator head, const std::string::cons
 }
 
 // clang-format off
-static const std::regex re_symbol_closure_node_prefix{
-//  "%i] "
-    " +(\\d+)] "};
-static const std::regex re2_symbol_closure_node_normal{
-//  "%s (%s,%s) found in %s %s\r\n"
-    "(.+) \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
-static const std::regex re2_symbol_closure_node_normal_unref_dup_header{
-    " +(\\d+)] >>> UNREFERENCED DUPLICATE (.+)\r\n"};
-static const std::regex re2_symbol_closure_node_normal_unref_dups{
-//  ">>> (%s,%s) found in %s %s\r\n"
-    " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
-static const std::regex re2_symbol_closure_node_linker_generated{
-//  "%s found as linker generated symbol\r\n"
-    " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};
+static const std::regex re_symbol_closure_node_normal{
+//  "%i] " and "%s (%s,%s) found in %s %s\r\n"
+    "   *(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
+static const std::regex re_symbol_closure_node_normal_unref_dup_header{
+//  "%i] " and ">>> UNREFERENCED DUPLICATE %s\r\n"
+    "   *(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)\r\n"};
+static const std::regex re_symbol_closure_node_normal_unref_dups{
+//  "%i] " and ">>> (%s,%s) found in %s %s\r\n"
+    "   *(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
+static const std::regex re_symbol_closure_node_linker_generated{
+//  "%i] " and "%s found as linker generated symbol\r\n"
+    "   *(\\d+)\\] (.+) found as linker generated symbol\r\n"};
 // clang-format on
 
-auto MWLinkerMap::SymbolClosure::Read2(std::string::const_iterator& head,
-                                       const std::string::const_iterator tail,
-                                       NodeBase* const parent_node, const int curr_level,
-                                       std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read3(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::list<std::string>& unresolved_symbols, std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
+  NodeBase* curr_node = &this->root;
+  unsigned long curr_hierarchy_level = 0;
+
   while (head < tail)
   {
-    if (std::regex_search(head, tail, match, re_symbol_closure_node_prefix,
+    if (std::regex_search(head, tail, match, re_symbol_closure_node_normal,
                           std::regex_constants::match_continuous))
     {
-      const int next_level = std::stoi(match.str(1));
-      if (next_level == curr_level)
+      const unsigned long next_hierarchy_level = std::stoul(match.str(1));
+      if (curr_hierarchy_level + 1 < next_hierarchy_level)
+        return Error::SymbolClosureHierarchySkip;
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+
+      auto next_node = std::make_unique<NodeNormal>(  //
+          match.str(2), match.str(3), match.str(4), match.str(5), match.str(6));
+
+      for (auto i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
+        curr_node = curr_node->parent;
+      curr_hierarchy_level = next_hierarchy_level;
+
+      if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
+                            std::regex_constants::match_continuous))
       {
-        const auto prefix_length = match.length();
-        if (std::regex_search(head + prefix_length, tail, match, re2_symbol_closure_node_normal,
-                              std::regex_constants::match_continuous))
+        if (std::stoul(match.str(1)) != curr_hierarchy_level)
+          return Error::SymbolClosureUnrefDupsHierarchyMismatch;
+        if (match.str(2) != next_node->name)
+          return Error::SymbolClosureUnrefDupsNameMismatch;
+        line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+        while (head < tail)
         {
-          line_number += 1, head += prefix_length + match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-          auto node = std::make_unique<NodeNormal>(match.str(2), match.str(3), match.str(4),
-                                                   match.str(5), match.str(6));
-
-          if (std::regex_search(head, tail, match, re2_symbol_closure_node_normal_unref_dup_header,
+          if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                 std::regex_constants::match_continuous))
           {
-            if (std::stoi(match.str(1)) != curr_level)
-              return Error::SymbolClosureUnrefDupsLevelMismatch;
-            if (match.str(2) != node->name)
-              return Error::SymbolClosureUnrefDupsNameMismatch;
+            if (std::stoul(match.str(1)) != curr_hierarchy_level)
+              return Error::SymbolClosureUnrefDupsHierarchyMismatch;
             line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-            while (head < tail)
-            {
-              if (!std::regex_search(head, tail, match, re2_symbol_closure_node_normal_unref_dups,
-                                     std::regex_constants::match_continuous))
-                break;
-
-              if (std::stoi(match.str(1)) != curr_level)
-                return Error::SymbolClosureUnrefDupsLevelMismatch;
-              line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-              node->unref_dups.emplace_back(match.str(2), match.str(3), match.str(4), match.str(5));
-            }
-            if (node->unref_dups.size() == 0)
-              return Error::SymbolClosureUnrefDupsEmpty;
-            this->SetMinVersion(MWLinkerVersion::version_2_3_3_build_137);
+            next_node->unref_dups.emplace_back(  //
+                match.str(2), match.str(3), match.str(4), match.str(5));
+            continue;
           }
+          break;
+        }
+        if (next_node->unref_dups.size() == 0)
+          return Error::SymbolClosureUnrefDupsEmpty;
+        this->SetMinVersion(MWLinkerVersion::version_2_3_3_build_137);
+      }
 
-          node->parent = parent_node;
-          Read2(head, tail, node.get(), next_level + 1, line_number);
-          parent_node->children.push_back(std::move(node));
-          continue;
-        }
-        if (std::regex_search(head + prefix_length, tail, match,
-                              re2_symbol_closure_node_linker_generated,
-                              std::regex_constants::match_continuous))
-        {
-          /* code */
-        }
-      }
-      else if (next_level > curr_level)
+      next_node->parent = curr_node;
+      if (const bool is_weird = (next_node->name == "_dtors$99" &&
+                                 next_node->module == "Linker Generated Symbol File");
+          curr_node->children.push_back((curr_node = next_node.get(), std::move(next_node))),
+          is_weird)  // Yo dawg, I herd you like operator comma.
       {
-        return Error::SymbolClosureHierarchySkip;
+        this->SetMinVersion(MWLinkerVersion::version_3_0_4);
+        // Though I do not understand it, the following is a normal occurrence:
+        // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
+        // "    3] .text (section,local) found in xyz.cpp lib.a"
+        auto dummy_node = std::make_unique<NodeBase>();
+        dummy_node->parent = curr_node;
+        curr_node->children.push_back((curr_node = dummy_node.get(), std::move(dummy_node)));
+        ++curr_hierarchy_level;
       }
-      else
-      {
-        return Error::None;
-      }
+      continue;
     }
+    if (std::regex_search(head, tail, match, re_symbol_closure_node_linker_generated,
+                          std::regex_constants::match_continuous))
+    {
+      const unsigned long next_hierarchy_level = std::stoul(match.str(1));
+      if (curr_hierarchy_level + 1 < next_hierarchy_level)
+        return Error::SymbolClosureHierarchySkip;
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+
+      auto next_node = std::make_unique<NodeLinkerGenerated>(match.str(2));
+
+      for (auto i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
+        curr_node = curr_node->parent;
+      curr_hierarchy_level = next_hierarchy_level;
+
+      next_node->parent = curr_node;
+      curr_node->children.push_back((curr_node = next_node.get(), std::move(next_node)));
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_unresolved_symbol,
+                          std::regex_constants::match_continuous))
+    {
+      do
+      {
+        line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+        unresolved_symbols.push_back(match.str(1));
+      } while (std::regex_search(head, tail, match, re_unresolved_symbol,
+                                 std::regex_constants::match_continuous));
+      continue;
+    }
+    break;
   }
+  return Error::None;
 }
 
-// clang-format off
-static const std::regex re_symbol_closure_node_normal{
-//  "%s (%s,%s) found in %s %s\r\n"
-    " +(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
-static const std::regex re_symbol_closure_node_normal_unref_dup_header{
-//  ">>> UNREFERENCED DUPLICATE %s\r\n"
-    " +(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)\r\n"};
-static const std::regex re_symbol_closure_node_normal_unref_dups{
-//  ">>> (%s,%s) found in %s %s\r\n"
-    " +(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.*)\r\n"};
-static const std::regex re_symbol_closure_node_linker_generated{
-//  "%s found as linker generated symbol\r\n"
-    " +(\\d+)\\] (.+) found as linker generated symbol\r\n"};
-// clang-format on
-
-auto MWLinkerMap::SymbolClosure::Read(std::string::const_iterator& head,
-                                      const std::string::const_iterator tail,
-                                      std::list<std::string>& unresolved_symbols,
-                                      std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::list<std::string>& unresolved_symbols, std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -378,7 +383,7 @@ auto MWLinkerMap::SymbolClosure::Read(std::string::const_iterator& head,
                             std::regex_constants::match_continuous))
       {
         if (std::stoi(match.str(1)) != curr_level)
-          return Error::SymbolClosureUnrefDupsLevelMismatch;
+          return Error::SymbolClosureUnrefDupsHierarchyMismatch;
         if (match.str(2) != node->name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -390,7 +395,7 @@ auto MWLinkerMap::SymbolClosure::Read(std::string::const_iterator& head,
             break;
 
           if (std::stoi(match.str(1)) != curr_level)
-            return Error::SymbolClosureUnrefDupsLevelMismatch;
+            return Error::SymbolClosureUnrefDupsHierarchyMismatch;
           line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
           node->unref_dups.emplace_back(match.str(2), match.str(3), match.str(4), match.str(5));
@@ -478,9 +483,9 @@ static const std::regex re_code_fold_summary_header{
     "\r\n\r\n\r\nCode folded in file: (.+) \r\n"};
 // clang-format on
 
-auto MWLinkerMap::EPPC_PatternMatching::Read(std::string::const_iterator& head,
-                                             const std::string::const_iterator tail,
-                                             std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -532,9 +537,9 @@ static const std::regex re_code_fold_summary_unit_duplicate_new_branch{
     "--> (.+) is duplicated by (.+), size = (\\d+), new branch function (.+) \r\n\r\n"};
 // clang-format on
 
-auto MWLinkerMap::EPPC_PatternMatching::ReadSummary(std::string::const_iterator& head,
-                                                    const std::string::const_iterator tail,
-                                                    std::size_t& line_number) -> Error
+MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::ReadSummary(  //
+    std::string::const_iterator& head, const std::string::const_iterator tail,
+    std::size_t& line_number)
 {
   std::smatch match;
   DECLARE_DEBUG_STRING_VIEW;
