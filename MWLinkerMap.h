@@ -47,6 +47,12 @@ struct MWLinkerMap
     SymbolClosureUnrefDupsNameMismatch,
     SymbolClosureUnrefDupsEmpty,
 
+    EPPC_PatternMatchingMergingFirstNameMismatch,
+    EPPC_PatternMatchingMergingSecondNameMismatch,
+    EPPC_PatternMatchingMergingSizeMismatch,
+    EPPC_PatternMatchingMergingInterchangeMissingEpilogue,
+    EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch,
+
     SectionLayoutBadPrologue,
 
     MemoryMapBadPrologue,
@@ -140,11 +146,57 @@ struct MWLinkerMap
   //  - Added EPPC_PatternMatching
   struct EPPC_PatternMatching final : PortionBase
   {
+    // As it analyzes, EPPC_PatternMatching looks for functions that are duplicates of one another
+    // and prints what it finds to the linker map.
+    struct MergingUnit
+    {
+      MergingUnit(std::string first_name_, std::string second_name_, std::uint32_t size_,
+                  bool was_interchanged_, bool will_be_replaced_)
+          : first_name(std::move(first_name_)), second_name(std::move(second_name_)), size(size_),
+            will_be_replaced(will_be_replaced_), was_interchanged(was_interchanged_){};
+      ~MergingUnit() = default;
+
+      std::string first_name;
+      std::string second_name;
+      std::uint32_t size;
+      // If the conditions are right (e.g. the function is more than just a BLR instruction), then
+      // one function is replaced with a branch to the other function, saving space at the cost of a
+      // tiny amount of overhead. This is by far the more common code merging technique.
+      bool will_be_replaced;
+      // TODO: explain interchanged
+      bool was_interchanged;
+    };
+    // TODO: add description
+    // It happens right after Merging, look at gimp flowchart
+    struct FoldingUnit
+    {
+      struct Unit
+      {
+        Unit(std::string first_name_, std::string second_name_, std::uint32_t size_,
+             bool new_branch_function_)
+            : first_name(first_name_), second_name(std::move(second_name_)), size(size_),
+              new_branch_function(new_branch_function_){};
+        ~Unit() = default;
+
+        std::string first_name;
+        std::string second_name;
+        std::uint32_t size;
+        bool new_branch_function;
+      };
+
+      FoldingUnit(std::string name_) : name(std::move(name_)){};
+
+      std::string name;
+      std::list<Unit> units;
+    };
+
     EPPC_PatternMatching() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
     virtual ~EPPC_PatternMatching() = default;
 
     Error Read(const char*&, const char*, std::size_t&);
-    Error ReadSummary(const char*&, const char*, std::size_t&);
+
+    std::list<MergingUnit> merging_units;
+    std::list<FoldingUnit> folding_units;
   };
 
   // CodeWarrior for Wii 1.0

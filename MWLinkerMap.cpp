@@ -108,6 +108,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     this->portions.push_back(std::move(portion));
   }
   // TODO: is this where SYMBOL NOT FOUND post-prints really go?  Double check Ghidra.
+  // TODO: this might belong to EPPC_PatternMatching...
   while (std::regex_search(head, tail, match, re_unresolved_symbol,
                            std::regex_constants::match_continuous))
   {
@@ -310,7 +311,6 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
           curr_node->children.push_back((curr_node = next_node.get(), std::move(next_node))),
           is_weird)  // Yo dawg, I herd you like operator comma.
       {
-        this->SetMinVersion(MWLinkerVersion::version_3_0_4);
         // Though I do not understand it, the following is a normal occurrence:
         // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
         // "    3] .text (section,local) found in xyz.cpp lib.a"
@@ -318,6 +318,7 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
         dummy_node->parent = curr_node;
         curr_node->children.push_back((curr_node = dummy_node.get(), std::move(dummy_node)));
         ++curr_hierarchy_level;
+        this->SetMinVersion(MWLinkerVersion::version_3_0_4);
       }
       continue;
     }
@@ -360,18 +361,24 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
 }
 
 // clang-format off
-static const std::regex re_code_fold_analysis_unit_duplicate{
+static const std::regex re_code_merging_is_duplicated{
 //  "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
     "--> duplicated code: symbol (.+) is duplicated by (.+), size = (\\d+) \r\n\r\n"};
-static const std::regex re_code_fold_analysis_unit_replace{
+static const std::regex re_code_merging_will_be_replaced{
 //  "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
     "--> the function (.+) will be replaced by a branch to (.+)\r\n\r\n\r\n"};
-static const std::regex re_code_fold_analysis_unit_interchange{
+static const std::regex re_code_merging_was_interchanged{
 //  "--> the function %s was interchanged with %s, size=%d \r\n"
     "--> the function (.+) was interchanged with (.+), size=(\\d+) \r\n"};
-static const std::regex re_code_fold_summary_header{
+static const std::regex re_code_folding_header{
 //  "\r\n\r\n\r\nCode folded in file: %s \r\n"
     "\r\n\r\n\r\nCode folded in file: (.+) \r\n"};
+static const std::regex re_code_folding_is_duplicated{
+//  "--> %s is duplicated by %s, size = %d \r\n\r\n"
+    "--> (.+) is duplicated by (.+), size = (\\d+) \r\n\r\n"};
+static const std::regex re_code_folding_is_duplicated_new_branch{
+//  "--> %s is duplicated by %s, size = %d, new branch function %s \r\n\r\n"
+    "--> (.+) is duplicated by (.+), size = (\\d+), new branch function (.+) \r\n\r\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
@@ -380,71 +387,102 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
+  std::string last;
+
   while (head < tail)
   {
-    if (std::regex_search(head, tail, match, re_code_fold_analysis_unit_duplicate,
+    bool will_be_replaced = false;
+    bool was_interchanged = false;
+    if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                           std::regex_constants::match_continuous))
     {
       line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      const std::string first_name = match.str(1);
+      const std::string second_name = match.str(2);
+      const std::uint32_t size = std::stoul(match.str(3));
+      if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
+                            std::regex_constants::match_continuous))
+      {
+        if (match.str(1) != first_name)
+          return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
+        if (match.str(2) != second_name)
+          return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
+        line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+        will_be_replaced = true;
+      }
+      this->merging_units.emplace_back(  //
+          std::move(first_name), std::move(second_name), size, will_be_replaced, was_interchanged);
       continue;
     }
-    if (std::regex_search(head, tail, match, re_code_fold_analysis_unit_replace,
+    if (std::regex_search(head, tail, match, re_code_merging_was_interchanged,
                           std::regex_constants::match_continuous))
     {
-      line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_code_fold_analysis_unit_interchange,
-                          std::regex_constants::match_continuous))
-    {
+      const std::string first_name = match.str(1);
+      const std::string second_name = match.str(2);
+      const std::uint32_t size = std::stoul(match.str(3));
+      was_interchanged = true;
+
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
+                            std::regex_constants::match_continuous))
+      {
+        if (match.str(1) != first_name)
+          return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
+        if (match.str(2) != second_name)
+          return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
+        line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+        will_be_replaced = true;
+      }
+      if (std::regex_search(head, tail, match, re_code_merging_is_duplicated))
+      {
+        if (match.str(1) != first_name)
+          return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
+        if (match.str(2) != second_name)
+          return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
+        if (std::stoul(match.str(3)) != size)
+          return Error::EPPC_PatternMatchingMergingSizeMismatch;
+        line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      }
+      else
+      {
+        return Error::EPPC_PatternMatchingMergingInterchangeMissingEpilogue;
+      }
+      this->merging_units.emplace_back(  //
+          std::move(first_name), std::move(second_name), size, will_be_replaced, was_interchanged);
       continue;
     }
     break;
   }
   while (head < tail)
   {
-    if (std::regex_search(head, tail, match, re_code_fold_summary_header,
+    if (std::regex_search(head, tail, match, re_code_folding_header,
                           std::regex_constants::match_continuous))
     {
+      auto folding_unit = FoldingUnit(match.str(1));
       line_number += 4, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      const auto error = ReadSummary(head, tail, line_number);
-      if (error != Error::None)
-        return error;
-      continue;
-    }
-    break;
-  }
-  return Error::None;
-}
-
-// clang-format off
-static const std::regex re_code_fold_summary_unit_duplicate{
-//  "--> %s is duplicated by %s, size = %d \r\n\r\n"
-    "--> (.+) is duplicated by (.+), size = (\\d+) \r\n\r\n"};
-static const std::regex re_code_fold_summary_unit_duplicate_new_branch{
-//  "--> %s is duplicated by %s, size = %d, new branch function %s \r\n\r\n"
-    "--> (.+) is duplicated by (.+), size = (\\d+), new branch function (.+) \r\n\r\n"};
-// clang-format on
-
-MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::ReadSummary(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
-{
-  std::cmatch match;
-  DECLARE_DEBUG_STRING_VIEW;
-
-  while (head < tail)
-  {
-    if (std::regex_search(head, tail, match, re_code_fold_summary_unit_duplicate,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_code_fold_summary_unit_duplicate_new_branch,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      while (head < tail)
+      {
+        if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
+                              std::regex_constants::match_continuous))
+        {
+          line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+          folding_unit.units.emplace_back(  //
+              match.str(1), match.str(2), std::stoul(match.str(3)), false);
+          continue;
+        }
+        if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
+                              std::regex_constants::match_continuous))
+        {
+          if (match.str(1) != match.str(4))  // It is an assumption that they will match
+            return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
+          line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+          folding_unit.units.emplace_back(  //
+              match.str(1), match.str(2), std::stoul(match.str(3)), true);
+          continue;
+        }
+        break;
+      }
+      this->folding_units.push_back(std::move(folding_unit));
       continue;
     }
     break;
