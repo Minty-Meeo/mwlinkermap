@@ -473,7 +473,7 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
         if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
                               std::regex_constants::match_continuous))
         {
-          if (match.str(1) != match.str(4))  // It is an assumption that they will match
+          if (match.str(1) != match.str(4))  // It is my assumption that they will match
             return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
           line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
           folding_unit.units.emplace_back(  //
