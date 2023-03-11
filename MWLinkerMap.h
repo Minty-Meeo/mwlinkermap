@@ -194,7 +194,7 @@ struct MWLinkerMap
       std::list<Unit> units;
     };
 
-    EPPC_PatternMatching() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
+    EPPC_PatternMatching() { SetMinVersion(MWLinkerVersion::version_4_2_build_142); };
     virtual ~EPPC_PatternMatching() = default;
 
     virtual bool IsEmpty() override { return merging_units.empty() || folding_units.empty(); }
@@ -255,13 +255,63 @@ struct MWLinkerMap
       virtual ~UnitDisassembleError() = default;
     };
 
-    LinkerOpts() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
+    LinkerOpts() { SetMinVersion(MWLinkerVersion::version_4_2_build_142); };
     virtual ~LinkerOpts() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
     Error Read(const char*&, const char*, std::size_t&);
 
     std::list<std::unique_ptr<UnitBase>> units;
+  };
+
+  // CodeWarror for GCN 3.0a3 (at the earliest)
+  //  - Added Branch Islands.
+  struct BranchIslands final : PortionBase
+  {
+    struct Unit
+    {
+      Unit(std::string first_name_, std::string second_name_, bool is_safe_)
+          : first_name(std::move(first_name_)), second_name(std::move(second_name_)),
+            is_safe(is_safe_){};
+      ~Unit() = default;
+
+      std::string first_name;
+      std::string second_name;
+      bool is_safe;
+    };
+
+    BranchIslands() { SetMinVersion(MWLinkerVersion::version_4_1_build_51213); };
+    ~BranchIslands() = default;
+
+    virtual bool IsEmpty() override { return units.empty(); }
+    Error Read(const char*&, const char*, std::size_t&);
+
+    std::list<Unit> units;
+  };
+
+  // CodeWarror for GCN 3.0a3 (at the earliest)
+  //  - Added Mixed Mode Islands.
+  struct MixedModeIslands final : PortionBase
+  {
+    struct Unit
+    {
+      Unit(std::string first_name_, std::string second_name_, bool is_safe_)
+          : first_name(std::move(first_name_)), second_name(std::move(second_name_)),
+            is_safe(is_safe_){};
+      ~Unit() = default;
+
+      std::string first_name;
+      std::string second_name;
+      bool is_safe;
+    };
+
+    MixedModeIslands() { SetMinVersion(MWLinkerVersion::version_4_1_build_51213); };
+    ~MixedModeIslands() = default;
+
+    virtual bool IsEmpty() override { return units.empty(); }
+    Error Read(const char*&, const char*, std::size_t&);
+
+    std::list<Unit> units;
   };
 
   // CodeWarrior for GCN 2.7

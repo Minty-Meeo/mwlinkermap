@@ -80,10 +80,6 @@ static const std::regex re_linker_generated_symbols_header{
 // "<<< Failure in PreCalculateETI: st_size was %x, st_size should be %x\r\n"
 // "<<< Failure in %s: GetFilePos is %x, sect->calc_offset is %x\r\n"
 // "<<< Failure in %s: GetFilePos is %x, sect->bin_offset is %x\r\n"
-// "  safe branch island %s created for %s\r\n"
-// "  branch island %s created for %s\r\n"
-// "  safe mixed mode island %s created for %s\r\n"
-// "  mixed mode island %s created for %s\r\n"
 
 MWLinkerMap::Error MWLinkerMap::Read(  //
     const char* head, const char* const tail, std::size_t& line_number)
@@ -188,13 +184,23 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
                         std::regex_constants::match_continuous))
   {
     line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    // TODO
+    auto portion = std::make_unique<MixedModeIslands>();
+    const auto error = portion->Read(head, tail, line_number);
+    UPDATE_DEBUG_STRING_VIEW;
+    if (error != Error::None)
+      return error;
+    this->portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_branch_islands_header,
                         std::regex_constants::match_continuous))
   {
     line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    // TODO
+    auto portion = std::make_unique<BranchIslands>();
+    const auto error = portion->Read(head, tail, line_number);
+    UPDATE_DEBUG_STRING_VIEW;
+    if (error != Error::None)
+      return error;
+    this->portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_linktime_size_decreasing_optimizations_header,
                         std::regex_constants::match_continuous))
@@ -608,6 +614,82 @@ MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       this->units.push_back(  //
           std::make_unique<UnitOptimized>(match.str(1), match.str(2), match.str(3)));
+      continue;
+    }
+    break;
+  }
+  return Error::None;
+}
+
+// clang-format off
+static const std::regex re_branch_islands_created{
+    "  branch island (.+) created for (.+)\r\n"};
+//  "  branch island %s created for %s\r\n"
+static const std::regex re_branch_islands_created_safe{
+    "  safe branch island (.+) created for (.+)\r\n"};
+//  "  safe branch island %s created for %s\r\n"
+// clang-format on
+
+MWLinkerMap::Error MWLinkerMap::BranchIslands::Read(  //
+    const char*& head, const char* const tail, std::size_t& line_number)
+{
+  // TODO: I have only ever seen Branch Islands from Skylanders Swap Force, and on top of that, it
+  // was an empty portion. From datamining MWLDEPPC, I can only assume it goes something like this.
+
+  std::cmatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+
+  while (head < tail)
+  {
+    if (std::regex_search(head, tail, match, re_branch_islands_created,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      this->units.emplace_back(match.str(1), match.str(2), false);
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_branch_islands_created_safe,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      this->units.emplace_back(match.str(1), match.str(2), true);
+      continue;
+    }
+    break;
+  }
+  return Error::None;
+}
+
+// clang-format off
+static const std::regex re_mixed_mode_islands_created{
+    "  mixed mode island (.+) created for (.+)\r\n"};
+//  "  mixed mode island %s created for %s\r\n"
+static const std::regex re_mixed_mode_islands_created_safe{
+    "  safe mixed mode island (.+) created for (.+)\r\n"};
+//  "  safe mixed mode island %s created for %s\r\n"
+// clang-format on
+
+MWLinkerMap::Error MWLinkerMap::MixedModeIslands::Read(  //
+    const char*& head, const char* const tail, std::size_t& line_number)
+{
+  // TODO: I have literally never seen Mixed Mode Islands.
+  // Similar to Branch Islands, this is conjecture.
+
+  std::cmatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+
+  while (head < tail)
+  {
+    if (std::regex_search(head, tail, match, re_mixed_mode_islands_created,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_mixed_mode_islands_created_safe,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
     break;
