@@ -203,10 +203,59 @@ struct MWLinkerMap
   //  - Added LinkerOpts
   struct LinkerOpts final : PortionBase
   {
+    struct UnitBase
+    {
+      UnitBase(std::string module_, std::string name_)
+          : module(std::move(module_)), name(std::move(name_)){};
+      virtual ~UnitBase() = default;
+
+      std::string module;
+      std::string name;
+    };
+
+    struct UnitNotNear final : UnitBase
+    {
+      UnitNotNear(std::string module_, std::string name_, std::string reference_name_)
+          : UnitBase(std::move(module_), std::move(name_)),
+            reference_name(std::move(reference_name_)){};
+      virtual ~UnitNotNear() = default;
+
+      std::string reference_name;
+    };
+
+    struct UnitNotComputed final : UnitBase
+    {
+      UnitNotComputed(std::string module_, std::string name_, std::string reference_name_)
+          : UnitBase(std::move(module_), std::move(name_)),
+            reference_name(std::move(reference_name_)){};
+      virtual ~UnitNotComputed() = default;
+
+      std::string reference_name;
+    };
+
+    struct UnitOptimized final : UnitBase
+    {
+      UnitOptimized(std::string module_, std::string name_, std::string reference_name_)
+          : UnitBase(std::move(module_), std::move(name_)),
+            reference_name(std::move(reference_name_)){};
+      virtual ~UnitOptimized() = default;
+
+      std::string reference_name;
+    };
+
+    struct UnitDisassembleError final : UnitBase
+    {
+      UnitDisassembleError(std::string module_, std::string name_)
+          : UnitBase(std::move(module_), std::move(name_)){};
+      virtual ~UnitDisassembleError() = default;
+    };
+
     LinkerOpts() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
     virtual ~LinkerOpts() = default;
 
     Error Read(const char*&, const char*, std::size_t&);
+
+    std::list<std::unique_ptr<UnitBase>> units;
   };
 
   // CodeWarrior for GCN 2.7

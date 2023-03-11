@@ -1,9 +1,14 @@
+// TODO: speed test std::vector vs std::list
+
 #include <cstddef>
 #include <istream>
 #include <regex>
 #include <sstream>
 #include <string>
 #include <utility>
+
+#include <iostream>
+#include <typeinfo>
 
 #include "MWLinkerMap.h"
 
@@ -34,18 +39,18 @@ static const std::regex re_unresolved_symbol{
 static const std::regex re_excluded_symbol{
 //  ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s\r\n"
     ">>> EXCLUDED SYMBOL (.+) \\((.+),(.+)\\) found in (.+) (.+)\r\n"};
-static const std::regex re_linktime_size_increasing_optimizations_header{
-//  "\r\nLinktime size-increasing optimizations\r\n"
-    "\r\nLinktime size-increasing optimizations\r\n"};
-static const std::regex re_linktime_size_decreasing_optimizations_header{
-//  "\r\nLinktime size-decreasing optimizations\r\n"
-    "\r\nLinktime size-decreasing optimizations\r\n"};
 static const std::regex re_mixed_mode_islands_header{
 //  "\r\nMixed Mode Islands\r\n"
     "\r\nMixed Mode Islands\r\n"};
 static const std::regex re_branch_islands_header{
 //  "\r\nBranch Islands\r\n"
     "\r\nBranch Islands\r\n"};
+static const std::regex re_linktime_size_decreasing_optimizations_header{
+//  "\r\nLinktime size-decreasing optimizations\r\n"
+    "\r\nLinktime size-decreasing optimizations\r\n"};
+static const std::regex re_linktime_size_increasing_optimizations_header{
+//  "\r\nLinktime size-increasing optimizations\r\n"
+    "\r\nLinktime size-increasing optimizations\r\n"};
 static const std::regex re_section_layout_header{
 //  "\r\n\r\n%s section layout\r\n"
     "\r\n\r\n(.+) section layout\r\n"};
@@ -63,6 +68,23 @@ static const std::regex re_linker_generated_symbols_header{
     "\r\n\r\nLinker generated symbols:\r\n"};
 // clang-format on
 
+// Other linker map prints are known to exist, but have never been seen.  These include:
+
+// ">>> %s wasn't passed a section\r\n"
+// ">>> DYNAMIC SYMBOL: %s referenced\r\n"
+// ">>> MODULE SYMBOL NAME TOO LARGE: %s\r\n"
+// ">>> NONMODULE SYMBOL NAME TOO LARGE: %s\r\n"
+// "<<< Failure in ComputeSizeETI: section->Header->sh_size was %x, rel_size should be %x\r\n"
+// "<<< Failure in ComputeSizeETI: st_size was %x, st_size should be %x\r\n"
+// "<<< Failure in PreCalculateETI: section->Header->sh_size was %x, rel_size should be %x\r\n"
+// "<<< Failure in PreCalculateETI: st_size was %x, st_size should be %x\r\n"
+// "<<< Failure in %s: GetFilePos is %x, sect->calc_offset is %x\r\n"
+// "<<< Failure in %s: GetFilePos is %x, sect->bin_offset is %x\r\n"
+// "  safe branch island %s created for %s\r\n"
+// "  branch island %s created for %s\r\n"
+// "  safe mixed mode island %s created for %s\r\n"
+// "  mixed mode island %s created for %s\r\n"
+
 MWLinkerMap::Error MWLinkerMap::Read(  //
     const char* head, const char* const tail, std::size_t& line_number)
 {
@@ -73,12 +95,33 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
   DECLARE_DEBUG_STRING_VIEW;
   line_number = 0;
 
-  // Normally this would always be present; its absence would be an early sign that the file is
-  // not a MetroWerks linker map. However, I have decided to support certain modified linker maps
-  // that are almost on-spec but are missing this portion, among other things.
+  // 1 Link map of <entry point>
+
+  // ? Unresolved Symbols pre-print(?)
+
+  // 1 Program's Symbol Closure
+  // 2 EPPC_PatternMatching
+  // 3 DWARF Symbol Closure
+
+  // ? Unresolved Symbols post-print(?)
+
+  // ? LinkerOpts
+
+  // 1 Mixed Mode Islands
+  // 2 Branch Islands
+  // 3 Linktime size-decreasing optimizations
+  // 4 Linktime size-increasing optimizations
+
+  // 1 Section layouts
+  // 2 Memory map
+  // 3 Linker generated symbols
+
   if (std::regex_search(head, tail, match, re_entry_point_name,
                         std::regex_constants::match_continuous))
   {
+    // Normally this would always be present; its absence would be an early sign that the file is
+    // not a MetroWerks linker map. However, I have decided to support certain modified linker maps
+    // that are almost on-spec but are missing this portion, among other things.
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
     this->portions.push_back(std::make_unique<EntryPoint>(match.str(1)));  // TODO: emplace_back?
   }
@@ -95,8 +138,8 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    // TODO: don't add empty ones
-    this->portions.push_back(std::move(portion));
+    if (!portion->root.children.empty())
+      this->portions.push_back(std::move(portion));
   }
   {
     auto portion = std::make_unique<EPPC_PatternMatching>();
@@ -104,8 +147,24 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    // TODO: don't add empty ones
-    this->portions.push_back(std::move(portion));
+    if (!portion->merging_units.empty() || !portion->folding_units.empty())
+      this->portions.push_back(std::move(portion));
+  }
+  {
+    // With '-[no]listdwarf' and DWARF debugging information enabled, a second symbol closure
+    // containing info about the .dwarf and .debug sections will appear. Note that, without an
+    // EPPC_PatternMatching in the middle, this will blend into the prior symbol closure in the
+    // eyes of this read function.
+    auto portion = std::make_unique<SymbolClosure>();
+    const auto error = portion->Read(head, tail, this->unresolved_symbols, line_number);
+    UPDATE_DEBUG_STRING_VIEW;
+    if (error != Error::None)
+      return error;
+    if (!portion->root.children.empty())
+    {
+      portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
+      this->portions.push_back(std::move(portion));
+    }
   }
   // TODO: is this where SYMBOL NOT FOUND post-prints really go?  Double check Ghidra.
   // TODO: this might belong to EPPC_PatternMatching...
@@ -122,8 +181,8 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    // TODO: don't add empty ones
-    this->portions.push_back(std::move(portion));
+    if (!portion->units.empty())
+      this->portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
                         std::regex_constants::match_continuous))
@@ -189,6 +248,9 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
       // Linker maps from Doubutsu no Mori + (foresta.map2 and static.map2) are modified similarly
       // to their counterparts in Doubutsu no Mori e+, though now with no preceding newlines. The
       // unmodified linker maps were also left on the disc, so maybe just use those instead?
+      // Similarly modified linker maps:
+      //   The Legend of Zelda - Ocarina of Time & Master Quest
+      //   The Legend of Zelda - The Wind Waker (framework.map)
       auto portion = std::make_unique<SectionLayout>(match.str(1));
       const auto error = portion->Read(head, tail, line_number);
       UPDATE_DEBUG_STRING_VIEW;
@@ -306,12 +368,12 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
       }
 
       next_node->parent = curr_node;
-      if (const bool is_weird = (next_node->name == "_dtors$99" &&
+      if (const bool is_weird = (next_node->name == "_dtors$99" &&  // Redundancy out of paranoia
                                  next_node->module == "Linker Generated Symbol File");
           curr_node->children.push_back((curr_node = next_node.get(), std::move(next_node))),
           is_weird)  // Yo dawg, I herd you like operator comma.
       {
-        // Though I do not understand it, the following is a normal occurrence:
+        // Though I do not understand it, the following is a normal occurrence for _dtors$99:
         // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
         // "    3] .text (section,local) found in xyz.cpp lib.a"
         auto dummy_node = std::make_unique<NodeBase>();
@@ -343,9 +405,10 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
     if (std::regex_search(head, tail, match, re_unresolved_symbol,
                           std::regex_constants::match_continuous))
     {
-      // Some versions of MWLDEPPC print unresolved symbols as the link tree is being walked and
-      // printed itself. This gives a good idea of what function was looking for that symbol, but
-      // because no hierarchy tier is given, it is impossible to be certain without analyzing code.
+      // Up until CW for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the symbol
+      // closure was being walked and printed itself. This gives a good idea of what function was
+      // looking for that symbol, but because no hierarchy tier is given, it is impossible to be
+      // certain without analyzing code.
       // TODO: min version if this is mid-printed
       do
       {
@@ -397,8 +460,8 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
                           std::regex_constants::match_continuous))
     {
       line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      const std::string first_name = match.str(1);
-      const std::string second_name = match.str(2);
+      std::string first_name = match.str(1);
+      std::string second_name = match.str(2);
       const std::uint32_t size = std::stoul(match.str(3));
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
@@ -417,8 +480,8 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
     if (std::regex_search(head, tail, match, re_code_merging_was_interchanged,
                           std::regex_constants::match_continuous))
     {
-      const std::string first_name = match.str(1);
-      const std::string second_name = match.str(2);
+      std::string first_name = match.str(1);
+      std::string second_name = match.str(2);
       const std::uint32_t size = std::stoul(match.str(3));
       was_interchanged = true;
 
@@ -518,24 +581,33 @@ MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_linker_opts_unit_address_not_computed,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_linker_opts_unit_address_optimize,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      this->units.push_back(  //
+          std::make_unique<UnitNotNear>(match.str(1), match.str(2), match.str(3)));
       continue;
     }
     if (std::regex_search(head, tail, match, re_linker_opts_unit_disassemble_error,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      this->units.push_back(  //
+          std::make_unique<UnitDisassembleError>(match.str(1), match.str(2)));
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_linker_opts_unit_address_not_computed,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      this->units.push_back(  //
+          std::make_unique<UnitNotComputed>(match.str(1), match.str(2), match.str(3)));
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_linker_opts_unit_address_optimize,
+                          std::regex_constants::match_continuous))
+    {
+      // I have not seen a single symbol map with this
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      this->units.push_back(  //
+          std::make_unique<UnitOptimized>(match.str(1), match.str(2), match.str(3)));
       continue;
     }
     break;
@@ -753,6 +825,39 @@ static const std::regex re_memory_map_5_column_prologue_1{
 static const std::regex re_memory_map_5_column_prologue_2{
 //  "                   address           Offset   Address  Address\r\n"
     "                   address           Offset   Address  Address\r\n"};
+// 
+// "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n"
+// "                       address           Offset   Address  Address       Line     Offset   Name\r\n"
+// "  %20s %08x %08x %08x %08x %08x    %10i %08x %s\r\n"
+
+// "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n"
+// "                       address           Offset   Address  Address    Offset   Name\r\n"
+// "  %20s %08x %08x %08x %08x %08x   %08x %s\r\n"
+
+// "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n"
+// "                       address           Offset   Address  Address     Line\r\n"
+// "  %20s %08x %08x %08x %08x %08x %10i\r\n"
+
+// "                       Starting Size     File     ROM      RAM Buffer\r\n"
+// "                       address           Offset   Address  Address\r\n"
+// "  %20s %08x %08x %08x %08x %08x\r\n"
+
+// "                       Starting Size     File        S-Record Bin File Bin File\r\n"
+// "                       address           Offset      Line     Offset   Name\r\n"
+// "  %20s %08x %08x %08x  %10i %08x %s\r\n"
+
+// "                       Starting Size     File     Bin File Bin File\r\n"
+// "                       address           Offset   Offset   Name\r\n"
+// "  %20s %08x %08x %08x %08x %s\r\n"
+
+// "                       Starting Size     File       S-Record\r\n"
+// "                       address           Offset     Line\r\n"
+// "  %20s %08x %08x %08x %10i\r\n"
+
+// "                       Starting Size     File\r\n"
+// "                       address           Offset\r\n"
+// "  %20s %08x %08x %08x\r\n"
+
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::Read(  //
