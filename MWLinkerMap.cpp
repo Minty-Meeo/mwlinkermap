@@ -610,7 +610,7 @@ MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
     if (std::regex_search(head, tail, match, re_linker_opts_unit_address_optimize,
                           std::regex_constants::match_continuous))
     {
-      // I have not seen a single symbol map with this
+      // I have not seen a single linker map with this
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       this->units.push_back(  //
           std::make_unique<UnitOptimized>(match.str(1), match.str(2), match.str(3)));
@@ -623,11 +623,11 @@ MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
 
 // clang-format off
 static const std::regex re_branch_islands_created{
-    "  branch island (.+) created for (.+)\r\n"};
 //  "  branch island %s created for %s\r\n"
+    "  branch island (.+) created for (.+)\r\n"};
 static const std::regex re_branch_islands_created_safe{
-    "  safe branch island (.+) created for (.+)\r\n"};
 //  "  safe branch island %s created for %s\r\n"
+    "  safe branch island (.+) created for (.+)\r\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::BranchIslands::Read(  //
@@ -662,11 +662,11 @@ MWLinkerMap::Error MWLinkerMap::BranchIslands::Read(  //
 
 // clang-format off
 static const std::regex re_mixed_mode_islands_created{
-    "  mixed mode island (.+) created for (.+)\r\n"};
 //  "  mixed mode island %s created for %s\r\n"
+    "  mixed mode island (.+) created for (.+)\r\n"};
 static const std::regex re_mixed_mode_islands_created_safe{
-    "  safe mixed mode island (.+) created for (.+)\r\n"};
 //  "  safe mixed mode island %s created for %s\r\n"
+    "  safe mixed mode island (.+) created for (.+)\r\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MixedModeIslands::Read(  //
