@@ -69,6 +69,7 @@ struct MWLinkerMap
     {
       min_version = std::max(min_version, version);
     }
+    virtual bool IsEmpty() = 0;
 
     MWLinkerVersion min_version = MWLinkerVersion::Unknown;
   };
@@ -77,6 +78,8 @@ struct MWLinkerMap
   {
     EntryPoint(std::string name) : entry_point_name(name) {}
     ~EntryPoint() = default;
+
+    virtual bool IsEmpty() override { return true; }
 
     std::string entry_point_name;
   };
@@ -137,6 +140,7 @@ struct MWLinkerMap
     SymbolClosure() { min_version = MWLinkerVersion::version_2_3_3_build_126; };
     virtual ~SymbolClosure() = default;
 
+    virtual bool IsEmpty() override { return root.children.empty(); }
     Error Read(const char*&, const char*, std::list<std::string>&, std::size_t&);
 
     NodeBase root;
@@ -193,6 +197,7 @@ struct MWLinkerMap
     EPPC_PatternMatching() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
     virtual ~EPPC_PatternMatching() = default;
 
+    virtual bool IsEmpty() override { return merging_units.empty() || folding_units.empty(); }
     Error Read(const char*&, const char*, std::size_t&);
 
     std::list<MergingUnit> merging_units;
@@ -253,6 +258,7 @@ struct MWLinkerMap
     LinkerOpts() { this->min_version = MWLinkerVersion::version_4_2_build_142; };
     virtual ~LinkerOpts() = default;
 
+    virtual bool IsEmpty() override { return units.empty(); }
     Error Read(const char*&, const char*, std::size_t&);
 
     std::list<std::unique_ptr<UnitBase>> units;
@@ -340,6 +346,7 @@ struct MWLinkerMap
     SectionLayout(std::string name_) : name(std::move(name_)){};
     virtual ~SectionLayout() = default;
 
+    virtual bool IsEmpty() override { return units.empty(); }
     Error Read(const char*&, const char*, std::size_t&);
     Error Read3Column(const char*&, const char*, std::size_t&);
     Error Read4Column(const char*&, const char*, std::size_t&);
@@ -396,6 +403,7 @@ struct MWLinkerMap
     MemoryMap() = default;
     virtual ~MemoryMap() = default;
 
+    virtual bool IsEmpty() override { return units.empty(); }
     Error Read(const char*&, const char*, std::size_t&);
     Error Read3ColumnA(const char*&, const char*, std::size_t&);
     Error Read3ColumnB(const char*&, const char*, std::size_t&);
@@ -419,6 +427,7 @@ struct MWLinkerMap
     LinkerGeneratedSymbols() = default;
     virtual ~LinkerGeneratedSymbols() = default;
 
+    virtual bool IsEmpty() override { return units.empty(); }
     Error Read(const char*&, const char*, std::size_t&);
 
     std::list<std::unique_ptr<Unit>> units;

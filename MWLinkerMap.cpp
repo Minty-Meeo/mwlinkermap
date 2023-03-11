@@ -138,7 +138,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    if (!portion->root.children.empty())
+    if (!portion->IsEmpty())
       this->portions.push_back(std::move(portion));
   }
   {
@@ -147,7 +147,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    if (!portion->merging_units.empty() || !portion->folding_units.empty())
+    if (!portion->IsEmpty())
       this->portions.push_back(std::move(portion));
   }
   {
@@ -160,7 +160,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    if (!portion->root.children.empty())
+    if (!portion->IsEmpty())
     {
       portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
       this->portions.push_back(std::move(portion));
@@ -181,7 +181,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    if (!portion->units.empty())
+    if (!portion->IsEmpty())
       this->portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
