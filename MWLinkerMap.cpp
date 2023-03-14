@@ -112,6 +112,42 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
   // 2 Memory map
   // 3 Linker generated symbols
 
+  if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+
+    // Linker maps from Animal Crossing (foresta.map and static.map) and Doubutsu no Mori e+
+    // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
+    // modified to strip out the Link Map portion and UNUSED symbols, though the way it was done
+    // also removed one of the Section Layout header's preceding newlines.
+    auto portion = std::make_unique<SectionLayout>(match.str(1));
+    const auto error = portion->Read(head, tail, line_number);
+    UPDATE_DEBUG_STRING_VIEW;
+    if (error != Error::None)
+      return error;
+    this->portions.push_back(std::move(portion));
+    goto MODIFIED_LINKER_MAPS_SKIP_TO_HERE;
+  }
+  if (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+
+    // Linker maps from Doubutsu no Mori + (foresta.map2 and static.map2) are modified similarly
+    // to their counterparts in Doubutsu no Mori e+, though now with no preceding newlines. The
+    // unmodified linker maps were also left on the disc, so maybe just use those instead?
+    // Similarly modified linker maps:
+    //   The Legend of Zelda - Ocarina of Time & Master Quest
+    //   The Legend of Zelda - The Wind Waker (framework.map)
+    auto portion = std::make_unique<SectionLayout>(match.str(1));
+    const auto error = portion->Read(head, tail, line_number);
+    UPDATE_DEBUG_STRING_VIEW;
+    if (error != Error::None)
+      return error;
+    this->portions.push_back(std::move(portion));
+    goto MODIFIED_LINKER_MAPS_SKIP_TO_HERE;
+  }
   if (std::regex_search(head, tail, match, re_entry_point_name,
                         std::regex_constants::match_continuous))
   {
@@ -214,58 +250,18 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
     // TODO
   }
-  while (head < tail)
+MODIFIED_LINKER_MAPS_SKIP_TO_HERE:
+  while (std::regex_search(head, tail, match, re_section_layout_header,
+                           std::regex_constants::match_continuous))
   {
-    if (std::regex_search(head, tail, match, re_section_layout_header,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
-      auto portion = std::make_unique<SectionLayout>(match.str(1));
-      const auto error = portion->Read(head, tail, line_number);
-      UPDATE_DEBUG_STRING_VIEW;
-      if (error != Error::None)
-        return error;
-      this->portions.push_back(std::move(portion));
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-      // Linker maps from Animal Crossing (foresta.map and static.map) and Doubutsu no Mori e+
-      // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
-      // modified to strip out the Link Map portion and UNUSED symbols, though the way it was done
-      // also removed one of the Section Layout header's preceding newlines.
-      auto portion = std::make_unique<SectionLayout>(match.str(1));
-      const auto error = portion->Read(head, tail, line_number);
-      UPDATE_DEBUG_STRING_VIEW;
-      if (error != Error::None)
-        return error;
-      this->portions.push_back(std::move(portion));
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
-      // Linker maps from Doubutsu no Mori + (foresta.map2 and static.map2) are modified similarly
-      // to their counterparts in Doubutsu no Mori e+, though now with no preceding newlines. The
-      // unmodified linker maps were also left on the disc, so maybe just use those instead?
-      // Similarly modified linker maps:
-      //   The Legend of Zelda - Ocarina of Time & Master Quest
-      //   The Legend of Zelda - The Wind Waker (framework.map)
-      auto portion = std::make_unique<SectionLayout>(match.str(1));
-      const auto error = portion->Read(head, tail, line_number);
-      UPDATE_DEBUG_STRING_VIEW;
-      if (error != Error::None)
-        return error;
-      this->portions.push_back(std::move(portion));
-      continue;
-    }
-    break;
+    auto portion = std::make_unique<SectionLayout>(match.str(1));
+    const auto error = portion->Read(head, tail, line_number);
+    UPDATE_DEBUG_STRING_VIEW;
+    if (error != Error::None)
+      return error;
+    this->portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_memory_map_header,
                         std::regex_constants::match_continuous))
