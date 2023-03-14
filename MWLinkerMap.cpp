@@ -166,7 +166,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
   }
   {
     auto portion = std::make_unique<SymbolClosure>();
-    const auto error = portion->Read(head, tail, this->unresolved_symbols, line_number);
+    const auto error = portion->Read(head, tail, line_number, this->unresolved_symbols);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
@@ -188,7 +188,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     // EPPC_PatternMatching in the middle, this will blend into the prior symbol closure in the
     // eyes of this read function.
     auto portion = std::make_unique<SymbolClosure>();
-    const auto error = portion->Read(head, tail, this->unresolved_symbols, line_number);
+    const auto error = portion->Read(head, tail, line_number, this->unresolved_symbols);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
@@ -590,8 +590,8 @@ static const std::regex re_symbol_closure_node_linker_generated{
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
-    const char*& head, const char* const tail, std::list<std::string>& unresolved_symbols,
-    std::size_t& line_number)
+    const char*& head, const char* const tail, std::size_t& line_number,
+    std::list<std::string>& unresolved_symbols)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;

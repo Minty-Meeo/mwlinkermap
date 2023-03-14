@@ -144,7 +144,7 @@ struct MWLinkerMap
     virtual ~SymbolClosure() = default;
 
     virtual bool IsEmpty() override { return root.children.empty(); }
-    Error Read(const char*&, const char*, std::list<std::string>&, std::size_t&);
+    Error Read(const char*&, const char*, std::size_t&, std::list<std::string>&);
 
     NodeBase root;
   };
