@@ -121,12 +121,10 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
     // modified to strip out the Link Map portion and UNUSED symbols, though the way it was done
     // also removed one of the Section Layout header's preceding newlines.
-    auto portion = std::make_unique<SectionLayout>(match.str(1));
-    const auto error = portion->Read(head, tail, line_number);
+    const auto error = this->ReadSectionLayoutPrologue(head, tail, line_number, match.str(1));
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
     goto MODIFIED_LINKER_MAPS_SKIP_TO_HERE;
   }
   if (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
@@ -140,12 +138,10 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     // Similarly modified linker maps:
     //   The Legend of Zelda - Ocarina of Time & Master Quest
     //   The Legend of Zelda - The Wind Waker (framework.map)
-    auto portion = std::make_unique<SectionLayout>(match.str(1));
-    const auto error = portion->Read(head, tail, line_number);
+    const auto error = this->ReadSectionLayoutPrologue(head, tail, line_number, match.str(1));
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
     goto MODIFIED_LINKER_MAPS_SKIP_TO_HERE;
   }
   if (std::regex_search(head, tail, match, re_entry_point_name,
@@ -256,12 +252,10 @@ MODIFIED_LINKER_MAPS_SKIP_TO_HERE:
   {
     line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
-    auto portion = std::make_unique<SectionLayout>(match.str(1));
-    const auto error = portion->Read(head, tail, line_number);
+    const auto error = this->ReadSectionLayoutPrologue(head, tail, line_number, match.str(1));
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_memory_map_header,
                         std::regex_constants::match_continuous))
@@ -295,6 +289,93 @@ MODIFIED_LINKER_MAPS_SKIP_TO_HERE:
       return Error::GarbageFound;
   }
 
+  return Error::None;
+}
+
+// clang-format off
+static const std::regex re_section_layout_3_column_prologue_1{
+    "  Starting        Virtual\r\n"};
+static const std::regex re_section_layout_3_column_prologue_2{
+    "  address  Size   address\r\n"};
+static const std::regex re_section_layout_3_column_prologue_3{
+    "  -----------------------\r\n"};
+static const std::regex re_section_layout_4_column_prologue_1{
+    "  Starting        Virtual  File\r\n"};
+static const std::regex re_section_layout_4_column_prologue_2{
+    "  address  Size   address  offset\r\n"};
+static const std::regex re_section_layout_4_column_prologue_3{
+    "  ---------------------------------\r\n"};
+// clang-format on
+
+MWLinkerMap::Error MWLinkerMap::ReadSectionLayoutPrologue(  //
+    const char*& head, const char* const tail, std::size_t& line_number, std::string name)
+{
+  std::cmatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+
+  if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_1,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_2,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_3,
+                            std::regex_constants::match_continuous))
+      {
+        line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+        auto portion = std::make_unique<SectionLayout>(std::move(name));
+        const auto error = portion->Read3Column(head, tail, line_number);
+        UPDATE_DEBUG_STRING_VIEW;
+        if (error != Error::None)
+          return error;
+        this->portions.push_back(std::move(portion));
+      }
+      else
+      {
+        return Error::SectionLayoutBadPrologue;
+      }
+    }
+    else
+    {
+      return Error::SectionLayoutBadPrologue;
+    }
+  }
+  else if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_1,
+                             std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_2,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_3,
+                            std::regex_constants::match_continuous))
+      {
+        line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+        auto portion = std::make_unique<SectionLayout>(std::move(name));
+        portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
+        const auto error = portion->Read4Column(head, tail, line_number);
+        UPDATE_DEBUG_STRING_VIEW;
+        if (error != Error::None)
+          return error;
+        this->portions.push_back(std::move(portion));
+      }
+      else
+      {
+        return Error::SectionLayoutBadPrologue;
+      }
+    }
+    else
+    {
+      return Error::SectionLayoutBadPrologue;
+    }
+  }
+  else
+  {
+    return Error::SectionLayoutBadPrologue;
+  }
   return Error::None;
 }
 
@@ -965,82 +1046,6 @@ MWLinkerMap::Error MWLinkerMap::MixedModeIslands::Read(  //
     break;
   }
   return Error::None;
-}
-
-// clang-format off
-static const std::regex re_section_layout_3_column_prologue_1{
-    "  Starting        Virtual\r\n"};
-static const std::regex re_section_layout_3_column_prologue_2{
-    "  address  Size   address\r\n"};
-static const std::regex re_section_layout_3_column_prologue_3{
-    "  -----------------------\r\n"};
-static const std::regex re_section_layout_4_column_prologue_1{
-    "  Starting        Virtual  File\r\n"};
-static const std::regex re_section_layout_4_column_prologue_2{
-    "  address  Size   address  offset\r\n"};
-static const std::regex re_section_layout_4_column_prologue_3{
-    "  ---------------------------------\r\n"};
-// clang-format on
-
-MWLinkerMap::Error MWLinkerMap::SectionLayout::Read(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
-{
-  std::cmatch match;
-  DECLARE_DEBUG_STRING_VIEW;
-
-  if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_1,
-                        std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_2,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_3,
-                            std::regex_constants::match_continuous))
-      {
-        line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-        return this->Read3Column(head, tail, line_number);
-      }
-      else
-      {
-        return Error::SectionLayoutBadPrologue;
-      }
-    }
-    else
-    {
-      return Error::SectionLayoutBadPrologue;
-    }
-  }
-  else if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_1,
-                             std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_2,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_3,
-                            std::regex_constants::match_continuous))
-      {
-        line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-        this->SetMinVersion(MWLinkerVersion::version_3_0_4);
-        return this->Read4Column(head, tail, line_number);
-      }
-      else
-      {
-        return Error::SectionLayoutBadPrologue;
-      }
-    }
-    else
-    {
-      return Error::SectionLayoutBadPrologue;
-    }
-  }
-  else
-  {
-    return Error::SectionLayoutBadPrologue;
-  }
 }
 
 // clang-format off

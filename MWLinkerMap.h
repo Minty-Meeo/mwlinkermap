@@ -554,6 +554,7 @@ struct MWLinkerMap
   Error Read(std::istream&, std::size_t&);
   Error Read(const std::string&, std::size_t&);
   Error Read(const char*, const char*, std::size_t&);
+  Error ReadSectionLayoutPrologue(const char*&, const char* const, std::size_t&, std::string);
   Error ReadMemoryMapPrologue(const char*&, const char*, std::size_t&);
 
   std::list<std::unique_ptr<PortionBase>> portions;
