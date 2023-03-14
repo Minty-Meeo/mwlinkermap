@@ -47,9 +47,6 @@ struct MWLinkerMap
     Unimplemented,
     GarbageFound,
 
-    RegexFail,
-
-    SymbolClosureBadBody,
     SymbolClosureHierarchySkip,
     SymbolClosureUnrefDupsHierarchyMismatch,
     SymbolClosureUnrefDupsNameMismatch,
@@ -64,8 +61,6 @@ struct MWLinkerMap
     SectionLayoutBadPrologue,
 
     MemoryMapBadPrologue,
-
-    SymbolNotFound,
   };
 
   struct PortionBase
