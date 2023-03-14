@@ -125,7 +125,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    goto MODIFIED_LINKER_MAPS_SKIP_TO_HERE;
+    goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE;
   }
   if (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
                         std::regex_constants::match_continuous))
@@ -142,16 +142,18 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
-    goto MODIFIED_LINKER_MAPS_SKIP_TO_HERE;
+    goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE;
   }
   if (std::regex_search(head, tail, match, re_entry_point_name,
                         std::regex_constants::match_continuous))
   {
-    // Normally this would always be present; its absence would be an early sign that the file is
-    // not a MetroWerks linker map. However, I have decided to support certain modified linker maps
-    // that are almost on-spec but are missing this portion, among other things.
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->portions.push_back(std::make_unique<EntryPoint>(match.str(1)));  // TODO: emplace_back?
+    this->entry_point_name = match.str(1);
+  }
+  else
+  {
+    // If this is not present, the file must not be a Metrowerks linker map.
+    return Error::EntryPointNameMissing;
   }
   while (std::regex_search(head, tail, match, re_unresolved_symbol,
                            std::regex_constants::match_continuous))
@@ -246,7 +248,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
     // TODO
   }
-MODIFIED_LINKER_MAPS_SKIP_TO_HERE:
+NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   while (std::regex_search(head, tail, match, re_section_layout_header,
                            std::regex_constants::match_continuous))
   {

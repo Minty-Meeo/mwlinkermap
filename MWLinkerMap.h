@@ -46,6 +46,7 @@ struct MWLinkerMap
     Fail,
     Unimplemented,
     GarbageFound,
+    EntryPointNameMissing,
 
     SymbolClosureHierarchySkip,
     SymbolClosureUnrefDupsHierarchyMismatch,
@@ -75,16 +76,6 @@ struct MWLinkerMap
     virtual bool IsEmpty() = 0;
 
     MWLinkerVersion min_version = MWLinkerVersion::Unknown;
-  };
-
-  struct EntryPoint final : PortionBase
-  {
-    EntryPoint(std::string name) : entry_point_name(name) {}
-    ~EntryPoint() = default;
-
-    virtual bool IsEmpty() override { return true; }
-
-    std::string entry_point_name;
   };
 
   // CodeWarrior for GCN 1.1
@@ -557,6 +548,7 @@ struct MWLinkerMap
   Error ReadSectionLayoutPrologue(const char*&, const char* const, std::size_t&, std::string);
   Error ReadMemoryMapPrologue(const char*&, const char*, std::size_t&);
 
+  std::string entry_point_name;
   std::list<std::unique_ptr<PortionBase>> portions;
   std::list<std::string> unresolved_symbols;
 };
