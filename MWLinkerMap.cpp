@@ -293,17 +293,17 @@ MODIFIED_LINKER_MAPS_SKIP_TO_HERE:
 }
 
 // clang-format off
-static const std::regex re_section_layout_3_column_prologue_1{
+static const std::regex re_section_layout_3column_prologue_1{
     "  Starting        Virtual\r\n"};
-static const std::regex re_section_layout_3_column_prologue_2{
+static const std::regex re_section_layout_3column_prologue_2{
     "  address  Size   address\r\n"};
-static const std::regex re_section_layout_3_column_prologue_3{
+static const std::regex re_section_layout_3column_prologue_3{
     "  -----------------------\r\n"};
-static const std::regex re_section_layout_4_column_prologue_1{
+static const std::regex re_section_layout_4column_prologue_1{
     "  Starting        Virtual  File\r\n"};
-static const std::regex re_section_layout_4_column_prologue_2{
+static const std::regex re_section_layout_4column_prologue_2{
     "  address  Size   address  offset\r\n"};
-static const std::regex re_section_layout_4_column_prologue_3{
+static const std::regex re_section_layout_4column_prologue_3{
     "  ---------------------------------\r\n"};
 // clang-format on
 
@@ -313,15 +313,15 @@ MWLinkerMap::Error MWLinkerMap::ReadSectionLayoutPrologue(  //
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_1,
+  if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_1,
                         std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_2,
+    if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      if (std::regex_search(head, tail, match, re_section_layout_3_column_prologue_3,
+      if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_3,
                             std::regex_constants::match_continuous))
       {
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -342,15 +342,15 @@ MWLinkerMap::Error MWLinkerMap::ReadSectionLayoutPrologue(  //
       return Error::SectionLayoutBadPrologue;
     }
   }
-  else if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_1,
+  else if (std::regex_search(head, tail, match, re_section_layout_4column_prologue_1,
                              std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_2,
+    if (std::regex_search(head, tail, match, re_section_layout_4column_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      if (std::regex_search(head, tail, match, re_section_layout_4_column_prologue_3,
+      if (std::regex_search(head, tail, match, re_section_layout_4column_prologue_3,
                             std::regex_constants::match_continuous))
       {
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -1049,13 +1049,13 @@ MWLinkerMap::Error MWLinkerMap::MixedModeIslands::Read(  //
 }
 
 // clang-format off
-static const std::regex re_section_layout_3_column_unit_normal{
+static const std::regex re_section_layout_3column_unit_normal{
 //  "  %08x %06x %08x %2i %s \t%s %s\r\n"
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.*)\r\n"};
-static const std::regex re_section_layout_3_column_unit_unused{
+static const std::regex re_section_layout_3column_unit_unused{
 //  "  UNUSED   %06x ........ %s %s %s\r\n"
     "  UNUSED   ([0-9a-f]{6}) \\.{8} (.+) (.+) (.*)\r\n"};
-static const std::regex re_section_layout_3_column_unit_entry{
+static const std::regex re_section_layout_3column_unit_entry{
 //  "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.+) \\(entry of (.+)\\) \t(.+) (.*)\r\n"};
 // clang-format on
@@ -1068,7 +1068,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
 
   while (head < tail)
   {
-    if (std::regex_search(head, tail, match, re_section_layout_3_column_unit_normal,
+    if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitNormal>(  //
@@ -1077,7 +1077,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
-    if (std::regex_search(head, tail, match, re_section_layout_3_column_unit_unused,
+    if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitUnused>(  //
@@ -1085,7 +1085,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
-    if (std::regex_search(head, tail, match, re_section_layout_3_column_unit_entry,
+    if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitEntry>(  //
@@ -1100,16 +1100,16 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
 }
 
 // clang-format off
-static const std::regex re_section_layout_4_column_unit_normal{
+static const std::regex re_section_layout_4column_unit_normal{
 //  "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.*)\r\n"};
-static const std::regex re_section_layout_4_column_unit_unused{
+static const std::regex re_section_layout_4column_unit_unused{
 //  "  UNUSED   %06x ........ ........    %s %s %s\r\n"
     "  UNUSED   ([0-9a-f]{6}) \\.{8} \\.{8}    (.+) (.+) (.*)\r\n"};
-static const std::regex re_section_layout_4_column_unit_entry{
+static const std::regex re_section_layout_4column_unit_entry{
 //  "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})    (.+) \\(entry of (.+)\\) \t(.+) (.*)\r\n"};
-static const std::regex re_section_layout_4_column_unit_special{
+static const std::regex re_section_layout_4column_unit_special{
 //  "  %08x %06x %08x %08x %2i %s\r\n"
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.+)\r\n"};
 // clang-format on
@@ -1122,7 +1122,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
 
   while (head < tail)
   {
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_normal,
+    if (std::regex_search(head, tail, match, re_section_layout_4column_unit_normal,
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitNormal>(  //
@@ -1131,7 +1131,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_unused,
+    if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitUnused>(  //
@@ -1139,7 +1139,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_entry,
+    if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitEntry>(  //
@@ -1149,7 +1149,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
       continue;
     }
     // This regex is so overkill, it risks finding false positives.  TODO: irregularity post-checker
-    if (std::regex_search(head, tail, match, re_section_layout_4_column_unit_special,
+    if (std::regex_search(head, tail, match, re_section_layout_4column_unit_special,
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitSpecial>(  //
