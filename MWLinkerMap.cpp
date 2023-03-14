@@ -20,13 +20,17 @@ MWLinkerMap::Error MWLinkerMap::Read(std::istream& stream, std::size_t& line_num
 {
   std::stringstream sstream;
   sstream << stream.rdbuf();
-  const std::string string = std::move(sstream).str();
-  return this->Read(string, line_number);
+  return this->Read(sstream, line_number);
 }
 
-MWLinkerMap::Error MWLinkerMap::Read(const std::string& string, std::size_t& line_number)
+MWLinkerMap::Error MWLinkerMap::Read(const std::stringstream& sstream, std::size_t& line_number)
 {
-  return this->Read(string.c_str(), string.c_str() + string.length(), line_number);
+  return this->Read(sstream.view(), line_number);
+}
+
+MWLinkerMap::Error MWLinkerMap::Read(const std::string_view string_view, std::size_t& line_number)
+{
+  return this->Read(string_view.data(), string_view.data() + string_view.length(), line_number);
 }
 
 // clang-format off

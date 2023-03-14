@@ -3,7 +3,9 @@
 #include <istream>
 #include <list>
 #include <memory>
+#include <sstream>
 #include <string>
+#include <string_view>
 
 enum class MWLinkerVersion
 {
@@ -543,7 +545,8 @@ struct MWLinkerMap
   ~MWLinkerMap() = default;
 
   Error Read(std::istream&, std::size_t&);
-  Error Read(const std::string&, std::size_t&);
+  Error Read(const std::stringstream&, std::size_t&);
+  Error Read(std::string_view, std::size_t&);
   Error Read(const char*, const char*, std::size_t&);
   Error ReadSectionLayoutPrologue(const char*&, const char* const, std::size_t&, std::string);
   Error ReadMemoryMapPrologue(const char*&, const char*, std::size_t&);
