@@ -155,13 +155,6 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     // If this is not present, the file must not be a Metrowerks linker map.
     return Error::EntryPointNameMissing;
   }
-  while (std::regex_search(head, tail, match, re_unresolved_symbol,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->unresolved_symbols.push_back(match.str(1));
-    // TODO: min version if this is pre-printed
-  }
   {
     auto portion = std::make_unique<SymbolClosure>();
     const auto error = portion->Read(head, tail, line_number, this->unresolved_symbols);
@@ -195,15 +188,6 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
       portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
       this->portions.push_back(std::move(portion));
     }
-  }
-  // TODO: is this where SYMBOL NOT FOUND post-prints really go?  Double check Ghidra.
-  // TODO: this might belong to EPPC_PatternMatching...
-  while (std::regex_search(head, tail, match, re_unresolved_symbol,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->unresolved_symbols.push_back(match.str(1));
-    // TODO: min version if this is post-printed
   }
   {
     auto portion = std::make_unique<LinkerOpts>();
@@ -767,8 +751,13 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
       // Up until CW for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the symbol
       // closure was being walked and printed itself. This gives a good idea of what function was
       // looking for that symbol, but because no hierarchy tier is given, it is impossible to be
-      // certain without analyzing code.
-      // TODO: min version if this is mid-printed
+      // certain without analyzing code. After that, (I'm pretty sure) all unresolved symbols from
+      // the symbol closure(s) and EPPC_PatternMatching would be printed after the DWARF symbol
+      // closure. The way it works out, this same reading code handles that as well. If symbol
+      // closures are disabled, this read function will still parse the unresolved symbol prints.
+      // There are also a few linker maps I've found where it appears the unresolved symbols are
+      // pre-printed before the first symbol closure. Wouldn't you know it, this reading code also
+      // handles that.
       do
       {
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
