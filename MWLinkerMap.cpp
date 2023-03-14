@@ -7,9 +7,6 @@
 #include <string>
 #include <utility>
 
-#include <iostream>
-#include <typeinfo>
-
 #include "MWLinkerMap.h"
 
 #define DECLARE_DEBUG_STRING_VIEW std::string_view _debug_string_view(head, tail)
@@ -40,9 +37,6 @@ static const std::regex re_entry_point_name{
 static const std::regex re_unresolved_symbol{
 //  ">>> SYMBOL NOT FOUND: %s\r\n"
     ">>> SYMBOL NOT FOUND: (.+)\r\n"};
-static const std::regex re_excluded_symbol{
-//  ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s\r\n"
-    ">>> EXCLUDED SYMBOL (.+) \\((.+),(.+)\\) found in (.+) (.+)\r\n"};
 static const std::regex re_mixed_mode_islands_header{
 //  "\r\nMixed Mode Islands\r\n"
     "\r\nMixed Mode Islands\r\n"};
@@ -74,6 +68,7 @@ static const std::regex re_linker_generated_symbols_header{
 
 // Other linker map prints are known to exist, but have never been seen.  These include:
 
+// ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s\r\n"
 // ">>> %s wasn't passed a section\r\n"
 // ">>> DYNAMIC SYMBOL: %s referenced\r\n"
 // ">>> MODULE SYMBOL NAME TOO LARGE: %s\r\n"
@@ -103,7 +98,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
   // 2 EPPC_PatternMatching
   // 3 DWARF Symbol Closure
 
-  // ? Unresolved Symbols post-print(?)
+  // ? Unresolved Symbols post-print
 
   // ? LinkerOpts
 
@@ -120,7 +115,6 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
                         std::regex_constants::match_continuous))
   {
     line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
     // Linker maps from Animal Crossing (foresta.map and static.map) and Doubutsu no Mori e+
     // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
     // modified to strip out the Link Map portion and UNUSED symbols, though the way it was done
@@ -135,7 +129,6 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
                         std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
     // Linker maps from Doubutsu no Mori + (foresta.map2 and static.map2) are modified similarly
     // to their counterparts in Doubutsu no Mori e+, though now with no preceding newlines. The
     // unmodified linker maps were also left on the disc, so maybe just use those instead?
@@ -178,20 +171,18 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
       this->portions.push_back(std::move(portion));
   }
   {
-    // With '-[no]listdwarf' and DWARF debugging information enabled, a second symbol closure
+    // With '-listdwarf' and DWARF debugging information enabled, a second symbol closure
     // containing info about the .dwarf and .debug sections will appear. Note that, without an
     // EPPC_PatternMatching in the middle, this will blend into the prior symbol closure in the
     // eyes of this read function.
     auto portion = std::make_unique<SymbolClosure>();
+    portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
     const auto error = portion->Read(head, tail, line_number, this->unresolved_symbols);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-    {
-      portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
       this->portions.push_back(std::move(portion));
-    }
   }
   {
     auto portion = std::make_unique<LinkerOpts>();
@@ -241,7 +232,6 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
                            std::regex_constants::match_continuous))
   {
     line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
     const auto error = this->ReadSectionLayoutPrologue(head, tail, line_number, match.str(1));
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
@@ -251,7 +241,6 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
                         std::regex_constants::match_continuous))
   {
     line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
     const auto error = this->ReadMemoryMapPrologue(head, tail, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
@@ -261,7 +250,6 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
                         std::regex_constants::match_continuous))
   {
     line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-
     auto portion = std::make_unique<LinkerGeneratedSymbols>();
     const auto error = portion->Read(head, tail, line_number);
     UPDATE_DEBUG_STRING_VIEW;
@@ -278,7 +266,6 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
     if (std::any_of(head, tail, [](const char c) { return c != '\0'; }))
       return Error::GarbageFound;
   }
-
   return Error::None;
 }
 
@@ -670,7 +657,7 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
   NodeBase* curr_node = &this->root;
   unsigned long curr_hierarchy_level = 0;
 
-  while (head < tail)
+  while (true)
   {
     if (std::regex_search(head, tail, match, re_symbol_closure_node_normal,
                           std::regex_constants::match_continuous))
@@ -695,7 +682,7 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
         if (match.str(2) != next_node->name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-        while (head < tail)
+        while (true)
         {
           if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                 std::regex_constants::match_continuous))
@@ -804,7 +791,7 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
 
   std::string last;
 
-  while (head < tail)
+  while (true)
   {
     bool will_be_replaced = false;
     bool was_interchanged = false;
@@ -869,14 +856,14 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
     }
     break;
   }
-  while (head < tail)
+  while (true)
   {
     if (std::regex_search(head, tail, match, re_code_folding_header,
                           std::regex_constants::match_continuous))
     {
       auto folding_unit = FoldingUnit(match.str(1));
       line_number += 4, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      while (head < tail)
+      while (true)
       {
         if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
                               std::regex_constants::match_continuous))
@@ -928,7 +915,7 @@ MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  while (head < tail)
+  while (true)
   {
     if (std::regex_search(head, tail, match, re_linker_opts_unit_address_range,
                           std::regex_constants::match_continuous))
@@ -986,7 +973,7 @@ MWLinkerMap::Error MWLinkerMap::BranchIslands::Read(  //
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  while (head < tail)
+  while (true)
   {
     if (std::regex_search(head, tail, match, re_branch_islands_created,
                           std::regex_constants::match_continuous))
@@ -1025,7 +1012,7 @@ MWLinkerMap::Error MWLinkerMap::MixedModeIslands::Read(  //
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  while (head < tail)
+  while (true)
   {
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created,
                           std::regex_constants::match_continuous))
@@ -1062,7 +1049,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  while (head < tail)
+  while (true)
   {
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
@@ -1116,7 +1103,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  while (head < tail)
+  while (true)
   {
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_normal,
                           std::regex_constants::match_continuous))
