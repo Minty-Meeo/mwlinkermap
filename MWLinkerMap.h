@@ -8,26 +8,34 @@
 enum class MWLinkerVersion
 {
   Unknown,
-
-  // Metrowerks, Inc
-  version_2_3_3_build_126,  // Codewarrior for GCN 1.0   (May 21 2000 19:00:24)
-  version_2_3_3_build_137,  // CodeWarrior for GCN 1.1   (Feb  7 2001 12:15:53)
-  version_2_4_1_build_47,   // CodeWarrior for GCN 1.2.5 (Jun 12 2001 11:53:24)
-
-  // Metrowerks Corporation
-  version_2_4_2_build_81,   // CodeWarrior for GCN 1.3.2 (May  7 2002 23:43:34)
-  version_2_4_7_build_92,   // CodeWarrior for GCN 2.0   (Sep 16 2002 15:15:26)
-  version_2_4_7_build_102,  // CodeWarrior for GCN 2.5   (Nov  7 2002 12:45:57)
-  version_2_4_7_build_107,  // CodeWarrior for GCN 2.6   (Jul 14 2003 14:20:31)
-  version_3_0_4,            // CodeWarrior for GCN 2.7   (Aug 13 2004 10:40:59)
-  version_4_1_build_51213,  // CodeWarrior for GCN 3.0a3 (Dec 13 2005 17:41:17)
-
-  // Freescale Semiconductor, Inc
-  version_4_2_build_60320,  // CodeWarrior for GCN 3.0   (Mar 20 2006 23:19:16)
-  version_4_2_build_142,    // CodeWarrior for Wii 1.0   (Aug 26 2008 02:33:56)
-  version_4_3_build_151,    // CodeWarrior for Wii 1.1   (Apr  2 2009 15:05:36)
-  version_4_3_build_172,    // CodeWarrior for Wii 1.3   (Apr 23 2010 11:39:30)
-  version_4_3_build_213,    // CodeWarrior for Wii 1.7   (Sep  5 2011 13:02:03)
+  // Codewarrior for GCN 1.0   (May 21 2000 19:00:24)
+  version_2_3_3_build_126,
+  // CodeWarrior for GCN 1.1   (Feb  7 2001 12:15:53)
+  version_2_3_3_build_137,
+  // CodeWarrior for GCN 1.2.5 (Jun 12 2001 11:53:24)
+  version_2_4_1_build_47,
+  // CodeWarrior for GCN 1.3.2 (May  7 2002 23:43:34)
+  version_2_4_2_build_81,
+  // CodeWarrior for GCN 2.0   (Sep 16 2002 15:15:26)
+  version_2_4_7_build_92,
+  // CodeWarrior for GCN 2.5   (Nov  7 2002 12:45:57)
+  version_2_4_7_build_102,
+  // CodeWarrior for GCN 2.6   (Jul 14 2003 14:20:31)
+  version_2_4_7_build_107,
+  // CodeWarrior for GCN 2.7   (Aug 13 2004 10:40:59)
+  version_3_0_4,
+  // CodeWarrior for GCN 3.0a3 (Dec 13 2005 17:41:17)
+  version_4_1_build_51213,
+  // CodeWarrior for GCN 3.0   (Mar 20 2006 23:19:16)
+  version_4_2_build_60320,
+  // CodeWarrior for Wii 1.0   (Aug 26 2008 02:33:56)
+  version_4_2_build_142,
+  // CodeWarrior for Wii 1.1   (Apr  2 2009 15:05:36)
+  version_4_3_build_151,
+  // CodeWarrior for Wii 1.3   (Apr 23 2010 11:39:30)
+  version_4_3_build_172,
+  // CodeWarrior for Wii 1.7   (Sep  5 2011 13:02:03)
+  version_4_3_build_213,
 };
 
 struct MWLinkerMap
