@@ -1460,16 +1460,12 @@ MWLinkerMap::Error MWLinkerMap::LinkerGeneratedSymbols::Read(  //
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  while (head < tail)
+  while (std::regex_search(head, tail, match, re_linker_generated_symbols_unit,
+                           std::regex_constants::match_continuous))
   {
-    if (std::regex_search(head, tail, match, re_linker_generated_symbols_unit,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      this->units.push_back(std::make_unique<Unit>(match.str(1), xstoul(match.str(2))));
-      continue;
-    }
-    break;
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    this->units.push_back(std::make_unique<Unit>(match.str(1), xstoul(match.str(2))));
+    continue;
   }
   return Error::None;
 }
