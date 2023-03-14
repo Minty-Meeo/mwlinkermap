@@ -855,7 +855,8 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
         line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
         will_be_replaced = true;
       }
-      if (std::regex_search(head, tail, match, re_code_merging_is_duplicated))
+      if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
+                            std::regex_constants::match_continuous))
       {
         if (match.str(1) != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
