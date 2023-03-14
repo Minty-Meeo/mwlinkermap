@@ -405,62 +405,126 @@ struct MWLinkerMap
     std::list<std::unique_ptr<UnitBase>> units;
   };
 
+  // Unknown
+  //  - Added Memory Map
+  // CodeWarrior for GCN 2.7
+  //  - Changed size column for debug sections from "%06x" to "%08x".
   // CodeWarrior for Wii 1.0
-  //  - Added four spaces to left, removed one padding space in middle.
+  //  - Appended four spaces to left, removed one padding space in middle.
   struct MemoryMap final : PortionBase
   {
     // TODO: make list of names of sections which are not allocated
     // .debug_srcinfo / .debug_sfnames / .debug / .line)
     // Check ELF format SH_TYPE (Section Header) or whatever, I think that is the clue.
 
-    struct UnitBase
+    struct UnitNormal
     {
-      UnitBase() = default;
-      UnitBase(std::string section_name_, std::uint32_t size_, std::uint32_t foffset_)
-          : section_name(std::move(section_name_)), size(size_), foffset(foffset_){};
-      virtual ~UnitBase() = default;
+      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t file_offset_)
+          : name(std::move(name_)), file_offset(file_offset_), size(size_),
+            starting_address(starting_address_){};
 
-      std::string section_name;
+      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t file_offset_, int s_record_line_)
+          : name(std::move(name_)), file_offset(file_offset_), size(size_),
+            starting_address(starting_address_){};
+
+      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t file_offset_, std::uint32_t rom_address_,
+                 std::uint32_t ram_buffer_address_)
+          : name(std::move(name_)), file_offset(file_offset_), size(size_),
+            starting_address(starting_address_), rom_address(rom_address_),
+            ram_buffer_address(ram_buffer_address_){};
+
+      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t file_offset_, std::uint32_t rom_address_,
+                 std::uint32_t ram_buffer_address_, int s_record_line_)
+          : name(std::move(name_)), file_offset(file_offset_), size(size_),
+            starting_address(starting_address_), rom_address(rom_address_),
+            ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_){};
+
+      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t file_offset_, std::uint32_t bin_file_offset_,
+                 std::string bin_file_name_)
+          : name(std::move(name_)), file_offset(file_offset_), size(size_),
+            starting_address(starting_address_), bin_file_offset(bin_file_offset_),
+            bin_file_name(std::move(bin_file_name_)){};
+
+      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t file_offset_, int s_record_line_, std::uint32_t bin_file_offset_,
+                 std::string bin_file_name_)
+          : name(std::move(name_)), file_offset(file_offset_), size(size_),
+            starting_address(starting_address_), s_record_line(s_record_line_),
+            bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_)){};
+
+      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t file_offset_, std::uint32_t rom_address_,
+                 std::uint32_t ram_buffer_address_, std::uint32_t bin_file_offset_,
+                 std::string bin_file_name_)
+          : name(std::move(name_)), file_offset(file_offset_), size(size_),
+            starting_address(starting_address_), rom_address(rom_address_),
+            ram_buffer_address(ram_buffer_address_), bin_file_offset(bin_file_offset_),
+            bin_file_name(std::move(bin_file_name_)){};
+
+      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t file_offset_, std::uint32_t rom_address_,
+                 std::uint32_t ram_buffer_address_, int s_record_line_,
+                 std::uint32_t bin_file_offset_, std::string bin_file_name_)
+          : name(std::move(name_)), file_offset(file_offset_), size(size_),
+            starting_address(starting_address_), rom_address(rom_address_),
+            ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_),
+            bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_)){};
+
+      std::string name;
+      std::uint32_t starting_address;
       std::uint32_t size;
-      std::uint32_t foffset;
+      std::uint32_t file_offset;
+      std::uint32_t rom_address;
+      std::uint32_t ram_buffer_address;
+      int s_record_line;
+      std::uint32_t bin_file_offset;
+      std::string bin_file_name;
     };
 
-    // Sections which have Section Header Flag "Alloc" enabled
-    struct UnitAllocated final : UnitBase
-    {
-      UnitAllocated() = default;
-      UnitAllocated(std::string section_name_, std::uint32_t size_, std::uint32_t foffset_,
-                    std::uint32_t saddress_, std::uint32_t rom_addr_, std::uint32_t ram_buff_addr_)
-          : UnitBase(std::move(section_name_), size_, foffset_), saddress(saddress_),
-            rom_addr(rom_addr_), ram_buff_addr(ram_buff_addr_){};
-      virtual ~UnitAllocated() = default;
-
-      std::uint32_t saddress;
-      std::uint32_t rom_addr;
-      std::uint32_t ram_buff_addr;
-    };
-
+    // objdump debug shf_flags
     // Sections which do not, such as '.debug_srcinfo', '.debug_sfnames', '.debug', or '.line'
     // TODO: Confirm this is really the distinction
-    struct UnitInfo final : UnitBase
+    struct UnitDebug
     {
-      UnitInfo() = default;
-      UnitInfo(std::string section_name_, std::uint32_t size_, std::uint32_t foffset_)
-          : UnitBase(std::move(section_name_), size_, foffset_){};
-      virtual ~UnitInfo() = default;
+      UnitDebug(std::string name_, std::uint32_t size_, std::uint32_t file_offset_)
+          : name(std::move(name_)), size(size_), file_offset(file_offset_){};
+
+      std::string name;
+      std::uint32_t size;
+      std::uint32_t file_offset;
     };
 
-    MemoryMap() = default;
+    MemoryMap(bool has_rom_ram_)  // ctor for old memory map
+        : has_rom_ram(has_rom_ram_), has_bin_file(false), has_s_record(false){};
+    MemoryMap(bool has_rom_ram_, bool has_bin_file_, bool has_s_record_)
+        : has_rom_ram(has_rom_ram_), has_bin_file(has_bin_file_), has_s_record(has_s_record_)
+    {
+      SetMinVersion(MWLinkerVersion::version_4_2_build_142);
+    }
     virtual ~MemoryMap() = default;
 
-    virtual bool IsEmpty() override { return units.empty(); }
-    Error Read(const char*&, const char*, std::size_t&);
-    Error Read3ColumnA(const char*&, const char*, std::size_t&);
-    Error Read3ColumnB(const char*&, const char*, std::size_t&);
-    Error Read5Column(const char*&, const char*, std::size_t&);
+    virtual bool IsEmpty() override { return normal_units.empty() || debug_units.empty(); }
+    Error ReadSimple_old(const char*&, const char*, std::size_t&);
+    Error ReadRomRam_old(const char*&, const char*, std::size_t&);
+    Error ReadSimple(const char*&, const char*, std::size_t&);
+    Error ReadSimpleSRecord(const char*&, const char*, std::size_t&);
+    Error ReadRomRam(const char*&, const char*, std::size_t&);
+    Error ReadRomRamSRecord(const char*&, const char*, std::size_t&);
+    Error ReadBinFile(const char*&, const char*, std::size_t&);
+    Error ReadBinFileSRecord(const char*&, const char*, std::size_t&);
+    Error ReadRomRamBinFile(const char*&, const char*, std::size_t&);
+    Error ReadRomRamBinFileSRecord(const char*&, const char*, std::size_t&);
 
-    std::list<std::unique_ptr<UnitBase>> units;
-    bool extra_info;  // TODO: What causes MWLD(EPPC) to emit this??
+    std::list<UnitNormal> normal_units;
+    std::list<UnitDebug> debug_units;
+    const bool has_rom_ram;
+    const bool has_bin_file;
+    const bool has_s_record;
   };
 
   struct LinkerGeneratedSymbols final : PortionBase
@@ -489,6 +553,7 @@ struct MWLinkerMap
   Error Read(std::istream&, std::size_t&);
   Error Read(const std::string&, std::size_t&);
   Error Read(const char*, const char*, std::size_t&);
+  Error ReadMemoryMapPrologue(const char*&, const char*, std::size_t&);
 
   std::list<std::unique_ptr<PortionBase>> portions;
   std::list<std::string> unresolved_symbols;
