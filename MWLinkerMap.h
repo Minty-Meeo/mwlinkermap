@@ -408,12 +408,10 @@ struct MWLinkerMap
     std::list<std::unique_ptr<UnitBase>> units;
   };
 
-  // Unknown
-  //  - Added Memory Map
   // CodeWarrior for GCN 2.7
   //  - Changed size column for debug sections from "%06x" to "%08x".
   // CodeWarrior for Wii 1.0
-  //  - Appended four spaces to left, removed one padding space in middle.
+  //  - Expanded Memory Map variants, slightly tweaked existing printfs.
   struct MemoryMap final : PortionBase
   {
     // TODO: make list of names of sections which are not allocated
