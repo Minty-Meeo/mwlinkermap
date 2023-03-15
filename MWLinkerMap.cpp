@@ -19,15 +19,49 @@ MWLinkerMap::Error MWLinkerMap::Read(std::istream& stream, std::size_t& line_num
   sstream << stream.rdbuf();
   return this->Read(sstream, line_number);
 }
-
 MWLinkerMap::Error MWLinkerMap::Read(const std::stringstream& sstream, std::size_t& line_number)
 {
   return this->Read(sstream.view(), line_number);
 }
-
 MWLinkerMap::Error MWLinkerMap::Read(const std::string_view string_view, std::size_t& line_number)
 {
   return this->Read(string_view.data(), string_view.data() + string_view.length(), line_number);
+}
+
+MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(std::istream& stream, std::size_t& line_number)
+{
+  std::stringstream sstream;
+  sstream << stream.rdbuf();
+  return this->ReadTLOZTP(sstream, line_number);
+}
+MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(const std::stringstream& sstream,
+                                           std::size_t& line_number)
+{
+  return this->ReadTLOZTP(sstream.view(), line_number);
+}
+MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(const std::string_view string_view,
+                                           std::size_t& line_number)
+{
+  return this->ReadTLOZTP(string_view.data(), string_view.data() + string_view.length(),
+                          line_number);
+}
+
+MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(std::istream& stream, std::size_t& line_number)
+{
+  std::stringstream sstream;
+  sstream << stream.rdbuf();
+  return this->ReadSMGalaxy(sstream, line_number);
+}
+MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(const std::stringstream& sstream,
+                                             std::size_t& line_number)
+{
+  return this->ReadSMGalaxy(sstream.view(), line_number);
+}
+MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(const std::string_view string_view,
+                                             std::size_t& line_number)
+{
+  return this->ReadSMGalaxy(string_view.data(), string_view.data() + string_view.length(),
+                            line_number);
 }
 
 // clang-format off
@@ -119,7 +153,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
     // modified to strip out the Link Map portion and UNUSED symbols, though the way it was done
     // also removed one of the Section Layout header's preceding newlines.
-    const auto error = this->ReadSectionLayoutPrologue(head, tail, line_number, match.str(1));
+    const auto error = this->ReadPrologue_SectionLayout(head, tail, line_number, match.str(1));
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
@@ -135,7 +169,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     // Similarly modified linker maps:
     //   The Legend of Zelda - Ocarina of Time & Master Quest
     //   The Legend of Zelda - The Wind Waker (framework.map)
-    const auto error = this->ReadSectionLayoutPrologue(head, tail, line_number, match.str(1));
+    const auto error = this->ReadPrologue_SectionLayout(head, tail, line_number, match.str(1));
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
@@ -232,7 +266,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
                            std::regex_constants::match_continuous))
   {
     line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    const auto error = this->ReadSectionLayoutPrologue(head, tail, line_number, match.str(1));
+    const auto error = this->ReadPrologue_SectionLayout(head, tail, line_number, match.str(1));
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
@@ -241,7 +275,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
                         std::regex_constants::match_continuous))
   {
     line_number += 3, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    const auto error = this->ReadMemoryMapPrologue(head, tail, line_number);
+    const auto error = this->ReadPrologue_MemoryMap(head, tail, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
       return error;
@@ -270,6 +304,94 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
 }
 
 // clang-format off
+static const std::regex re_section_layout_header_tloztp{
+//  "%s section layout\n"
+    "(.+) section layout\n"};
+// clang-format on
+
+MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(  //
+    const char* head, const char* const tail, std::size_t& line_number)
+{
+  if (head == nullptr || tail == nullptr || head > tail)
+    return Error::Fail;
+
+  std::cmatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+  line_number = 0;
+
+  // The Legend of Zelda: Twilight Princess features CodeWarrior for GCN 2.7 linker maps that have
+  // been post-processed to appear similar to older linker maps. Nintendo EAD probably did this to
+  // procrastinate updating the JUTException library. These linker maps contain prologue-free,
+  // three-column section layout portions, and nothing else. Also, the line endings were changed to
+  // Unix style.
+  while (std::regex_search(head, tail, match, re_section_layout_header_tloztp,
+                           std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    auto portion = std::make_unique<SectionLayout>(match.str(1));
+    const auto error = portion->ReadTLOZTP(head, tail, line_number);
+    UPDATE_DEBUG_STRING_VIEW;
+    if (error != Error::None)
+      return error;
+    this->portions.push_back(std::move(portion));
+  }
+  if (head < tail)
+  {
+    // I already explained why this check is here.
+    if (std::any_of(head, tail, [](const char c) { return c != '\0'; }))
+      return Error::GarbageFound;
+  }
+  return Error::None;
+}
+
+MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(  //
+    const char* head, const char* const tail, std::size_t& line_number)
+{
+  if (head == nullptr || tail == nullptr || head > tail)
+    return Error::Fail;
+
+  std::cmatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+  line_number = 0;
+
+  // We only see this header once, as every symbol is mashed into an imaginary ".text" section.
+  if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
+                        std::regex_constants::match_continuous))
+  {
+    line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    auto portion = std::make_unique<SectionLayout>(match.str(1));
+    portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
+    const auto error = portion->Read4Column(head, tail, line_number);
+    UPDATE_DEBUG_STRING_VIEW;
+    if (error != Error::None)
+      return error;
+    this->portions.push_back(std::move(portion));
+  }
+  else
+  {
+    return Error::SMGalaxyYouHadOneJob;
+  }
+  // It seems like a mistake, but for a few examples, a tiny bit of simple-style,
+  // headerless, CodeWarrior for Wii 1.0 (at minimum) Memory Map can be found.
+  {
+    auto portion = std::make_unique<MemoryMap>(false, false, false);
+    const auto error = portion->ReadSimple(head, tail, line_number);
+    UPDATE_DEBUG_STRING_VIEW;
+    if (error != Error::None)
+      return error;
+    if (!portion->IsEmpty())
+      this->portions.push_back(std::move(portion));
+  }
+  if (head < tail)
+  {
+    // I already explained why this check is here.
+    if (std::any_of(head, tail, [](const char c) { return c != '\0'; }))
+      return Error::GarbageFound;
+  }
+  return Error::None;
+}
+
+// clang-format off
 static const std::regex re_section_layout_3column_prologue_1{
     "  Starting        Virtual\r\n"};
 static const std::regex re_section_layout_3column_prologue_2{
@@ -284,7 +406,7 @@ static const std::regex re_section_layout_4column_prologue_3{
     "  ---------------------------------\r\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::ReadSectionLayoutPrologue(  //
+MWLinkerMap::Error MWLinkerMap::ReadPrologue_SectionLayout(  //
     const char*& head, const char* const tail, std::size_t& line_number, std::string name)
 {
   std::cmatch match;
@@ -419,7 +541,7 @@ static const std::regex re_memory_map_romram_binfile_srecord_prologue_2{
     "                       address           Offset   Address  Address       Line     Offset   Name\r\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::ReadMemoryMapPrologue(  //
+MWLinkerMap::Error MWLinkerMap::ReadPrologue_MemoryMap(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -739,16 +861,16 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
     if (std::regex_search(head, tail, match, re_unresolved_symbol,
                           std::regex_constants::match_continuous))
     {
-      // Up until CW for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the symbol
-      // closure was being walked and printed itself. This gives a good idea of what function was
-      // looking for that symbol, but because no hierarchy tier is given, it is impossible to be
-      // certain without analyzing code. After that, (I'm pretty sure) all unresolved symbols from
-      // the symbol closure(s) and EPPC_PatternMatching would be printed after the DWARF symbol
-      // closure. The way it works out, this same reading code handles that as well. If symbol
-      // closures are disabled, this read function will still parse the unresolved symbol prints.
-      // There are also a few linker maps I've found where it appears the unresolved symbols are
-      // pre-printed before the first symbol closure. Wouldn't you know it, this reading code also
-      // handles that.
+      // Up until CodeWarrior for GCN 3.0a3 (at the earliest), unresolved symbols were printed as
+      // the symbol closure was being walked and printed itself. This gives a good idea of what
+      // function was looking for that symbol, but because no hierarchy tier is given, it is
+      // impossible to be certain without analyzing code. After that, (I'm pretty sure) all
+      // unresolved symbols from the symbol closure(s) and EPPC_PatternMatching would be printed
+      // after the DWARF symbol closure. The way it works out, this same reading code handles that
+      // as well. If symbol closures are disabled, this read function will still parse the
+      // unresolved symbol prints. There are also a few linker maps I've found where it appears the
+      // unresolved symbols are pre-printed before the first symbol closure. Wouldn't you know it,
+      // this reading code also handles that.
       do
       {
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -1055,7 +1177,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitNormal>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
           std::stoul(match.str(4)), match.str(5), match.str(6), match.str(7)));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
@@ -1072,7 +1194,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitEntry>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
           match.str(5), match.str(6), match.str(7)));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
@@ -1131,13 +1253,67 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
-    // This regex is so overkill, it risks finding false positives.  TODO: irregularity post-checker
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_special,
                           std::regex_constants::match_continuous))
     {
+      std::string name = match.str(6);
+      if (name != "*fill*" && name != "**fill**")
+        return Error::SectionLayoutSpecialNotFill;
       this->units.push_back(std::make_unique<UnitSpecial>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-          std::stoul(match.str(5)), match.str(6)));
+          std::stoul(match.str(5)), std::move(name)));
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    break;
+  }
+  return Error::None;
+}
+
+// clang-format off
+static const std::regex re_section_layout_tloztp_unit_normal{
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.*)\n"};
+static const std::regex re_section_layout_tloztp_unit_entry{
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})    (.+) \\(entry of (.+)\\) \t(.+) (.*)\n"};
+static const std::regex re_section_layout_tloztp_unit_special{
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+)\n"};
+// clang-format on
+
+MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadTLOZTP(  //
+    const char*& head, const char* const tail, std::size_t& line_number)
+{
+  std::cmatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+
+  while (true)
+  {
+    if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_normal,
+                          std::regex_constants::match_continuous))
+    {
+      this->units.push_back(std::make_unique<UnitNormal>(  //
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+          std::stoul(match.str(4)), match.str(5), match.str(6), match.str(7)));
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
+                          std::regex_constants::match_continuous))
+    {
+      this->units.push_back(std::make_unique<UnitEntry>(  //
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
+          match.str(5), match.str(6), match.str(7)));
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_special,
+                          std::regex_constants::match_continuous))
+    {
+      std::string name = match.str(5);
+      if (name != "*fill*" && name != "**fill**")
+        return Error::SectionLayoutSpecialNotFill;
+      this->units.push_back(std::make_unique<UnitSpecial>(  //
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+          std::stoul(match.str(4)), std::move(name)));
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       continue;
     }
@@ -1152,7 +1328,7 @@ static const std::regex re_memory_map_unit_normal_simple_old{
     "   {0,15}(.*)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r\n"};
 static const std::regex re_memory_map_unit_debug_old{
 //  "  %15s           %06x %08x\r\n" <-- Sometimes the size can overflow six digits
-//  "  %15s           %08x %08x\r\n" <-- Starting with CW for GCN 2.7
+//  "  %15s           %08x %08x\r\n" <-- Starting with CodeWarrior for GCN 2.7
     "   {0,15}(.*)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r\n"};
 // clang-format on
 

@@ -48,7 +48,9 @@ struct MWLinkerMap
     Fail,
     Unimplemented,
     GarbageFound,
+
     EntryPointNameMissing,
+    SMGalaxyYouHadOneJob,
 
     SymbolClosureHierarchySkip,
     SymbolClosureUnrefDupsHierarchyMismatch,
@@ -62,6 +64,7 @@ struct MWLinkerMap
     EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch,
 
     SectionLayoutBadPrologue,
+    SectionLayoutSpecialNotFill,
 
     MemoryMapBadPrologue,
   };
@@ -316,25 +319,33 @@ struct MWLinkerMap
   {
     struct UnitBase
     {
+      UnitBase(std::uint32_t size_, std::string name_) : size(size_), name(std::move(name_)){};
       virtual ~UnitBase() = default;
+
+      std::uint32_t size;
+      std::string name;
     };
 
     struct UnitNormal final : UnitBase
     {
-      UnitNormal(std::uint32_t saddress_, std::uint32_t size_, std::uint32_t vaddress_,
-                 std::uint32_t foffset_, std::uint32_t alignment_, std::string name_,
+      UnitNormal(std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t virtual_address_, std::uint32_t alignment_, std::string name_,
                  std::string module_, std::string file_)
-          : saddress(saddress_), size(size_), vaddress(vaddress_), foffset(foffset_),
-            alignment(alignment_), name(std::move(name_)), module(std::move(module_)),
+          : UnitBase(size, std::move(name_)), starting_address(starting_address_),
+            virtual_address(virtual_address_), alignment(alignment_), module(std::move(module_)),
             file(std::move(file_)){};
+      UnitNormal(std::uint32_t starting_address_, std::uint32_t size_,
+                 std::uint32_t virtual_address_, std::uint32_t foffset_, std::uint32_t alignment_,
+                 std::string name_, std::string module_, std::string file_)
+          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
+            virtual_address(virtual_address_), foffset(foffset_), alignment(alignment_),
+            module(std::move(module_)), file(std::move(file_)){};
       virtual ~UnitNormal() = default;
 
-      std::uint32_t saddress;
-      std::uint32_t size;
-      std::uint32_t vaddress;
+      std::uint32_t starting_address;
+      std::uint32_t virtual_address;
       std::uint32_t foffset;
       std::uint32_t alignment;
-      std::string name;
       std::string module;  // ELF object or static library name
       std::string file;    // Static library STT_FILE symbol name (optional)
     };
@@ -342,60 +353,65 @@ struct MWLinkerMap
     struct UnitUnused final : UnitBase
     {
       UnitUnused(std::uint32_t size_, std::string name_, std::string module_, std::string file_)
-          : size(size_), name(std::move(name_)), module(std::move(module_)),
-            file(std::move(file_)){};
+          : UnitBase(size_, std::move(name_)), module(std::move(module_)), file(std::move(file_)){};
       virtual ~UnitUnused() = default;
 
-      std::uint32_t size;
-      std::string name;
       std::string module;  // ELF object or static library name
       std::string file;    // Static library STT_FILE symbol name (optional)
     };
 
     struct UnitEntry final : UnitBase
     {
-      UnitEntry() = default;
-      UnitEntry(std::uint32_t saddress_, std::uint32_t size_, std::uint32_t vaddress_,
-                std::uint32_t foffset_, std::string name_, std::string entry_of_name_,
+      UnitEntry(std::uint32_t starting_address_, std::uint32_t size_,
+                std::uint32_t virtual_address_, std::string name_, std::string entry_of_name_,
                 std::string module_, std::string file_)
-          : saddress(saddress_), size(size_), vaddress(vaddress_), foffset(foffset_),
-            name(std::move(name_)), entry_of_name(std::move(entry_of_name_)),
+          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
+            virtual_address(virtual_address_), entry_of_name(std::move(entry_of_name_)),
             module(std::move(module_)), file(std::move(file_)){};
+      UnitEntry(std::uint32_t starting_address_, std::uint32_t size_,
+                std::uint32_t virtual_address_, std::uint32_t foffset_, std::string name_,
+                std::string entry_of_name_, std::string module_, std::string file_)
+          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
+            virtual_address(virtual_address_), foffset(foffset_),
+            entry_of_name(std::move(entry_of_name_)), module(std::move(module_)),
+            file(std::move(file_)){};
       virtual ~UnitEntry() = default;
 
-      std::uint32_t saddress;
-      std::uint32_t size;
-      std::uint32_t vaddress;
+      std::uint32_t starting_address;
+      std::uint32_t virtual_address;
       std::uint32_t foffset;
-      std::string name;
       std::string entry_of_name;  // (entry of _____)
       std::string module;         // ELF object or static library name
       std::string file;           // Static library STT_FILE symbol name (optional)
     };
 
-    struct UnitSpecial final : UnitBase
+    struct UnitSpecial final : UnitBase  // e.g. "*fill*" or "**fill**"
     {
-      UnitSpecial(std::uint32_t saddress_, std::uint32_t size_, std::uint32_t vaddress_,
-                  std::uint32_t foffset_, std::uint32_t alignment_, std::string name_)
-          : saddress(saddress_), size(size_), vaddress(vaddress_), foffset(foffset_),
-            alignment(alignment_), name(std::move(name_)){};
+      UnitSpecial(std::uint32_t starting_address_, std::uint32_t size_,
+                  std::uint32_t virtual_address_, std::uint32_t alignment_, std::string name_)
+          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
+            virtual_address(virtual_address_),
+            alignment(alignment_){};  // Used for Twilight Princess modified linker maps
+      UnitSpecial(std::uint32_t starting_address_, std::uint32_t size_,
+                  std::uint32_t virtual_address_, std::uint32_t foffset_, std::uint32_t alignment_,
+                  std::string name_)
+          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
+            virtual_address(virtual_address_), foffset(foffset_), alignment(alignment_){};
       virtual ~UnitSpecial() = default;
 
-      std::uint32_t saddress;
-      std::uint32_t size;
-      std::uint32_t vaddress;
+      std::uint32_t starting_address;
+      std::uint32_t virtual_address;
       std::uint32_t foffset;
       std::uint32_t alignment;
-      std::string name;  // e.g. "*fill*" or "**fill**"
     };
 
     SectionLayout(std::string name_) : name(std::move(name_)){};
     virtual ~SectionLayout() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
-    Error Read(const char*&, const char*, std::size_t&);
     Error Read3Column(const char*&, const char*, std::size_t&);
     Error Read4Column(const char*&, const char*, std::size_t&);
+    Error ReadTLOZTP(const char*&, const char*, std::size_t&);
 
     std::string name;
     std::list<std::unique_ptr<UnitBase>> units;
@@ -410,47 +426,40 @@ struct MWLinkerMap
     // TODO: make list of names of sections which are not allocated
     // .debug_srcinfo / .debug_sfnames / .debug / .line)
     // Check ELF format SH_TYPE (Section Header) or whatever, I think that is the clue.
-
     struct UnitNormal
     {
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_)
           : name(std::move(name_)), file_offset(file_offset_), size(size_),
             starting_address(starting_address_){};
-
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_, int s_record_line_)
           : name(std::move(name_)), file_offset(file_offset_), size(size_),
             starting_address(starting_address_){};
-
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_, std::uint32_t rom_address_,
                  std::uint32_t ram_buffer_address_)
           : name(std::move(name_)), file_offset(file_offset_), size(size_),
             starting_address(starting_address_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_){};
-
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_, std::uint32_t rom_address_,
                  std::uint32_t ram_buffer_address_, int s_record_line_)
           : name(std::move(name_)), file_offset(file_offset_), size(size_),
             starting_address(starting_address_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_){};
-
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_, std::uint32_t bin_file_offset_,
                  std::string bin_file_name_)
           : name(std::move(name_)), file_offset(file_offset_), size(size_),
             starting_address(starting_address_), bin_file_offset(bin_file_offset_),
             bin_file_name(std::move(bin_file_name_)){};
-
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_, int s_record_line_, std::uint32_t bin_file_offset_,
                  std::string bin_file_name_)
           : name(std::move(name_)), file_offset(file_offset_), size(size_),
             starting_address(starting_address_), s_record_line(s_record_line_),
             bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_)){};
-
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_, std::uint32_t rom_address_,
                  std::uint32_t ram_buffer_address_, std::uint32_t bin_file_offset_,
@@ -459,7 +468,6 @@ struct MWLinkerMap
             starting_address(starting_address_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), bin_file_offset(bin_file_offset_),
             bin_file_name(std::move(bin_file_name_)){};
-
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_, std::uint32_t rom_address_,
                  std::uint32_t ram_buffer_address_, int s_record_line_,
@@ -479,7 +487,6 @@ struct MWLinkerMap
       std::uint32_t bin_file_offset;
       std::string bin_file_name;
     };
-
     // objdump debug shf_flags
     // Sections which do not, such as '.debug_srcinfo', '.debug_sfnames', '.debug', or '.line'
     // TODO: Confirm this is really the distinction
@@ -548,8 +555,17 @@ struct MWLinkerMap
   Error Read(const std::stringstream&, std::size_t&);
   Error Read(std::string_view, std::size_t&);
   Error Read(const char*, const char*, std::size_t&);
-  Error ReadSectionLayoutPrologue(const char*&, const char* const, std::size_t&, std::string);
-  Error ReadMemoryMapPrologue(const char*&, const char*, std::size_t&);
+  Error ReadTLOZTP(std::istream&, std::size_t&);
+  Error ReadTLOZTP(const std::stringstream&, std::size_t&);
+  Error ReadTLOZTP(std::string_view, std::size_t&);
+  Error ReadTLOZTP(const char*, const char*, std::size_t&);
+  Error ReadSMGalaxy(std::istream&, std::size_t&);
+  Error ReadSMGalaxy(const std::stringstream&, std::size_t&);
+  Error ReadSMGalaxy(std::string_view, std::size_t&);
+  Error ReadSMGalaxy(const char*, const char*, std::size_t&);
+
+  Error ReadPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string);
+  Error ReadPrologue_MemoryMap(const char*&, const char*, std::size_t&);
 
   std::string entry_point_name;
   std::list<std::unique_ptr<PortionBase>> portions;
