@@ -915,6 +915,8 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
   {
     bool will_be_replaced = false;
     bool was_interchanged = false;
+    // EPPC_PatternMatching looks for functions that are duplicates of one another and prints what
+    // it has changed in real-time to the linker map.
     if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                           std::regex_constants::match_continuous))
     {
@@ -976,6 +978,7 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
     }
     break;
   }
+  // After analysis concludes, a redundant summary of changes per-file is printed.
   while (true)
   {
     if (std::regex_search(head, tail, match, re_code_folding_header,

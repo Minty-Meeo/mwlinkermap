@@ -149,8 +149,6 @@ struct MWLinkerMap
   //  - Added EPPC_PatternMatching
   struct EPPC_PatternMatching final : PortionBase
   {
-    // As it analyzes, EPPC_PatternMatching looks for functions that are duplicates of one another
-    // and prints what it finds to the linker map.
     struct MergingUnit
     {
       MergingUnit(std::string first_name_, std::string second_name_, std::uint32_t size_,
@@ -166,11 +164,12 @@ struct MWLinkerMap
       // one function is replaced with a branch to the other function, saving space at the cost of a
       // tiny amount of overhead. This is by far the more common code merging technique.
       bool will_be_replaced;
-      // TODO: explain interchanged
+      // Rarely, a function can be marked for removal when a duplicate of it is elsewhere in the
+      // binary. All references to it are then redirected to the duplicate. Even rarer than that,
+      // sometimes the linker can change its mind and replace it with a branch instead.
       bool was_interchanged;
     };
-    // TODO: add description
-    // It happens right after Merging, look at gimp flowchart
+
     struct FoldingUnit
     {
       struct Unit
