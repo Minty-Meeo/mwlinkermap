@@ -87,10 +87,8 @@ static const std::regex re_section_layout_header{
 //  "\r\n\r\n%s section layout\r\n"
     "\r?\n\r?\n(.+) section layout\r?\n"};
 static const std::regex re_section_layout_header_modified_a{
-//  "\r\n%s section layout\r\n"
     "\r?\n(.+) section layout\r?\n"};
 static const std::regex re_section_layout_header_modified_b{
-//  "%s section layout\r\n"
     "(.+) section layout\r?\n"};
 static const std::regex re_memory_map_header{
 //  "\r\n\r\nMemory map:\r\n"
@@ -303,12 +301,6 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   return Error::None;
 }
 
-// clang-format off
-static const std::regex re_section_layout_header_tloztp{
-//  "%s section layout\n"
-    "(.+) section layout\n"};
-// clang-format on
-
 MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(  //
     const char* head, const char* const tail, std::size_t& line_number)
 {
@@ -322,9 +314,9 @@ MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(  //
   // The Legend of Zelda: Twilight Princess features CodeWarrior for GCN 2.7 linker maps that have
   // been post-processed to appear similar to older linker maps. Nintendo EAD probably did this to
   // procrastinate updating the JUTException library. These linker maps contain prologue-free,
-  // three-column section layout portions, and nothing else. Also, the line endings were changed to
-  // Unix style.
-  while (std::regex_search(head, tail, match, re_section_layout_header_tloztp,
+  // three-column section layout portions, and nothing else. Also, not that it matters to this
+  // read function, the line endings of the linker maps left on disc were Unix style (LF).
+  while (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
                            std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
@@ -1277,12 +1269,10 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
 }
 
 // clang-format off
-static const std::regex re_section_layout_tloztp_unit_normal{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.*)\n"};
 static const std::regex re_section_layout_tloztp_unit_entry{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})    (.+) \\(entry of (.+)\\) \t(.+) (.*)\n"};
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})    (.+) \\(entry of (.+)\\) \t(.+) (.*)\r?\n"};
 static const std::regex re_section_layout_tloztp_unit_special{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+)\n"};
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadTLOZTP(  //
@@ -1293,7 +1283,7 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadTLOZTP(  //
 
   while (true)
   {
-    if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_normal,
+    if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
       this->units.push_back(std::make_unique<UnitNormal>(  //
