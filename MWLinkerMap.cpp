@@ -67,10 +67,10 @@ MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(const std::string_view string_view,
 // clang-format off
 static const std::regex re_entry_point_name{
 //  "Link map of %s\r\n"
-    "Link map of (.+)\r?\n"};
+    "Link map of (.*)\r?\n"};
 static const std::regex re_unresolved_symbol{
 //  ">>> SYMBOL NOT FOUND: %s\r\n"
-    ">>> SYMBOL NOT FOUND: (.+)\r?\n"};
+    ">>> SYMBOL NOT FOUND: (.*)\r?\n"};
 static const std::regex re_mixed_mode_islands_header{
 //  "\r\nMixed Mode Islands\r\n"
     "\r?\nMixed Mode Islands\r?\n"};
@@ -85,11 +85,11 @@ static const std::regex re_linktime_size_increasing_optimizations_header{
     "\r?\nLinktime size-increasing optimizations\r?\n"};
 static const std::regex re_section_layout_header{
 //  "\r\n\r\n%s section layout\r\n"
-    "\r?\n\r?\n(.+) section layout\r?\n"};
+    "\r?\n\r?\n(.*) section layout\r?\n"};
 static const std::regex re_section_layout_header_modified_a{
-    "\r?\n(.+) section layout\r?\n"};
+    "\r?\n(.*) section layout\r?\n"};
 static const std::regex re_section_layout_header_modified_b{
-    "(.+) section layout\r?\n"};
+    "(.*) section layout\r?\n"};
 static const std::regex re_memory_map_header{
 //  "\r\n\r\nMemory map:\r\n"
     "\r?\n\r?\nMemory map:\r?\n"};
@@ -755,16 +755,16 @@ MWLinkerMap::Error MWLinkerMap::ReadPrologue_MemoryMap(  //
 // clang-format off
 static const std::regex re_symbol_closure_node_normal{
 //  "%i] " and "%s (%s,%s) found in %s %s\r\n"
-    "   *(\\d+)\\] (.+) \\((.+),(.+)\\) found in (.+) (.*)\r?\n"};
+    "   *(\\d+)\\] (.*) \\((.*),(.*)\\) found in (.*) (.*)\r?\n"};
 static const std::regex re_symbol_closure_node_normal_unref_dup_header{
 //  "%i] " and ">>> UNREFERENCED DUPLICATE %s\r\n"
-    "   *(\\d+)\\] >>> UNREFERENCED DUPLICATE (.+)\r?\n"};
+    "   *(\\d+)\\] >>> UNREFERENCED DUPLICATE (.*)\r?\n"};
 static const std::regex re_symbol_closure_node_normal_unref_dups{
 //  "%i] " and ">>> (%s,%s) found in %s %s\r\n"
-    "   *(\\d+)\\] >>> \\((.+),(.+)\\) found in (.+) (.*)\r?\n"};
+    "   *(\\d+)\\] >>> \\((.*),(.*)\\) found in (.*) (.*)\r?\n"};
 static const std::regex re_symbol_closure_node_linker_generated{
 //  "%i] " and "%s found as linker generated symbol\r\n"
-    "   *(\\d+)\\] (.+) found as linker generated symbol\r?\n"};
+    "   *(\\d+)\\] (.*) found as linker generated symbol\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
@@ -885,22 +885,22 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
 // clang-format off
 static const std::regex re_code_merging_is_duplicated{
 //  "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
-    "--> duplicated code: symbol (.+) is duplicated by (.+), size = (\\d+) \r?\n\r?\n"};
+    "--> duplicated code: symbol (.*) is duplicated by (.*), size = (\\d+) \r?\n\r?\n"};
 static const std::regex re_code_merging_will_be_replaced{
 //  "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
-    "--> the function (.+) will be replaced by a branch to (.+)\r?\n\r?\n\r?\n"};
+    "--> the function (.*) will be replaced by a branch to (.*)\r?\n\r?\n\r?\n"};
 static const std::regex re_code_merging_was_interchanged{
 //  "--> the function %s was interchanged with %s, size=%d \r\n"
-    "--> the function (.+) was interchanged with (.+), size=(\\d+) \r?\n"};
+    "--> the function (.*) was interchanged with (.*), size=(\\d+) \r?\n"};
 static const std::regex re_code_folding_header{
 //  "\r\n\r\n\r\nCode folded in file: %s \r\n"
-    "\r?\n\r?\n\r?\nCode folded in file: (.+) \r?\n"};
+    "\r?\n\r?\n\r?\nCode folded in file: (.*) \r?\n"};
 static const std::regex re_code_folding_is_duplicated{
 //  "--> %s is duplicated by %s, size = %d \r\n\r\n"
-    "--> (.+) is duplicated by (.+), size = (\\d+) \r?\n\r?\n"};
+    "--> (.*) is duplicated by (.*), size = (\\d+) \r?\n\r?\n"};
 static const std::regex re_code_folding_is_duplicated_new_branch{
 //  "--> %s is duplicated by %s, size = %d, new branch function %s \r\n\r\n"
-    "--> (.+) is duplicated by (.+), size = (\\d+), new branch function (.+) \r?\n\r?\n"};
+    "--> (.*) is duplicated by (.*), size = (\\d+), new branch function (.*) \r?\n\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
@@ -1016,16 +1016,16 @@ MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
 // clang-format off
 static const std::regex re_linker_opts_unit_address_range{
 //  "  %s/ %s()/ %s - address not in near addressing range \r\n"
-    "  (.+)/ (.+)\\(\\)/ (.+) - address not in near addressing range \r?\n"};
+    "  (.*)/ (.*)\\(\\)/ (.*) - address not in near addressing range \r?\n"};
 static const std::regex re_linker_opts_unit_address_not_computed{
 //  "  %s/ %s()/ %s - final address not yet computed \r\n"
-    "  (.+)/ (.+)\\(\\)/ (.+) - final address not yet computed \r?\n"};
+    "  (.*)/ (.*)\\(\\)/ (.*) - final address not yet computed \r?\n"};
 static const std::regex re_linker_opts_unit_address_optimize{
 //  "! %s/ %s()/ %s - optimized addressing \r\n"
-    "! (.+)/ (.+)\\(\\)/ (.+) - optimized addressing \r?\n"};
+    "! (.*)/ (.*)\\(\\)/ (.*) - optimized addressing \r?\n"};
 static const std::regex re_linker_opts_unit_disassemble_error{
 //  "  %s/ %s() - error disassembling function \r\n"
-    "  (.+)/ (.+)\\(\\) - error disassembling function \r?\n"};
+    "  (.*)/ (.*)\\(\\) - error disassembling function \r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
@@ -1078,10 +1078,10 @@ MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
 // clang-format off
 static const std::regex re_branch_islands_created{
 //  "  branch island %s created for %s\r\n"
-    "  branch island (.+) created for (.+)\r?\n"};
+    "  branch island (.*) created for (.*)\r?\n"};
 static const std::regex re_branch_islands_created_safe{
 //  "  safe branch island %s created for %s\r\n"
-    "  safe branch island (.+) created for (.+)\r?\n"};
+    "  safe branch island (.*) created for (.*)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::BranchIslands::Read(  //
@@ -1117,10 +1117,10 @@ MWLinkerMap::Error MWLinkerMap::BranchIslands::Read(  //
 // clang-format off
 static const std::regex re_mixed_mode_islands_created{
 //  "  mixed mode island %s created for %s\r\n"
-    "  mixed mode island (.+) created for (.+)\r?\n"};
+    "  mixed mode island (.*) created for (.*)\r?\n"};
 static const std::regex re_mixed_mode_islands_created_safe{
 //  "  safe mixed mode island %s created for %s\r\n"
-    "  safe mixed mode island (.+) created for (.+)\r?\n"};
+    "  safe mixed mode island (.*) created for (.*)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MixedModeIslands::Read(  //
@@ -1154,13 +1154,13 @@ MWLinkerMap::Error MWLinkerMap::MixedModeIslands::Read(  //
 // clang-format off
 static const std::regex re_section_layout_3column_unit_normal{
 //  "  %08x %06x %08x %2i %s \t%s %s\r\n"
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.*)\r?\n"};
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.*) \t(.*) (.*)\r?\n"};
 static const std::regex re_section_layout_3column_unit_unused{
 //  "  UNUSED   %06x ........ %s %s %s\r\n"
-    "  UNUSED   ([0-9a-f]{6}) \\.{8} (.+) (.+) (.*)\r?\n"};
+    "  UNUSED   ([0-9a-f]{6}) \\.{8} (.*) (.*) (.*)\r?\n"};
 static const std::regex re_section_layout_3column_unit_entry{
 //  "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.+) \\(entry of (.+)\\) \t(.+) (.*)\r?\n"};
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.*) \\(entry of (.*)\\) \t(.*) (.*)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
@@ -1205,16 +1205,16 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
 // clang-format off
 static const std::regex re_section_layout_4column_unit_normal{
 //  "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.+) \t(.+) (.*)\r?\n"};
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.*) \t(.*) (.*)\r?\n"};
 static const std::regex re_section_layout_4column_unit_unused{
 //  "  UNUSED   %06x ........ ........    %s %s %s\r\n"
-    "  UNUSED   ([0-9a-f]{6}) \\.{8} \\.{8}    (.+) (.+) (.*)\r?\n"};
+    "  UNUSED   ([0-9a-f]{6}) \\.{8} \\.{8}    (.*) (.*) (.*)\r?\n"};
 static const std::regex re_section_layout_4column_unit_entry{
 //  "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})    (.+) \\(entry of (.+)\\) \t(.+) (.*)\r?\n"};
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})    (.*) \\(entry of (.*)\\) \t(.*) (.*)\r?\n"};
 static const std::regex re_section_layout_4column_unit_special{
 //  "  %08x %06x %08x %08x %2i %s\r\n"
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.+)\r?\n"};
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.*)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
@@ -1270,9 +1270,9 @@ MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
 
 // clang-format off
 static const std::regex re_section_layout_tloztp_unit_entry{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})    (.+) \\(entry of (.+)\\) \t(.+) (.*)\r?\n"};
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})    (.*) \\(entry of (.*)\\) \t(.*) (.*)\r?\n"};
 static const std::regex re_section_layout_tloztp_unit_special{
-    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.+)\r?\n"};
+    "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.*)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadTLOZTP(  //
@@ -1498,7 +1498,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamSRecord(  //
 // clang-format off
 static const std::regex re_memory_map_unit_normal_binfile{
 //  "  %20s %08x %08x %08x %08x %s\r\n"
-    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) (.+)\r?\n"};
+    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadBinFile(  //
@@ -1526,7 +1526,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadBinFile(  //
 // clang-format off
 static const std::regex re_memory_map_unit_normal_binfile_srecord{
 //  "  %20s %08x %08x %08x  %10i %08x %s\r\n"
-    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   {0,9}(\\d+) ([0-9a-f]{8}) (.+)\r?\n"};
+    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadBinFileSRecord(  //
@@ -1555,7 +1555,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadBinFileSRecord(  //
 // clang-format off
 static const std::regex re_memory_map_unit_normal_romram_binfile{
 //  "  %20s %08x %08x %08x %08x %08x   %08x %s\r\n"
-    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   ([0-9a-f]{8}) (.+)\r?\n"};
+    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamBinFile(  //
@@ -1584,7 +1584,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamBinFile(  //
 // clang-format off
 static const std::regex re_memory_map_unit_normal_romram_binfile_srecord{
 //  "  %20s %08x %08x %08x %08x %08x    %10i %08x %s\r\n"
-    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})     {0,9}(\\d+) ([0-9a-f]{8}) (.+)\r?\n"};
+    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})     {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamBinFileSRecord(  //
@@ -1614,7 +1614,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamBinFileSRecord(  //
 // clang-format off
 static const std::regex re_linker_generated_symbols_unit{
 //  "%25s %08x\r\n"
-    " *(.+) ([0-9a-f]{8})\r?\n"};
+    " {0,25}(.*) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::LinkerGeneratedSymbols::Read(  //
