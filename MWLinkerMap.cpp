@@ -113,8 +113,7 @@ static const std::regex re_linker_generated_symbols_header{
 // "<<< Failure in %s: GetFilePos is %x, sect->calc_offset is %x\r\n"
 // "<<< Failure in %s: GetFilePos is %x, sect->bin_offset is %x\r\n"
 
-Map::Error Map::Read(  //
-    const char* head, const char* const tail, std::size_t& line_number)
+Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
@@ -302,8 +301,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   return Error::None;
 }
 
-Map::Error Map::ReadTLOZTP(  //
-    const char* head, const char* const tail, std::size_t& line_number)
+Map::Error Map::ReadTLOZTP(const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
@@ -337,8 +335,7 @@ Map::Error Map::ReadTLOZTP(  //
   return Error::None;
 }
 
-Map::Error Map::ReadSMGalaxy(  //
-    const char* head, const char* const tail, std::size_t& line_number)
+Map::Error Map::ReadSMGalaxy(const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
@@ -405,8 +402,8 @@ static const std::regex re_section_layout_4column_prologue_3{
     "  ---------------------------------\r?\n"};
 // clang-format on
 
-Map::Error Map::ReadPrologue_SectionLayout(  //
-    const char*& head, const char* const tail, std::size_t& line_number, std::string name)
+Map::Error Map::ReadPrologue_SectionLayout(const char*& head, const char* const tail,
+                                           std::size_t& line_number, std::string name)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -540,8 +537,8 @@ static const std::regex re_memory_map_romram_srecord_binfile_prologue_2{
     "                       address           Offset   Address  Address       Line     Offset   Name\r?\n"};
 // clang-format on
 
-Map::Error Map::ReadPrologue_MemoryMap(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail,
+                                       std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -768,9 +765,9 @@ static const std::regex re_symbol_closure_node_linker_generated{
     "   *(\\d+)\\] (.*) found as linker generated symbol\r?\n"};
 // clang-format on
 
-Map::Error Map::SymbolClosure::Read(  //
-    const char*& head, const char* const tail, std::size_t& line_number,
-    std::list<std::string>& unresolved_symbols)
+Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
+                                    std::size_t& line_number,
+                                    std::list<std::string>& unresolved_symbols)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -904,8 +901,8 @@ static const std::regex re_code_folding_is_duplicated_new_branch{
     "--> (.*) is duplicated by (.*), size = (\\d+), new branch function (.*) \r?\n\r?\n"};
 // clang-format on
 
-Map::Error Map::EPPC_PatternMatching::Read(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::EPPC_PatternMatching::Read(const char*& head, const char* const tail,
+                                           std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1032,8 +1029,8 @@ static const std::regex re_linker_opts_unit_disassemble_error{
     "  (.*)/ (.*)\\(\\) - error disassembling function \r?\n"};
 // clang-format on
 
-Map::Error Map::LinkerOpts::Read(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::LinkerOpts::Read(const char*& head, const char* const tail,
+                                 std::size_t& line_number)
 
 {
   std::cmatch match;
@@ -1088,8 +1085,8 @@ static const std::regex re_branch_islands_created_safe{
     "  safe branch island (.*) created for (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::BranchIslands::Read(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::BranchIslands::Read(const char*& head, const char* const tail,
+                                    std::size_t& line_number)
 {
   // TODO: I have only ever seen Branch Islands from Skylanders Swap Force, and on top of that, it
   // was an empty portion. From datamining MWLDEPPC, I can only assume it goes something like this.
@@ -1127,8 +1124,8 @@ static const std::regex re_mixed_mode_islands_created_safe{
     "  safe mixed mode island (.*) created for (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MixedModeIslands::Read(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MixedModeIslands::Read(const char*& head, const char* const tail,
+                                       std::size_t& line_number)
 {
   // TODO: I have literally never seen Mixed Mode Islands.
   // Similar to Branch Islands, this is conjecture.
@@ -1167,8 +1164,8 @@ static const std::regex re_section_layout_3column_unit_entry{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.*) \\(entry of (.*)\\) \t(.*) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::SectionLayout::Read3Column(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::SectionLayout::Read3Column(const char*& head, const char* const tail,
+                                           std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1221,8 +1218,8 @@ static const std::regex re_section_layout_4column_unit_special{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::SectionLayout::Read4Column(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::SectionLayout::Read4Column(const char*& head, const char* const tail,
+                                           std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1279,8 +1276,8 @@ static const std::regex re_section_layout_tloztp_unit_special{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::SectionLayout::ReadTLOZTP(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::SectionLayout::ReadTLOZTP(const char*& head, const char* const tail,
+                                          std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1332,8 +1329,8 @@ static const std::regex re_memory_map_unit_debug_old{
     "   {0,15}(.*)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadSimple_old(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadSimple_old(const char*& head, const char* const tail,
+                                          std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1360,8 +1357,8 @@ static const std::regex re_memory_map_unit_normal_romram_old{
     "   {0,15}(.*)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRam_old(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadRomRam_old(const char*& head, const char* const tail,
+                                          std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1392,8 +1389,8 @@ static const std::regex re_memory_map_unit_debug{
     "   {0,20}(.*)          ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadSimple(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadSimple(const char*& head, const char* const tail,
+                                      std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1420,8 +1417,8 @@ static const std::regex re_memory_map_unit_normal_romram{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRam(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadRomRam(const char*& head, const char* const tail,
+                                      std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1449,8 +1446,8 @@ static const std::regex re_memory_map_unit_normal_srecord{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})  {0,9}(\\d+)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadSRecord(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadSRecord(const char*& head, const char* const tail,
+                                       std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1477,8 +1474,8 @@ static const std::regex re_memory_map_unit_normal_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadBinFile(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadBinFile(const char*& head, const char* const tail,
+                                       std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1505,8 +1502,8 @@ static const std::regex re_memory_map_unit_normal_romram_srecord{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})  {0,9}(\\d+)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRamSRecord(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadRomRamSRecord(const char*& head, const char* const tail,
+                                             std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1534,8 +1531,8 @@ static const std::regex re_memory_map_unit_normal_romram_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRamBinFile(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadRomRamBinFile(const char*& head, const char* const tail,
+                                             std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1563,8 +1560,8 @@ static const std::regex re_memory_map_unit_normal_srecord_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadSRecordBinFile(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadSRecordBinFile(const char*& head, const char* const tail,
+                                              std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1592,8 +1589,8 @@ static const std::regex re_memory_map_unit_normal_romram_srecord_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})     {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRamSRecordBinFile(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::MemoryMap::ReadRomRamSRecordBinFile(const char*& head, const char* const tail,
+                                                    std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
@@ -1622,8 +1619,8 @@ static const std::regex re_linker_generated_symbols_unit{
     " {0,25}(.*) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::LinkerGeneratedSymbols::Read(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
+Map::Error Map::LinkerGeneratedSymbols::Read(const char*& head, const char* const tail,
+                                             std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
