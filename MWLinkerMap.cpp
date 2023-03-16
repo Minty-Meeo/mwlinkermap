@@ -16,52 +16,50 @@
 // Metrowerks Linker Maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
 
-MWLinkerMap::Error MWLinkerMap::Read(std::istream& stream, std::size_t& line_number)
+namespace MWLinker
+{
+Map::Error Map::Read(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
   sstream << stream.rdbuf();
   return this->Read(sstream, line_number);
 }
-MWLinkerMap::Error MWLinkerMap::Read(const std::stringstream& sstream, std::size_t& line_number)
+Map::Error Map::Read(const std::stringstream& sstream, std::size_t& line_number)
 {
   return this->Read(sstream.view(), line_number);
 }
-MWLinkerMap::Error MWLinkerMap::Read(const std::string_view string_view, std::size_t& line_number)
+Map::Error Map::Read(const std::string_view string_view, std::size_t& line_number)
 {
   return this->Read(string_view.data(), string_view.data() + string_view.length(), line_number);
 }
 
-MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(std::istream& stream, std::size_t& line_number)
+Map::Error Map::ReadTLOZTP(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
   sstream << stream.rdbuf();
   return this->ReadTLOZTP(sstream, line_number);
 }
-MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(const std::stringstream& sstream,
-                                           std::size_t& line_number)
+Map::Error Map::ReadTLOZTP(const std::stringstream& sstream, std::size_t& line_number)
 {
   return this->ReadTLOZTP(sstream.view(), line_number);
 }
-MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(const std::string_view string_view,
-                                           std::size_t& line_number)
+Map::Error Map::ReadTLOZTP(const std::string_view string_view, std::size_t& line_number)
 {
   return this->ReadTLOZTP(string_view.data(), string_view.data() + string_view.length(),
                           line_number);
 }
 
-MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(std::istream& stream, std::size_t& line_number)
+Map::Error Map::ReadSMGalaxy(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
   sstream << stream.rdbuf();
   return this->ReadSMGalaxy(sstream, line_number);
 }
-MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(const std::stringstream& sstream,
-                                             std::size_t& line_number)
+Map::Error Map::ReadSMGalaxy(const std::stringstream& sstream, std::size_t& line_number)
 {
   return this->ReadSMGalaxy(sstream.view(), line_number);
 }
-MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(const std::string_view string_view,
-                                             std::size_t& line_number)
+Map::Error Map::ReadSMGalaxy(const std::string_view string_view, std::size_t& line_number)
 {
   return this->ReadSMGalaxy(string_view.data(), string_view.data() + string_view.length(),
                             line_number);
@@ -115,7 +113,7 @@ static const std::regex re_linker_generated_symbols_header{
 // "<<< Failure in %s: GetFilePos is %x, sect->calc_offset is %x\r\n"
 // "<<< Failure in %s: GetFilePos is %x, sect->bin_offset is %x\r\n"
 
-MWLinkerMap::Error MWLinkerMap::Read(  //
+Map::Error Map::Read(  //
     const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
@@ -211,7 +209,7 @@ MWLinkerMap::Error MWLinkerMap::Read(  //
     // EPPC_PatternMatching in the middle, this will blend into the prior symbol closure in the
     // eyes of this read function.
     auto portion = std::make_unique<SymbolClosure>();
-    portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
+    portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->Read(head, tail, line_number, this->unresolved_symbols);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
@@ -304,7 +302,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   return Error::None;
 }
 
-MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(  //
+Map::Error Map::ReadTLOZTP(  //
     const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
@@ -339,7 +337,7 @@ MWLinkerMap::Error MWLinkerMap::ReadTLOZTP(  //
   return Error::None;
 }
 
-MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(  //
+Map::Error Map::ReadSMGalaxy(  //
     const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
@@ -355,7 +353,7 @@ MWLinkerMap::Error MWLinkerMap::ReadSMGalaxy(  //
   {
     line_number += 2, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
     auto portion = std::make_unique<SectionLayout>(match.str(1));
-    portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
+    portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->Read4Column(head, tail, line_number);
     UPDATE_DEBUG_STRING_VIEW;
     if (error != Error::None)
@@ -407,7 +405,7 @@ static const std::regex re_section_layout_4column_prologue_3{
     "  ---------------------------------\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::ReadPrologue_SectionLayout(  //
+Map::Error Map::ReadPrologue_SectionLayout(  //
     const char*& head, const char* const tail, std::size_t& line_number, std::string name)
 {
   std::cmatch match;
@@ -455,7 +453,7 @@ MWLinkerMap::Error MWLinkerMap::ReadPrologue_SectionLayout(  //
       {
         line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
         auto portion = std::make_unique<SectionLayout>(std::move(name));
-        portion->SetMinVersion(MWLinkerVersion::version_3_0_4);
+        portion->SetMinVersion(Version::version_3_0_4);
         const auto error = portion->Read4Column(head, tail, line_number);
         UPDATE_DEBUG_STRING_VIEW;
         if (error != Error::None)
@@ -542,7 +540,7 @@ static const std::regex re_memory_map_romram_srecord_binfile_prologue_2{
     "                       address           Offset   Address  Address       Line     Offset   Name\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::ReadPrologue_MemoryMap(  //
+Map::Error Map::ReadPrologue_MemoryMap(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -770,7 +768,7 @@ static const std::regex re_symbol_closure_node_linker_generated{
     "   *(\\d+)\\] (.*) found as linker generated symbol\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
+Map::Error Map::SymbolClosure::Read(  //
     const char*& head, const char* const tail, std::size_t& line_number,
     std::list<std::string>& unresolved_symbols)
 {
@@ -821,7 +819,7 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
         }
         if (next_node->unref_dups.empty())
           return Error::SymbolClosureUnrefDupsEmpty;
-        this->SetMinVersion(MWLinkerVersion::version_2_3_3_build_137);
+        this->SetMinVersion(Version::version_2_3_3_build_137);
       }
 
       next_node->parent = curr_node;
@@ -837,7 +835,7 @@ MWLinkerMap::Error MWLinkerMap::SymbolClosure::Read(  //
         dummy_node->parent = curr_node;
         curr_node->children.push_back((curr_node = dummy_node.get(), std::move(dummy_node)));
         ++curr_hierarchy_level;
-        this->SetMinVersion(MWLinkerVersion::version_3_0_4);
+        this->SetMinVersion(Version::version_3_0_4);
       }
       continue;
     }
@@ -906,7 +904,7 @@ static const std::regex re_code_folding_is_duplicated_new_branch{
     "--> (.*) is duplicated by (.*), size = (\\d+), new branch function (.*) \r?\n\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::EPPC_PatternMatching::Read(  //
+Map::Error Map::EPPC_PatternMatching::Read(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1034,7 +1032,7 @@ static const std::regex re_linker_opts_unit_disassemble_error{
     "  (.*)/ (.*)\\(\\) - error disassembling function \r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::LinkerOpts::Read(  //
+Map::Error Map::LinkerOpts::Read(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 
 {
@@ -1090,7 +1088,7 @@ static const std::regex re_branch_islands_created_safe{
     "  safe branch island (.*) created for (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::BranchIslands::Read(  //
+Map::Error Map::BranchIslands::Read(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   // TODO: I have only ever seen Branch Islands from Skylanders Swap Force, and on top of that, it
@@ -1129,7 +1127,7 @@ static const std::regex re_mixed_mode_islands_created_safe{
     "  safe mixed mode island (.*) created for (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MixedModeIslands::Read(  //
+Map::Error Map::MixedModeIslands::Read(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   // TODO: I have literally never seen Mixed Mode Islands.
@@ -1169,7 +1167,7 @@ static const std::regex re_section_layout_3column_unit_entry{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.*) \\(entry of (.*)\\) \t(.*) (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::SectionLayout::Read3Column(  //
+Map::Error Map::SectionLayout::Read3Column(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1223,7 +1221,7 @@ static const std::regex re_section_layout_4column_unit_special{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::SectionLayout::Read4Column(  //
+Map::Error Map::SectionLayout::Read4Column(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1281,7 +1279,7 @@ static const std::regex re_section_layout_tloztp_unit_special{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::SectionLayout::ReadTLOZTP(  //
+Map::Error Map::SectionLayout::ReadTLOZTP(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1334,7 +1332,7 @@ static const std::regex re_memory_map_unit_debug_old{
     "   {0,15}(.*)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSimple_old(  //
+Map::Error Map::MemoryMap::ReadSimple_old(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1362,7 +1360,7 @@ static const std::regex re_memory_map_unit_normal_romram_old{
     "   {0,15}(.*)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRam_old(  //
+Map::Error Map::MemoryMap::ReadRomRam_old(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1394,7 +1392,7 @@ static const std::regex re_memory_map_unit_debug{
     "   {0,20}(.*)          ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSimple(  //
+Map::Error Map::MemoryMap::ReadSimple(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1422,7 +1420,7 @@ static const std::regex re_memory_map_unit_normal_romram{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRam(  //
+Map::Error Map::MemoryMap::ReadRomRam(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1451,7 +1449,7 @@ static const std::regex re_memory_map_unit_normal_srecord{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})  {0,9}(\\d+)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSRecord(  //
+Map::Error Map::MemoryMap::ReadSRecord(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1479,7 +1477,7 @@ static const std::regex re_memory_map_unit_normal_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadBinFile(  //
+Map::Error Map::MemoryMap::ReadBinFile(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1507,7 +1505,7 @@ static const std::regex re_memory_map_unit_normal_romram_srecord{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})  {0,9}(\\d+)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamSRecord(  //
+Map::Error Map::MemoryMap::ReadRomRamSRecord(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1536,7 +1534,7 @@ static const std::regex re_memory_map_unit_normal_romram_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamBinFile(  //
+Map::Error Map::MemoryMap::ReadRomRamBinFile(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1565,7 +1563,7 @@ static const std::regex re_memory_map_unit_normal_srecord_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSRecordBinFile(  //
+Map::Error Map::MemoryMap::ReadSRecordBinFile(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1594,7 +1592,7 @@ static const std::regex re_memory_map_unit_normal_romram_srecord_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})     {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamSRecordBinFile(  //
+Map::Error Map::MemoryMap::ReadRomRamSRecordBinFile(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1624,7 +1622,7 @@ static const std::regex re_linker_generated_symbols_unit{
     " {0,25}(.*) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::LinkerGeneratedSymbols::Read(  //
+Map::Error Map::LinkerGeneratedSymbols::Read(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
@@ -1639,3 +1637,4 @@ MWLinkerMap::Error MWLinkerMap::LinkerGeneratedSymbols::Read(  //
   }
   return Error::None;
 }
+}  // namespace MWLinker

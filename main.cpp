@@ -19,9 +19,9 @@ void tempfunc(const char* name, int choice)
     return;
   }
 
-  MWLinkerMap linker_map;
+  MWLinker::Map linker_map;
   std::size_t line_number;
-  MWLinkerMap::Error error;
+  MWLinker::Map::Error error;
   switch (choice)
   {
   case 0:

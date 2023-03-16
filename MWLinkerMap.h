@@ -7,7 +7,9 @@
 #include <string>
 #include <string_view>
 
-enum class MWLinkerVersion
+namespace MWLinker
+{
+enum class Version
 {
   Unknown,
   // Codewarrior for GCN 1.0   (May 21 2000 19:00:24)
@@ -40,7 +42,7 @@ enum class MWLinkerVersion
   version_4_3_build_213,
 };
 
-struct MWLinkerMap
+struct Map
 {
   enum class Error
   {
@@ -74,13 +76,10 @@ struct MWLinkerMap
     PortionBase() = default;
     virtual ~PortionBase() = default;
 
-    void SetMinVersion(const MWLinkerVersion version)
-    {
-      min_version = std::max(min_version, version);
-    }
+    void SetMinVersion(const Version version) { min_version = std::max(min_version, version); }
     virtual bool IsEmpty() = 0;
 
-    MWLinkerVersion min_version = MWLinkerVersion::Unknown;
+    Version min_version = Version::Unknown;
   };
 
   // CodeWarrior for GCN 1.1
@@ -136,7 +135,7 @@ struct MWLinkerMap
       virtual ~NodeLinkerGenerated() = default;
     };
 
-    SymbolClosure() { min_version = MWLinkerVersion::version_2_3_3_build_126; };
+    SymbolClosure() { min_version = Version::version_2_3_3_build_126; };
     virtual ~SymbolClosure() = default;
 
     virtual bool IsEmpty() override { return root.children.empty(); }
@@ -192,7 +191,7 @@ struct MWLinkerMap
       std::list<Unit> units;
     };
 
-    EPPC_PatternMatching() { SetMinVersion(MWLinkerVersion::version_4_2_build_142); };
+    EPPC_PatternMatching() { SetMinVersion(Version::version_4_2_build_142); };
     virtual ~EPPC_PatternMatching() = default;
 
     virtual bool IsEmpty() override { return merging_units.empty() || folding_units.empty(); }
@@ -253,7 +252,7 @@ struct MWLinkerMap
       virtual ~UnitDisassembleError() = default;
     };
 
-    LinkerOpts() { SetMinVersion(MWLinkerVersion::version_4_2_build_142); };
+    LinkerOpts() { SetMinVersion(Version::version_4_2_build_142); };
     virtual ~LinkerOpts() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
@@ -278,7 +277,7 @@ struct MWLinkerMap
       bool is_safe;
     };
 
-    BranchIslands() { SetMinVersion(MWLinkerVersion::version_4_1_build_51213); };
+    BranchIslands() { SetMinVersion(Version::version_4_1_build_51213); };
     ~BranchIslands() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
@@ -303,7 +302,7 @@ struct MWLinkerMap
       bool is_safe;
     };
 
-    MixedModeIslands() { SetMinVersion(MWLinkerVersion::version_4_1_build_51213); };
+    MixedModeIslands() { SetMinVersion(Version::version_4_1_build_51213); };
     ~MixedModeIslands() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
@@ -504,7 +503,7 @@ struct MWLinkerMap
     MemoryMap(bool has_rom_ram_, bool has_s_record_, bool has_bin_file_)
         : has_rom_ram(has_rom_ram_), has_s_record(has_s_record_), has_bin_file(has_bin_file_)
     {
-      SetMinVersion(MWLinkerVersion::version_4_2_build_142);
+      SetMinVersion(Version::version_4_2_build_142);
     }
     virtual ~MemoryMap() = default;
 
@@ -547,8 +546,8 @@ struct MWLinkerMap
     std::list<std::unique_ptr<Unit>> units;
   };
 
-  MWLinkerMap() = default;
-  ~MWLinkerMap() = default;
+  Map() = default;
+  ~Map() = default;
 
   Error Read(std::istream&, std::size_t&);
   Error Read(const std::stringstream&, std::size_t&);
@@ -570,3 +569,4 @@ struct MWLinkerMap
   std::list<std::unique_ptr<PortionBase>> portions;
   std::list<std::string> unresolved_symbols;
 };
+}  // namespace MWLinker
