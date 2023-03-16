@@ -500,9 +500,9 @@ struct MWLinkerMap
     };
 
     MemoryMap(bool has_rom_ram_)  // ctor for old memory map
-        : has_rom_ram(has_rom_ram_), has_bin_file(false), has_s_record(false){};
-    MemoryMap(bool has_rom_ram_, bool has_bin_file_, bool has_s_record_)
-        : has_rom_ram(has_rom_ram_), has_bin_file(has_bin_file_), has_s_record(has_s_record_)
+        : has_rom_ram(has_rom_ram_), has_s_record(false), has_bin_file(false){};
+    MemoryMap(bool has_rom_ram_, bool has_s_record_, bool has_bin_file_)
+        : has_rom_ram(has_rom_ram_), has_s_record(has_s_record_), has_bin_file(has_bin_file_)
     {
       SetMinVersion(MWLinkerVersion::version_4_2_build_142);
     }
@@ -512,19 +512,19 @@ struct MWLinkerMap
     Error ReadSimple_old(const char*&, const char*, std::size_t&);
     Error ReadRomRam_old(const char*&, const char*, std::size_t&);
     Error ReadSimple(const char*&, const char*, std::size_t&);
-    Error ReadSimpleSRecord(const char*&, const char*, std::size_t&);
     Error ReadRomRam(const char*&, const char*, std::size_t&);
-    Error ReadRomRamSRecord(const char*&, const char*, std::size_t&);
+    Error ReadSRecord(const char*&, const char*, std::size_t&);
     Error ReadBinFile(const char*&, const char*, std::size_t&);
-    Error ReadBinFileSRecord(const char*&, const char*, std::size_t&);
+    Error ReadRomRamSRecord(const char*&, const char*, std::size_t&);
     Error ReadRomRamBinFile(const char*&, const char*, std::size_t&);
-    Error ReadRomRamBinFileSRecord(const char*&, const char*, std::size_t&);
+    Error ReadSRecordBinFile(const char*&, const char*, std::size_t&);
+    Error ReadRomRamSRecordBinFile(const char*&, const char*, std::size_t&);
 
     std::list<UnitNormal> normal_units;
     std::list<UnitDebug> debug_units;
     const bool has_rom_ram;
-    const bool has_bin_file;
     const bool has_s_record;
+    const bool has_bin_file;
   };
 
   struct LinkerGeneratedSymbols final : PortionBase

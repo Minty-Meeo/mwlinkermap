@@ -498,46 +498,46 @@ static const std::regex re_memory_map_simple_prologue_1{
 static const std::regex re_memory_map_simple_prologue_2{
 //  "                       address           Offset\r\n"
     "                       address           Offset\r?\n"};
-static const std::regex re_memory_map_simple_srecord_prologue_1{
-//  "                       Starting Size     File       S-Record\r\n"
-    "                       Starting Size     File       S-Record\r?\n"};
-static const std::regex re_memory_map_simple_srecord_prologue_2{
-//  "                       address           Offset     Line\r\n"
-    "                       address           Offset     Line\r?\n"};
 static const std::regex re_memory_map_romram_prologue_1{
 //  "                       Starting Size     File     ROM      RAM Buffer\r\n"
     "                       Starting Size     File     ROM      RAM Buffer\r?\n"};
 static const std::regex re_memory_map_romram_prologue_2{
 //  "                       address           Offset   Address  Address\r\n"
     "                       address           Offset   Address  Address\r?\n"};
-static const std::regex re_memory_map_romram_srecord_prologue_1{
-//  "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n"
-    "                       Starting Size     File     ROM      RAM Buffer  S-Record\r?\n"};
-static const std::regex re_memory_map_romram_srecord_prologue_2{
-//  "                       address           Offset   Address  Address     Line\r\n"
-    "                       address           Offset   Address  Address     Line\r?\n"};
+static const std::regex re_memory_map_srecord_prologue_1{
+//  "                       Starting Size     File       S-Record\r\n"
+    "                       Starting Size     File       S-Record\r?\n"};
+static const std::regex re_memory_map_srecord_prologue_2{
+//  "                       address           Offset     Line\r\n"
+    "                       address           Offset     Line\r?\n"};
 static const std::regex re_memory_map_binfile_prologue_1{
 //  "                       Starting Size     File     Bin File Bin File\r\n"
     "                       Starting Size     File     Bin File Bin File\r?\n"};
 static const std::regex re_memory_map_binfile_prologue_2{
 //  "                       address           Offset   Offset   Name\r\n"
     "                       address           Offset   Offset   Name\r?\n"};
-static const std::regex re_memory_map_binfile_srecord_prologue_1{
-//  "                       Starting Size     File        S-Record Bin File Bin File\r\n"
-    "                       Starting Size     File        S-Record Bin File Bin File\r?\n"};
-static const std::regex re_memory_map_binfile_srecord_prologue_2{
-//  "                       address           Offset      Line     Offset   Name\r\n"
-    "                       address           Offset      Line     Offset   Name\r?\n"};
+static const std::regex re_memory_map_romram_srecord_prologue_1{
+//  "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n"
+    "                       Starting Size     File     ROM      RAM Buffer  S-Record\r?\n"};
+static const std::regex re_memory_map_romram_srecord_prologue_2{
+//  "                       address           Offset   Address  Address     Line\r\n"
+    "                       address           Offset   Address  Address     Line\r?\n"};
 static const std::regex re_memory_map_romram_binfile_prologue_1{
 //  "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n"
     "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r?\n"};
 static const std::regex re_memory_map_romram_binfile_prologue_2{
 //  "                       address           Offset   Address  Address    Offset   Name\r\n"
     "                       address           Offset   Address  Address    Offset   Name\r?\n"};
-static const std::regex re_memory_map_romram_binfile_srecord_prologue_1{
+static const std::regex re_memory_map_srecord_binfile_prologue_1{
+//  "                       Starting Size     File        S-Record Bin File Bin File\r\n"
+    "                       Starting Size     File        S-Record Bin File Bin File\r?\n"};
+static const std::regex re_memory_map_srecord_binfile_prologue_2{
+//  "                       address           Offset      Line     Offset   Name\r\n"
+    "                       address           Offset      Line     Offset   Name\r?\n"};
+static const std::regex re_memory_map_romram_srecord_binfile_prologue_1{
 //  "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n"
     "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r?\n"};
-static const std::regex re_memory_map_romram_binfile_srecord_prologue_2{
+static const std::regex re_memory_map_romram_srecord_binfile_prologue_2{
 //  "                       address           Offset   Address  Address       Line     Offset   Name\r\n"
     "                       address           Offset   Address  Address       Line     Offset   Name\r?\n"};
 // clang-format on
@@ -608,26 +608,6 @@ MWLinkerMap::Error MWLinkerMap::ReadPrologue_MemoryMap(  //
       return Error::MemoryMapBadPrologue;
     }
   }
-  else if (std::regex_search(head, tail, match, re_memory_map_simple_srecord_prologue_1,
-                             std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_memory_map_simple_srecord_prologue_2,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      auto portion = std::make_unique<MemoryMap>(false, false, true);
-      const auto error = portion->ReadSimpleSRecord(head, tail, line_number);
-      UPDATE_DEBUG_STRING_VIEW;
-      if (error != Error::None)
-        return error;
-      this->portions.push_back(std::move(portion));
-    }
-    else
-    {
-      return Error::MemoryMapBadPrologue;
-    }
-  }
   else if (std::regex_search(head, tail, match, re_memory_map_romram_prologue_1,
                              std::regex_constants::match_continuous))
   {
@@ -648,16 +628,16 @@ MWLinkerMap::Error MWLinkerMap::ReadPrologue_MemoryMap(  //
       return Error::MemoryMapBadPrologue;
     }
   }
-  else if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_prologue_1,
+  else if (std::regex_search(head, tail, match, re_memory_map_srecord_prologue_1,
                              std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_prologue_2,
+    if (std::regex_search(head, tail, match, re_memory_map_srecord_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      auto portion = std::make_unique<MemoryMap>(true, false, true);
-      const auto error = portion->ReadRomRamSRecord(head, tail, line_number);
+      auto portion = std::make_unique<MemoryMap>(false, true, false);
+      const auto error = portion->ReadSRecord(head, tail, line_number);
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
         return error;
@@ -676,7 +656,7 @@ MWLinkerMap::Error MWLinkerMap::ReadPrologue_MemoryMap(  //
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      auto portion = std::make_unique<MemoryMap>(false, true, false);
+      auto portion = std::make_unique<MemoryMap>(false, false, true);
       const auto error = portion->ReadBinFile(head, tail, line_number);
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
@@ -688,16 +668,16 @@ MWLinkerMap::Error MWLinkerMap::ReadPrologue_MemoryMap(  //
       return Error::MemoryMapBadPrologue;
     }
   }
-  else if (std::regex_search(head, tail, match, re_memory_map_binfile_srecord_prologue_1,
+  else if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_prologue_1,
                              std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_memory_map_binfile_srecord_prologue_2,
+    if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      auto portion = std::make_unique<MemoryMap>(false, true, true);
-      const auto error = portion->ReadBinFileSRecord(head, tail, line_number);
+      auto portion = std::make_unique<MemoryMap>(true, true, false);
+      const auto error = portion->ReadRomRamSRecord(head, tail, line_number);
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
         return error;
@@ -716,7 +696,7 @@ MWLinkerMap::Error MWLinkerMap::ReadPrologue_MemoryMap(  //
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-      auto portion = std::make_unique<MemoryMap>(true, true, false);
+      auto portion = std::make_unique<MemoryMap>(true, false, true);
       const auto error = portion->ReadRomRamBinFile(head, tail, line_number);
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
@@ -728,16 +708,36 @@ MWLinkerMap::Error MWLinkerMap::ReadPrologue_MemoryMap(  //
       return Error::MemoryMapBadPrologue;
     }
   }
-  else if (std::regex_search(head, tail, match, re_memory_map_romram_binfile_srecord_prologue_1,
+  else if (std::regex_search(head, tail, match, re_memory_map_srecord_binfile_prologue_1,
                              std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    if (std::regex_search(head, tail, match, re_memory_map_romram_binfile_srecord_prologue_2,
+    if (std::regex_search(head, tail, match, re_memory_map_srecord_binfile_prologue_2,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+      auto portion = std::make_unique<MemoryMap>(false, true, true);
+      const auto error = portion->ReadSRecordBinFile(head, tail, line_number);
+      UPDATE_DEBUG_STRING_VIEW;
+      if (error != Error::None)
+        return error;
+      this->portions.push_back(std::move(portion));
+    }
+    else
+    {
+      return Error::MemoryMapBadPrologue;
+    }
+  }
+  else if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_binfile_prologue_1,
+                             std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_binfile_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
       auto portion = std::make_unique<MemoryMap>(true, true, true);
-      const auto error = portion->ReadRomRamBinFileSRecord(head, tail, line_number);
+      const auto error = portion->ReadRomRamSRecordBinFile(head, tail, line_number);
       UPDATE_DEBUG_STRING_VIEW;
       if (error != Error::None)
         return error;
@@ -1416,34 +1416,6 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSimple(  //
 }
 
 // clang-format off
-static const std::regex re_memory_map_unit_normal_simple_srecord{
-//  "  %20s %08x %08x %08x %10i\r\n"
-    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})  {0,9}(\\d+)\r?\n"};
-// clang-format on
-
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSimpleSRecord(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
-{
-  std::cmatch match;
-  DECLARE_DEBUG_STRING_VIEW;
-
-  while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple_srecord,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), std::stoi(match.str(5)));
-  }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
-}
-
-// clang-format off
 static const std::regex re_memory_map_unit_normal_romram{
 //  "  %20s %08x %08x %08x %08x %08x\r\n"
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
@@ -1462,6 +1434,62 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRam(  //
     this->normal_units.emplace_back(  //
         match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
         xstoul(match.str(5)), xstoul(match.str(6)));
+  }
+  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
+                           std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
+  }
+  return Error::None;
+}
+
+// clang-format off
+static const std::regex re_memory_map_unit_normal_srecord{
+//  "  %20s %08x %08x %08x %10i\r\n"
+    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})  {0,9}(\\d+)\r?\n"};
+// clang-format on
+
+MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSRecord(  //
+    const char*& head, const char* const tail, std::size_t& line_number)
+{
+  std::cmatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+
+  while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord,
+                           std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
+                                    xstoul(match.str(4)), std::stoi(match.str(5)));
+  }
+  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
+                           std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
+  }
+  return Error::None;
+}
+
+// clang-format off
+static const std::regex re_memory_map_unit_normal_binfile{
+//  "  %20s %08x %08x %08x %08x %s\r\n"
+    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) (.*)\r?\n"};
+// clang-format on
+
+MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadBinFile(  //
+    const char*& head, const char* const tail, std::size_t& line_number)
+{
+  std::cmatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+
+  while (std::regex_search(head, tail, match, re_memory_map_unit_normal_binfile,
+                           std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
+                                    xstoul(match.str(4)), xstoul(match.str(5)), match.str(6));
   }
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
                            std::regex_constants::match_continuous))
@@ -1502,63 +1530,6 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamSRecord(  //
 }
 
 // clang-format off
-static const std::regex re_memory_map_unit_normal_binfile{
-//  "  %20s %08x %08x %08x %08x %s\r\n"
-    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) (.*)\r?\n"};
-// clang-format on
-
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadBinFile(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
-{
-  std::cmatch match;
-  DECLARE_DEBUG_STRING_VIEW;
-
-  while (std::regex_search(head, tail, match, re_memory_map_unit_normal_binfile,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), xstoul(match.str(5)), match.str(6));
-  }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
-}
-
-// clang-format off
-static const std::regex re_memory_map_unit_normal_binfile_srecord{
-//  "  %20s %08x %08x %08x  %10i %08x %s\r\n"
-    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
-// clang-format on
-
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadBinFileSRecord(  //
-    const char*& head, const char* const tail, std::size_t& line_number)
-{
-  std::cmatch match;
-  DECLARE_DEBUG_STRING_VIEW;
-
-  while (std::regex_search(head, tail, match, re_memory_map_unit_normal_binfile_srecord,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->normal_units.emplace_back(  //
-        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-        std::stoi(match.str(5)), xstoul(match.str(6)), match.str(7));
-  }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
-}
-
-// clang-format off
 static const std::regex re_memory_map_unit_normal_romram_binfile{
 //  "  %20s %08x %08x %08x %08x %08x   %08x %s\r\n"
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   ([0-9a-f]{8}) (.*)\r?\n"};
@@ -1588,18 +1559,47 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamBinFile(  //
 }
 
 // clang-format off
-static const std::regex re_memory_map_unit_normal_romram_binfile_srecord{
-//  "  %20s %08x %08x %08x %08x %08x    %10i %08x %s\r\n"
-    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})     {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
+static const std::regex re_memory_map_unit_normal_srecord_binfile{
+//  "  %20s %08x %08x %08x  %10i %08x %s\r\n"
+    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamBinFileSRecord(  //
+MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSRecordBinFile(  //
     const char*& head, const char* const tail, std::size_t& line_number)
 {
   std::cmatch match;
   DECLARE_DEBUG_STRING_VIEW;
 
-  while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_binfile_srecord,
+  while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord_binfile,
+                           std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    this->normal_units.emplace_back(  //
+        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
+        std::stoi(match.str(5)), xstoul(match.str(6)), match.str(7));
+  }
+  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
+                           std::regex_constants::match_continuous))
+  {
+    line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
+    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
+  }
+  return Error::None;
+}
+
+// clang-format off
+static const std::regex re_memory_map_unit_normal_romram_srecord_binfile{
+//  "  %20s %08x %08x %08x %08x %08x    %10i %08x %s\r\n"
+    "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})     {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
+// clang-format on
+
+MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRamSRecordBinFile(  //
+    const char*& head, const char* const tail, std::size_t& line_number)
+{
+  std::cmatch match;
+  DECLARE_DEBUG_STRING_VIEW;
+
+  while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
