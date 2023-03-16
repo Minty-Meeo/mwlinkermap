@@ -106,6 +106,7 @@ struct Map
       // Default for an unknown ST_TYPE
       unknown = -1,
     };
+
     enum class Bind
     {
       // STB_LOCAL
@@ -121,6 +122,7 @@ struct Map
       // Default for an unknown ST_BIND
       unknown = -1,
     };
+
     struct NodeBase
     {
       NodeBase() = default;  // Necessary for root node
@@ -515,6 +517,7 @@ struct Map
       std::uint32_t bin_file_offset;
       std::string bin_file_name;
     };
+
     // objdump debug shf_flags
     // Sections which do not, such as '.debug_srcinfo', '.debug_sfnames', '.debug', or '.line'
     // TODO: Confirm this is really the distinction
