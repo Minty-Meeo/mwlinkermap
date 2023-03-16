@@ -13,6 +13,9 @@
 #define UPDATE_DEBUG_STRING_VIEW _debug_string_view = {head, tail}
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
 
+// Metrowerks Linker Maps should be considered binary files containing text with CRLF line endings.
+// To account for outside factors, though, this program can support both CRLF and LF line endings.
+
 MWLinkerMap::Error MWLinkerMap::Read(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
