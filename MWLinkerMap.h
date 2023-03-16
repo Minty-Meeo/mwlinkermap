@@ -453,9 +453,6 @@ struct Map
   //  - Expanded Memory Map variants, slightly tweaked existing printfs.
   struct MemoryMap final : PortionBase
   {
-    // TODO: make list of names of sections which are not allocated
-    // .debug_srcinfo / .debug_sfnames / .debug / .line)
-    // Check ELF format SH_TYPE (Section Header) or whatever, I think that is the clue.
     struct UnitNormal
     {
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
@@ -518,9 +515,8 @@ struct Map
       std::string bin_file_name;
     };
 
-    // objdump debug shf_flags
-    // Sections which do not, such as '.debug_srcinfo', '.debug_sfnames', '.debug', or '.line'
-    // TODO: Confirm this is really the distinction
+    // TODO: There is an opportunity for detecting the min version from the normal and debug section
+    // names, but I couldn't be bothered to look into it.
     struct UnitDebug
     {
       UnitDebug(std::string name_, std::uint32_t size_, std::uint32_t file_offset_)
