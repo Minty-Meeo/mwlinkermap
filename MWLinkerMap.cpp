@@ -1344,8 +1344,8 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSimple_old(  //
                            std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)));
+    this->normal_units.emplace_back(  //
+        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)));
   }
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug_old,
                            std::regex_constants::match_continuous))
@@ -1359,7 +1359,7 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadSimple_old(  //
 // clang-format off
 static const std::regex re_memory_map_unit_normal_romram_old{
 //  "  %15s  %08x %08x %08x %08x %08x\r\n"
-    "   {0,15}(.*)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
+    "   {0,15}(.*)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
 MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRam_old(  //
@@ -1372,8 +1372,9 @@ MWLinkerMap::Error MWLinkerMap::MemoryMap::ReadRomRam_old(  //
                            std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)));
+    this->normal_units.emplace_back(  //
+        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
+        xstoul(match.str(5)), xstoul(match.str(6)));
   }
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug_old,
                            std::regex_constants::match_continuous))
