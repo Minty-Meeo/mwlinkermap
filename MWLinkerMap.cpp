@@ -187,6 +187,8 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
     if (!portion->IsEmpty())
       this->portions.push_back(std::move(portion));
   }
+  // Unresolved symbol post-prints probably belong here (I have not confirmed if they preceed
+  // LinkerOpts), but the Symbol Closure reading code that just happened handles them well enough.
   {
     auto portion = std::make_unique<LinkerOpts>();
     const auto error = portion->Read(head, tail, line_number);
@@ -307,8 +309,9 @@ Map::Error Map::ReadSMGalaxy(const char* head, const char* const tail, std::size
   line_number = 0;
 
   // We only see this header once, as every symbol is mashed into an imaginary ".text" section.
-  if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
-                        std::regex_constants::match_continuous))
+  if (!std::regex_search(head, tail, match, re_section_layout_header_modified_a,
+                         std::regex_constants::match_continuous))
+    return Error::SMGalaxyYouHadOneJob;
   {
     line_number += 2, head += match.length();
     auto portion = std::make_unique<SectionLayout>(match.str(1));
@@ -317,10 +320,6 @@ Map::Error Map::ReadSMGalaxy(const char* head, const char* const tail, std::size
     if (error != Error::None)
       return error;
     this->portions.push_back(std::move(portion));
-  }
-  else
-  {
-    return Error::SMGalaxyYouHadOneJob;
   }
   // It seems like a mistake, but for a few examples, a tiny bit of simple-style,
   // headerless, CodeWarrior for Wii 1.0 (at minimum) Memory Map can be found.
@@ -946,7 +945,7 @@ Map::Error Map::EPPC_PatternMatching::Read(const char*& head, const char* const 
     }
     break;
   }
-  // After analysis concludes, a redundant summary of changes per-file is printed.
+  // After analysis concludes, a redundant summary of changes per file is printed.
   while (std::regex_search(head, tail, match, re_code_folding_header,
                            std::regex_constants::match_continuous))
   {
@@ -965,7 +964,7 @@ Map::Error Map::EPPC_PatternMatching::Read(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
                             std::regex_constants::match_continuous))
       {
-        if (match.str(1) != match.str(4))  // It is my assumption that they will always match
+        if (match.str(1) != match.str(4))  // It is my assumption that they will always match.
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
         line_number += 2, head += match.length();
         folding_unit.units.emplace_back(  //
@@ -980,13 +979,13 @@ Map::Error Map::EPPC_PatternMatching::Read(const char*& head, const char* const 
 }
 
 // clang-format off
-static const std::regex re_linker_opts_unit_address_range{
+static const std::regex re_linker_opts_unit_not_near{
 //  "  %s/ %s()/ %s - address not in near addressing range \r\n"
     "  (.*)/ (.*)\\(\\)/ (.*) - address not in near addressing range \r?\n"};
 static const std::regex re_linker_opts_unit_address_not_computed{
 //  "  %s/ %s()/ %s - final address not yet computed \r\n"
     "  (.*)/ (.*)\\(\\)/ (.*) - final address not yet computed \r?\n"};
-static const std::regex re_linker_opts_unit_address_optimize{
+static const std::regex re_linker_opts_unit_optimized{
 //  "! %s/ %s()/ %s - optimized addressing \r\n"
     "! (.*)/ (.*)\\(\\)/ (.*) - optimized addressing \r?\n"};
 static const std::regex re_linker_opts_unit_disassemble_error{
@@ -1002,7 +1001,7 @@ Map::Error Map::LinkerOpts::Read(const char*& head, const char* const tail,
 
   while (true)
   {
-    if (std::regex_search(head, tail, match, re_linker_opts_unit_address_range,
+    if (std::regex_search(head, tail, match, re_linker_opts_unit_not_near,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length();
@@ -1026,7 +1025,7 @@ Map::Error Map::LinkerOpts::Read(const char*& head, const char* const tail,
           std::make_unique<UnitNotComputed>(match.str(1), match.str(2), match.str(3)));
       continue;
     }
-    if (std::regex_search(head, tail, match, re_linker_opts_unit_address_optimize,
+    if (std::regex_search(head, tail, match, re_linker_opts_unit_optimized,
                           std::regex_constants::match_continuous))
     {
       // I have not seen a single linker map with this
@@ -1099,12 +1098,14 @@ Map::Error Map::MixedModeIslands::Read(const char*& head, const char* const tail
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length();
+      this->units.emplace_back(match.str(1), match.str(2), false);
       continue;
     }
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length();
+      this->units.emplace_back(match.str(1), match.str(2), true);
       continue;
     }
     break;
@@ -1134,27 +1135,27 @@ Map::Error Map::SectionLayout::Read3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitNormal>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
           std::stoul(match.str(4)), match.str(5), match.str(6), match.str(7)));
-      line_number += 1, head += match.length();
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
                           std::regex_constants::match_continuous))
     {
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitUnused>(  //
           xstoul(match.str(1)), match.str(2), match.str(3), match.str(4)));
-      line_number += 1, head += match.length();
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
                           std::regex_constants::match_continuous))
     {
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitEntry>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
           match.str(5), match.str(6), match.str(7)));
-      line_number += 1, head += match.length();
       continue;
     }
     break;
@@ -1187,27 +1188,27 @@ Map::Error Map::SectionLayout::Read4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_normal,
                           std::regex_constants::match_continuous))
     {
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitNormal>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
           std::stoul(match.str(5)), match.str(6), match.str(7), match.str(8)));
-      line_number += 1, head += match.length();
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
                           std::regex_constants::match_continuous))
     {
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitUnused>(  //
           xstoul(match.str(1)), match.str(2), match.str(3), match.str(4)));
-      line_number += 1, head += match.length();
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
                           std::regex_constants::match_continuous))
     {
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitEntry>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
           match.str(5), match.str(6), match.str(7), match.str(8)));
-      line_number += 1, head += match.length();
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_special,
@@ -1216,10 +1217,10 @@ Map::Error Map::SectionLayout::Read4Column(const char*& head, const char* const 
       std::string name = match.str(6);
       if (name != "*fill*" && name != "**fill**")
         return Error::SectionLayoutSpecialNotFill;
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitSpecial>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
           std::stoul(match.str(5)), std::move(name)));
-      line_number += 1, head += match.length();
       continue;
     }
     break;
@@ -1244,19 +1245,19 @@ Map::Error Map::SectionLayout::ReadTLOZTP(const char*& head, const char* const t
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitNormal>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
           std::stoul(match.str(4)), match.str(5), match.str(6), match.str(7)));
-      line_number += 1, head += match.length();
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
                           std::regex_constants::match_continuous))
     {
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitEntry>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
           match.str(5), match.str(6), match.str(7)));
-      line_number += 1, head += match.length();
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_special,
@@ -1265,10 +1266,10 @@ Map::Error Map::SectionLayout::ReadTLOZTP(const char*& head, const char* const t
       std::string name = match.str(5);
       if (name != "*fill*" && name != "**fill**")
         return Error::SectionLayoutSpecialNotFill;
+      line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitSpecial>(  //
           xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
           std::stoul(match.str(4)), std::move(name)));
-      line_number += 1, head += match.length();
       continue;
     }
     break;
