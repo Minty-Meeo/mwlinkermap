@@ -166,7 +166,7 @@ struct Map
       virtual ~NodeLinkerGenerated() = default;
     };
 
-    SymbolClosure() { min_version = Version::version_2_3_3_build_126; };
+    SymbolClosure() = default;
     virtual ~SymbolClosure() = default;
 
     virtual bool IsEmpty() override { return root.children.empty(); }
