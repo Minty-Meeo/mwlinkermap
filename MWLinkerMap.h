@@ -362,16 +362,17 @@ struct Map
             virtual_address(virtual_address_), alignment(alignment_), module(std::move(module_)),
             file(std::move(file_)){};
       UnitNormal(std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t virtual_address_, std::uint32_t foffset_, std::uint32_t alignment_,
-                 std::string name_, std::string module_, std::string file_)
+                 std::uint32_t virtual_address_, std::uint32_t file_offset_,
+                 std::uint32_t alignment_, std::string name_, std::string module_,
+                 std::string file_)
           : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
-            virtual_address(virtual_address_), foffset(foffset_), alignment(alignment_),
+            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
             module(std::move(module_)), file(std::move(file_)){};
       virtual ~UnitNormal() = default;
 
       std::uint32_t starting_address;
       std::uint32_t virtual_address;
-      std::uint32_t foffset;
+      std::uint32_t file_offset;
       std::uint32_t alignment;
       std::string module;  // ELF object or static library name
       std::string file;    // Static library STT_FILE symbol name (optional)
@@ -396,17 +397,17 @@ struct Map
             virtual_address(virtual_address_), entry_of_name(std::move(entry_of_name_)),
             module(std::move(module_)), file(std::move(file_)){};
       UnitEntry(std::uint32_t starting_address_, std::uint32_t size_,
-                std::uint32_t virtual_address_, std::uint32_t foffset_, std::string name_,
+                std::uint32_t virtual_address_, std::uint32_t file_offset_, std::string name_,
                 std::string entry_of_name_, std::string module_, std::string file_)
           : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
-            virtual_address(virtual_address_), foffset(foffset_),
+            virtual_address(virtual_address_), file_offset(file_offset_),
             entry_of_name(std::move(entry_of_name_)), module(std::move(module_)),
             file(std::move(file_)){};
       virtual ~UnitEntry() = default;
 
       std::uint32_t starting_address;
       std::uint32_t virtual_address;
-      std::uint32_t foffset;
+      std::uint32_t file_offset;
       std::string entry_of_name;  // (entry of _____)
       std::string module;         // ELF object or static library name
       std::string file;           // Static library STT_FILE symbol name (optional)
@@ -420,15 +421,15 @@ struct Map
             virtual_address(virtual_address_),
             alignment(alignment_){};  // Used for Twilight Princess modified linker maps
       UnitSpecial(std::uint32_t starting_address_, std::uint32_t size_,
-                  std::uint32_t virtual_address_, std::uint32_t foffset_, std::uint32_t alignment_,
-                  std::string name_)
+                  std::uint32_t virtual_address_, std::uint32_t file_offset_,
+                  std::uint32_t alignment_, std::string name_)
           : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
-            virtual_address(virtual_address_), foffset(foffset_), alignment(alignment_){};
+            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_){};
       virtual ~UnitSpecial() = default;
 
       std::uint32_t starting_address;
       std::uint32_t virtual_address;
-      std::uint32_t foffset;
+      std::uint32_t file_offset;
       std::uint32_t alignment;
     };
 
