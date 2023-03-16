@@ -55,6 +55,8 @@ struct Map
     SMGalaxyYouHadOneJob,
 
     SymbolClosureHierarchySkip,
+    SymbolClosureInvalidSymbolType,
+    SymbolClosureInvalidSymbolBind,
     SymbolClosureUnrefDupsHierarchyMismatch,
     SymbolClosureUnrefDupsNameMismatch,
     SymbolClosureUnrefDupsEmpty,
@@ -89,6 +91,36 @@ struct Map
   //  - Added _ctors$99 and _dtors$99, among other things.
   struct SymbolClosure final : PortionBase
   {
+    enum class Type
+    {
+      // STT_NOTYPE
+      notype = 0,
+      // STT_OBJECT
+      object = 1,
+      // STT_FUNC
+      func = 2,
+      // STT_SECTION
+      section = 3,
+      // STT_FILE
+      file = 4,
+      // Default for an unknown ST_TYPE
+      unknown = -1,
+    };
+    enum class Bind
+    {
+      // STB_LOCAL
+      local = 0,
+      // STB_GLOBAL
+      global = 1,
+      // STB_WEAK
+      weak = 2,
+      // Proprietary binding
+      multidef = 13,
+      // Proprietary binding
+      overload = 14,
+      // Default for an unknown ST_BIND
+      unknown = -1,
+    };
     struct NodeBase
     {
       NodeBase() = default;  // Necessary for root node
@@ -105,25 +137,22 @@ struct Map
     {
       struct UnreferencedDuplicate
       {
-        UnreferencedDuplicate(std::string type_, std::string bind_, std::string module_,
-                              std::string file_)
-            : type(std::move(type_)), bind(std::move(bind_)), module(std::move(module_)),
-              file(std::move(file_)){};
+        UnreferencedDuplicate(Type type_, Bind bind_, std::string module_, std::string file_)
+            : type(type_), bind(bind_), module(std::move(module_)), file(std::move(file_)){};
 
-        std::string type;
-        std::string bind;
+        Type type;
+        Bind bind;
         std::string module;
         std::string file;
       };
 
-      NodeNormal(std::string name_, std::string type_, std::string bind_, std::string module_,
-                 std::string file_)
-          : NodeBase(std::move(name_)), type(std::move(type_)), bind(std::move(bind_)),
-            module(std::move(module_)), file(std::move(file_)){};
+      NodeNormal(std::string name_, Type type_, Bind bind_, std::string module_, std::string file_)
+          : NodeBase(std::move(name_)), type(type_), bind(bind_), module(std::move(module_)),
+            file(std::move(file_)){};
       virtual ~NodeNormal() = default;
 
-      std::string type;
-      std::string bind;
+      Type type;
+      Bind bind;
       std::string module;
       std::string file;
       std::list<UnreferencedDuplicate> unref_dups;

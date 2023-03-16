@@ -5,6 +5,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 #include "MWLinkerMap.h"
@@ -765,6 +766,25 @@ static const std::regex re_symbol_closure_node_linker_generated{
     "   *(\\d+)\\] (.*) found as linker generated symbol\r?\n"};
 // clang-format on
 
+static const std::unordered_map<std::string, const Map::SymbolClosure::Type>
+    map_symbol_closure_st_type{
+        {"notype", Map::SymbolClosure::Type::notype},
+        {"object", Map::SymbolClosure::Type::object},
+        {"func", Map::SymbolClosure::Type::func},
+        {"section", Map::SymbolClosure::Type::section},
+        {"file", Map::SymbolClosure::Type::file},
+        {"unknown", Map::SymbolClosure::Type::unknown},
+    };
+static const std::unordered_map<std::string, const Map::SymbolClosure::Bind>
+    map_symbol_closure_st_bind{
+        {"local", Map::SymbolClosure::Bind::local},
+        {"global", Map::SymbolClosure::Bind::global},
+        {"weak", Map::SymbolClosure::Bind::weak},
+        {"multidef", Map::SymbolClosure::Bind::multidef},
+        {"overload", Map::SymbolClosure::Bind::overload},
+        {"unknown", Map::SymbolClosure::Bind::unknown},
+    };
+
 Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
                                     std::size_t& line_number,
                                     std::list<std::string>& unresolved_symbols)
@@ -783,10 +803,16 @@ Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
       const unsigned long next_hierarchy_level = std::stoul(match.str(1));
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
+      const std::string type = match.str(3), bind = match.str(4);
+      if (!map_symbol_closure_st_type.contains(type))
+        return Error::SymbolClosureInvalidSymbolType;
+      if (!map_symbol_closure_st_bind.contains(bind))
+        return Error::SymbolClosureInvalidSymbolBind;
       line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
 
       auto next_node = std::make_unique<NodeNormal>(  //
-          match.str(2), match.str(3), match.str(4), match.str(5), match.str(6));
+          match.str(2), map_symbol_closure_st_type.at(type), map_symbol_closure_st_bind.at(bind),
+          match.str(5), match.str(6));
 
       for (auto i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
@@ -807,9 +833,15 @@ Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
           {
             if (std::stoul(match.str(1)) != curr_hierarchy_level)
               return Error::SymbolClosureUnrefDupsHierarchyMismatch;
+            const std::string type = match.str(2), bind = match.str(3);
+            if (!map_symbol_closure_st_type.contains(type))
+              return Error::SymbolClosureInvalidSymbolType;
+            if (!map_symbol_closure_st_bind.contains(bind))
+              return Error::SymbolClosureInvalidSymbolType;
             line_number += 1, head += match.length(), UPDATE_DEBUG_STRING_VIEW;
             next_node->unref_dups.emplace_back(  //
-                match.str(2), match.str(3), match.str(4), match.str(5));
+                map_symbol_closure_st_type.at(type), map_symbol_closure_st_bind.at(bind),
+                match.str(4), match.str(5));
             continue;
           }
           break;
