@@ -12,7 +12,7 @@
 
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
 
-// Metrowerks Linker Maps should be considered binary files containing text with CRLF line endings.
+// Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
 
 namespace MWLinker
@@ -98,8 +98,7 @@ static const std::regex re_linker_generated_symbols_header{
     "\r?\n\r?\nLinker generated symbols:\r?\n"};
 // clang-format on
 
-// Other linker map prints are known to exist, but have never been seen.  These include:
-
+// Other linker map prints are known to exist, but have never been seen. These include:
 // ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s\r\n"
 // ">>> %s wasn't passed a section\r\n"
 // ">>> DYNAMIC SYMBOL: %s referenced\r\n"
@@ -120,50 +119,29 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
   std::cmatch match;
   line_number = 0;
 
-  // 1 Link map of <entry point>
-
-  // ? Unresolved Symbols pre-print(?)
-
-  // 1 Program's Symbol Closure
-  // 2 EPPC_PatternMatching
-  // 3 DWARF Symbol Closure
-
-  // ? Unresolved Symbols post-print
-
-  // ? LinkerOpts
-
-  // 1 Mixed Mode Islands
-  // 2 Branch Islands
-  // 3 Linktime size-decreasing optimizations
-  // 4 Linktime size-increasing optimizations
-
-  // 1 Section layouts
-  // 2 Memory map
-  // 3 Linker generated symbols
-
+  // Linker maps from Animal Crossing (foresta.map and static.map) and Doubutsu no Mori e+
+  // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
+  // modified to strip out the Link Map portion and UNUSED symbols, though the way it was done
+  // also removed one of the Section Layout header's preceding newlines.
   if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
                         std::regex_constants::match_continuous))
   {
     line_number += 2, head += match.length();
-    // Linker maps from Animal Crossing (foresta.map and static.map) and Doubutsu no Mori e+
-    // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
-    // modified to strip out the Link Map portion and UNUSED symbols, though the way it was done
-    // also removed one of the Section Layout header's preceding newlines.
     const auto error = this->ReadPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE;
   }
+  // Linker maps from Doubutsu no Mori + (foresta.map2 and static.map2) are modified similarly
+  // to their counterparts in Doubutsu no Mori e+, though now with no preceding newlines. The
+  // unmodified linker maps were also left on the disc, so maybe just use those instead?
+  // Similarly modified linker maps:
+  //   The Legend of Zelda - Ocarina of Time & Master Quest
+  //   The Legend of Zelda - The Wind Waker (framework.map)
   if (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
                         std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length();
-    // Linker maps from Doubutsu no Mori + (foresta.map2 and static.map2) are modified similarly
-    // to their counterparts in Doubutsu no Mori e+, though now with no preceding newlines. The
-    // unmodified linker maps were also left on the disc, so maybe just use those instead?
-    // Similarly modified linker maps:
-    //   The Legend of Zelda - Ocarina of Time & Master Quest
-    //   The Legend of Zelda - The Wind Waker (framework.map)
     const auto error = this->ReadPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
       return error;
@@ -196,11 +174,11 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
     if (!portion->IsEmpty())
       this->portions.push_back(std::move(portion));
   }
+  // With '-listdwarf' and DWARF debugging information enabled, a second symbol closure
+  // containing info about the .dwarf and .debug sections will appear. Note that, without an
+  // EPPC_PatternMatching in the middle, this will blend into the prior symbol closure in the
+  // eyes of this read function.
   {
-    // With '-listdwarf' and DWARF debugging information enabled, a second symbol closure
-    // containing info about the .dwarf and .debug sections will appear. Note that, without an
-    // EPPC_PatternMatching in the middle, this will blend into the prior symbol closure in the
-    // eyes of this read function.
     auto portion = std::make_unique<SymbolClosure>();
     portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->Read(head, tail, line_number, this->unresolved_symbols);
@@ -792,25 +770,20 @@ Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
         if (match.str(2) != next_node->name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
         line_number += 1, head += match.length();
-        while (true)
+        while (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
+                                 std::regex_constants::match_continuous))
         {
-          if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
-                                std::regex_constants::match_continuous))
-          {
-            if (std::stoul(match.str(1)) != curr_hierarchy_level)
-              return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-            const std::string type = match.str(2), bind = match.str(3);
-            if (!map_symbol_closure_st_type.contains(type))
-              return Error::SymbolClosureInvalidSymbolType;
-            if (!map_symbol_closure_st_bind.contains(bind))
-              return Error::SymbolClosureInvalidSymbolType;
-            line_number += 1, head += match.length();
-            next_node->unref_dups.emplace_back(  //
-                map_symbol_closure_st_type.at(type), map_symbol_closure_st_bind.at(bind),
-                match.str(4), match.str(5));
-            continue;
-          }
-          break;
+          if (std::stoul(match.str(1)) != curr_hierarchy_level)
+            return Error::SymbolClosureUnrefDupsHierarchyMismatch;
+          const std::string type = match.str(2), bind = match.str(3);
+          if (!map_symbol_closure_st_type.contains(type))
+            return Error::SymbolClosureInvalidSymbolType;
+          if (!map_symbol_closure_st_bind.contains(bind))
+            return Error::SymbolClosureInvalidSymbolType;
+          line_number += 1, head += match.length();
+          next_node->unref_dups.emplace_back(  //
+              map_symbol_closure_st_type.at(type), map_symbol_closure_st_bind.at(bind),
+              match.str(4), match.str(5));
         }
         if (next_node->unref_dups.empty())
           return Error::SymbolClosureUnrefDupsEmpty;
@@ -818,14 +791,14 @@ Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
       }
 
       next_node->parent = curr_node;
+      // Though I do not understand it, the following is a normal occurrence for _dtors$99:
+      // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
+      // "    3] .text (section,local) found in xyz.cpp lib.a"
       if (const bool is_weird = (next_node->name == "_dtors$99" &&  // Redundancy out of paranoia
                                  next_node->module == "Linker Generated Symbol File");
           curr_node->children.push_back((curr_node = next_node.get(), std::move(next_node))),
           is_weird)  // Yo dawg, I herd you like operator comma.
       {
-        // Though I do not understand it, the following is a normal occurrence for _dtors$99:
-        // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
-        // "    3] .text (section,local) found in xyz.cpp lib.a"
         auto dummy_node = std::make_unique<NodeBase>();
         dummy_node->parent = curr_node;
         curr_node->children.push_back((curr_node = dummy_node.get(), std::move(dummy_node)));
@@ -852,19 +825,19 @@ Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
       curr_node->children.push_back((curr_node = next_node.get(), std::move(next_node)));
       continue;
     }
+    // Up until CodeWarrior for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the
+    // symbol closure was being walked and printed itself. This gives a good idea of what function
+    // was looking for that symbol, but because no hierarchy level is given, it is impossible to be
+    // certain without analyzing code. After that version, all unresolved symbols from the symbol
+    // closure(s) and EPPC_PatternMatching would (I think) be printed after the DWARF symbol
+    // closure. The way it works out, this same reading code handles that as well. If symbol
+    // closures are disabled, this read function will still parse the unresolved symbol prints.
+    // There are also a few linker maps I've found where it appears the unresolved symbols are
+    // pre-printed before the first symbol closure. Wouldn't you know it, this reading code also
+    // handles that.
     if (std::regex_search(head, tail, match, re_unresolved_symbol,
                           std::regex_constants::match_continuous))
     {
-      // Up until CodeWarrior for GCN 3.0a3 (at the earliest), unresolved symbols were printed as
-      // the symbol closure was being walked and printed itself. This gives a good idea of what
-      // function was looking for that symbol, but because no hierarchy tier is given, it is
-      // impossible to be certain without analyzing code. After that, (I'm pretty sure) all
-      // unresolved symbols from the symbol closure(s) and EPPC_PatternMatching would be printed
-      // after the DWARF symbol closure. The way it works out, this same reading code handles that
-      // as well. If symbol closures are disabled, this read function will still parse the
-      // unresolved symbol prints. There are also a few linker maps I've found where it appears the
-      // unresolved symbols are pre-printed before the first symbol closure. Wouldn't you know it,
-      // this reading code also handles that.
       do
       {
         line_number += 1, head += match.length();
@@ -974,39 +947,34 @@ Map::Error Map::EPPC_PatternMatching::Read(const char*& head, const char* const 
     break;
   }
   // After analysis concludes, a redundant summary of changes per-file is printed.
-  while (true)
+  while (std::regex_search(head, tail, match, re_code_folding_header,
+                           std::regex_constants::match_continuous))
   {
-    if (std::regex_search(head, tail, match, re_code_folding_header,
-                          std::regex_constants::match_continuous))
+    auto folding_unit = FoldingUnit(match.str(1));
+    line_number += 4, head += match.length();
+    while (true)
     {
-      auto folding_unit = FoldingUnit(match.str(1));
-      line_number += 4, head += match.length();
-      while (true)
+      if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
+                            std::regex_constants::match_continuous))
       {
-        if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
-                              std::regex_constants::match_continuous))
-        {
-          line_number += 2, head += match.length();
-          folding_unit.units.emplace_back(  //
-              match.str(1), match.str(2), std::stoul(match.str(3)), false);
-          continue;
-        }
-        if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
-                              std::regex_constants::match_continuous))
-        {
-          if (match.str(1) != match.str(4))  // It is my assumption that they will always match
-            return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
-          line_number += 2, head += match.length();
-          folding_unit.units.emplace_back(  //
-              match.str(1), match.str(2), std::stoul(match.str(3)), true);
-          continue;
-        }
-        break;
+        line_number += 2, head += match.length();
+        folding_unit.units.emplace_back(  //
+            match.str(1), match.str(2), std::stoul(match.str(3)), false);
+        continue;
       }
-      this->folding_units.push_back(std::move(folding_unit));
-      continue;
+      if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
+                            std::regex_constants::match_continuous))
+      {
+        if (match.str(1) != match.str(4))  // It is my assumption that they will always match
+          return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
+        line_number += 2, head += match.length();
+        folding_unit.units.emplace_back(  //
+            match.str(1), match.str(2), std::stoul(match.str(3)), true);
+        continue;
+      }
+      break;
     }
-    break;
+    this->folding_units.push_back(std::move(folding_unit));
   }
   return Error::None;
 }
@@ -1084,11 +1052,10 @@ static const std::regex re_branch_islands_created_safe{
 Map::Error Map::BranchIslands::Read(const char*& head, const char* const tail,
                                     std::size_t& line_number)
 {
-  // TODO: I have only ever seen Branch Islands from Skylanders Swap Force, and on top of that, it
-  // was an empty portion. From datamining MWLDEPPC, I can only assume it goes something like this.
-
   std::cmatch match;
 
+  // TODO: I have only ever seen Branch Islands from Skylanders Swap Force, and on top of that, it
+  // was an empty portion. From datamining MWLDEPPC, I can only assume it goes something like this.
   while (true)
   {
     if (std::regex_search(head, tail, match, re_branch_islands_created,
@@ -1122,11 +1089,10 @@ static const std::regex re_mixed_mode_islands_created_safe{
 Map::Error Map::MixedModeIslands::Read(const char*& head, const char* const tail,
                                        std::size_t& line_number)
 {
-  // TODO: I have literally never seen Mixed Mode Islands.
-  // Similar to Branch Islands, this is conjecture.
-
   std::cmatch match;
 
+  // TODO: I have literally never seen Mixed Mode Islands.
+  // Similar to Branch Islands, this is conjecture.
   while (true)
   {
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created,
@@ -1610,7 +1576,6 @@ Map::Error Map::LinkerGeneratedSymbols::Read(const char*& head, const char* cons
   {
     line_number += 1, head += match.length();
     this->units.push_back(std::make_unique<Unit>(match.str(1), xstoul(match.str(2))));
-    continue;
   }
   return Error::None;
 }
