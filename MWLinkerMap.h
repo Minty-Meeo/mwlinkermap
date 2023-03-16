@@ -522,9 +522,9 @@ struct MWLinkerMap
 
     std::list<UnitNormal> normal_units;
     std::list<UnitDebug> debug_units;
-    const bool has_rom_ram;
-    const bool has_s_record;
-    const bool has_bin_file;
+    const bool has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
+    const bool has_s_record;  // Enabled by '-srec [filename]' option
+    const bool has_bin_file;  // Enabled by '-genbinary keyword' option
   };
 
   struct LinkerGeneratedSymbols final : PortionBase
