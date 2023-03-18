@@ -626,11 +626,13 @@ struct Map
   {
     struct Unit
     {
-      std::string name;
-      std::uint32_t value;
-
       Unit() = default;
       Unit(std::string name_, std::uint32_t value_) : name(std::move(name_)), value(value_){};
+
+      void Print(std::ostream&) const;
+
+      std::string name;
+      std::uint32_t value;
     };
 
     LinkerGeneratedSymbols() = default;

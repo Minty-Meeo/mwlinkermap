@@ -1592,6 +1592,9 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
                            std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length();
+    std::string temp = match.str(2);
+    if (temp.length() == 8 && temp.front() == '0')  // Make sure it's not just an overflowed value
+      this->SetMinVersion(Version::version_3_0_4);
     this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
   }
   return Error::None;
@@ -2045,7 +2048,12 @@ void Map::LinkerGeneratedSymbols::Print(std::ostream& stream) const
 {
   Common::Print(stream, "\r\n\r\nLinker generated symbols:\r\n");
   for (const auto& unit : units)
-    // "%25s %08x\r\n"
-    Common::Print(stream, "{:25s} {:08x}\r\n", unit.name, unit.value);
+    unit.Print(stream);
+}
+
+void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream) const
+{
+  // "%25s %08x\r\n"
+  Common::Print(stream, "{:25s} {:08x}\r\n", name, value);
 }
 }  // namespace MWLinker
