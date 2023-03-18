@@ -236,13 +236,21 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 2, head += match.length();
-    // TODO
+    auto portion = std::make_unique<LinktimeSizeDecreasingOptimizations>();
+    const auto error = portion->Scan(head, tail, line_number);
+    if (error != Error::None)
+      return error;
+    this->portions.push_back(std::move(portion));
   }
   if (std::regex_search(head, tail, match, re_linktime_size_increasing_optimizations_header,
                         std::regex_constants::match_continuous))
   {
     line_number += 2, head += match.length();
-    // TODO
+    auto portion = std::make_unique<LinktimeSizeIncreasingOptimizations>();
+    const auto error = portion->Scan(head, tail, line_number);
+    if (error != Error::None)
+      return error;
+    this->portions.push_back(std::move(portion));
   }
 NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   while (std::regex_search(head, tail, match, re_section_layout_header,
@@ -1222,47 +1230,6 @@ void Map::LinkerOpts::Print(std::ostream& stream) const
 }
 
 // clang-format off
-static const std::regex re_branch_islands_created{
-//  "  branch island %s created for %s\r\n"
-    "  branch island (.*) created for (.*)\r?\n"};
-static const std::regex re_branch_islands_created_safe{
-//  "  safe branch island %s created for %s\r\n"
-    "  safe branch island (.*) created for (.*)\r?\n"};
-// clang-format on
-
-Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
-                                    std::size_t& line_number)
-{
-  std::cmatch match;
-
-  // TODO: I have only ever seen Branch Islands from Skylanders Swap Force, and on top of that, it
-  // was an empty portion. From datamining MWLDEPPC, I can only assume it goes something like this.
-  while (true)
-  {
-    if (std::regex_search(head, tail, match, re_branch_islands_created,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length();
-      this->units.emplace_back(match.str(1), match.str(2), false);
-      continue;
-    }
-    if (std::regex_search(head, tail, match, re_branch_islands_created_safe,
-                          std::regex_constants::match_continuous))
-    {
-      line_number += 1, head += match.length();
-      this->units.emplace_back(match.str(1), match.str(2), true);
-      continue;
-    }
-    break;
-  }
-  return Error::None;
-}
-
-void Map::BranchIslands::Print(std::ostream& stream) const
-{
-}
-
-// clang-format off
 static const std::regex re_mixed_mode_islands_created{
 //  "  mixed mode island %s created for %s\r\n"
     "  mixed mode island (.*) created for (.*)\r?\n"};
@@ -1301,6 +1268,97 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
 
 void Map::MixedModeIslands::Print(std::ostream& stream) const
 {
+  Common::Print(stream, "\r\nMixed Mode Islands\r\n");
+  for (const auto& unit : units)
+    unit.Print(stream);
+}
+void Map::MixedModeIslands::Unit::Print(std::ostream& stream) const
+{
+  if (is_safe)
+    // "  safe mixed mode island %s created for %s\r\n"
+    Common::Print(stream, "  safe mixed mode island {:s} created for {:s}\r\n", first_name,
+                  second_name);
+  else
+    // "  mixed mode island %s created for %s\r\n"
+    Common::Print(stream, "  mixed mode island {:s} created for {:s}\r\n", first_name, second_name);
+}
+
+// clang-format off
+static const std::regex re_branch_islands_created{
+//  "  branch island %s created for %s\r\n"
+    "  branch island (.*) created for (.*)\r?\n"};
+static const std::regex re_branch_islands_created_safe{
+//  "  safe branch island %s created for %s\r\n"
+    "  safe branch island (.*) created for (.*)\r?\n"};
+// clang-format on
+
+Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
+                                    std::size_t& line_number)
+{
+  std::cmatch match;
+
+  // TODO: I have only ever seen Branch Islands from Skylanders Swap Force, and on top of that, it
+  // was an empty portion. From datamining MWLDEPPC, I can only assume it goes something like this.
+  while (true)
+  {
+    if (std::regex_search(head, tail, match, re_branch_islands_created,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length();
+      this->units.emplace_back(match.str(1), match.str(2), false);
+      continue;
+    }
+    if (std::regex_search(head, tail, match, re_branch_islands_created_safe,
+                          std::regex_constants::match_continuous))
+    {
+      line_number += 1, head += match.length();
+      this->units.emplace_back(match.str(1), match.str(2), true);
+      continue;
+    }
+    break;
+  }
+  return Error::None;
+}
+
+void Map::BranchIslands::Print(std::ostream& stream) const
+{
+  Common::Print(stream, "\r\nBranch Islands\r\n");
+  for (const auto& unit : units)
+    unit.Print(stream);
+}
+void Map::BranchIslands::Unit::Print(std::ostream& stream) const
+{
+  if (is_safe)
+    //  "  safe branch island %s created for %s\r\n"
+    Common::Print(stream, "  safe branch island {:s} created for {:s}\r\n", first_name,
+                  second_name);
+  else
+    //  "  branch island %s created for %s\r\n"
+    Common::Print(stream, "  branch island {:s} created for {:s}\r\n", first_name, second_name);
+}
+
+Map::Error Map::LinktimeSizeDecreasingOptimizations::Scan(const char*& head, const char* const tail,
+                                                          std::size_t& line_number)
+{
+  // TODO?  I am not convinced this portion is capable of containing anything.
+  return Error::None;
+}
+
+void Map::LinktimeSizeDecreasingOptimizations::Print(std::ostream& stream) const
+{
+  Common::Print(stream, "\r\nLinktime size-decreasing optimizations\r\n");
+}
+
+Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(const char*& head, const char* const tail,
+                                                          std::size_t& line_number)
+{
+  // TODO?  I am not convinced this portion is capable of containing anything.
+  return Error::None;
+}
+
+void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream) const
+{
+  Common::Print(stream, "\r\nLinktime size-increasing optimizations\r\n");
 }
 
 // clang-format off

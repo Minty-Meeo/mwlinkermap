@@ -327,13 +327,15 @@ struct Map
             is_safe(is_safe_){};
       ~Unit() = default;
 
+      void Print(std::ostream&) const;
+
       std::string first_name;
       std::string second_name;
       bool is_safe;
     };
 
     BranchIslands() { SetMinVersion(Version::version_4_1_build_51213); };
-    ~BranchIslands() = default;
+    virtual ~BranchIslands() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
     Error Scan(const char*&, const char*, std::size_t&);
@@ -353,19 +355,41 @@ struct Map
             is_safe(is_safe_){};
       ~Unit() = default;
 
+      void Print(std::ostream&) const;
+
       std::string first_name;
       std::string second_name;
       bool is_safe;
     };
 
     MixedModeIslands() { SetMinVersion(Version::version_4_1_build_51213); };
-    ~MixedModeIslands() = default;
+    virtual ~MixedModeIslands() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
 
     std::list<Unit> units;
+  };
+
+  struct LinktimeSizeDecreasingOptimizations final : PortionBase
+  {
+    LinktimeSizeDecreasingOptimizations() = default;
+    virtual ~LinktimeSizeDecreasingOptimizations() = default;
+
+    virtual bool IsEmpty() override { return true; }
+    Error Scan(const char*&, const char*, std::size_t&);
+    virtual void Print(std::ostream&) const override;
+  };
+
+  struct LinktimeSizeIncreasingOptimizations final : PortionBase
+  {
+    LinktimeSizeIncreasingOptimizations() = default;
+    virtual ~LinktimeSizeIncreasingOptimizations() = default;
+
+    virtual bool IsEmpty() override { return true; }
+    Error Scan(const char*&, const char*, std::size_t&);
+    virtual void Print(std::ostream&) const override;
   };
 
   // CodeWarrior for GCN 2.7
