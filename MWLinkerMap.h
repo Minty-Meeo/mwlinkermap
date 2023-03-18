@@ -523,7 +523,7 @@ struct Map
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_, int s_record_line_)
           : name(std::move(name_)), file_offset(file_offset_), size(size_),
-            starting_address(starting_address_){};
+            starting_address(starting_address_), s_record_line(s_record_line_){};
       UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t file_offset_, std::uint32_t rom_address_,
                  std::uint32_t ram_buffer_address_)
