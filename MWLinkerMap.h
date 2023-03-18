@@ -3,9 +3,12 @@
 #include <istream>
 #include <list>
 #include <memory>
+#include <optional>
+#include <ostream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace MWLinker
 {
@@ -80,6 +83,7 @@ struct Map
 
     void SetMinVersion(const Version version) { min_version = std::max(min_version, version); }
     virtual bool IsEmpty() = 0;
+    virtual void Print(std::ostream&) const = 0;
 
     Version min_version = Version::Unknown;
   };
@@ -129,6 +133,8 @@ struct Map
       NodeBase(std::string name_) : name(std::move(name_)){};
       virtual ~NodeBase() = default;
 
+      virtual void Print(std::ostream&, unsigned long) const;  // Necessary for root node
+
       NodeBase* parent = nullptr;
       std::list<std::unique_ptr<NodeBase>> children;
 
@@ -142,6 +148,8 @@ struct Map
         UnreferencedDuplicate(Type type_, Bind bind_, std::string module_, std::string file_)
             : type(type_), bind(bind_), module(std::move(module_)), file(std::move(file_)){};
 
+        void Print(std::ostream&, unsigned long) const;
+
         Type type;
         Bind bind;
         std::string module;
@@ -152,6 +160,8 @@ struct Map
           : NodeBase(std::move(name_)), type(type_), bind(bind_), module(std::move(module_)),
             file(std::move(file_)){};
       virtual ~NodeNormal() = default;
+
+      virtual void Print(std::ostream&, unsigned long) const;
 
       Type type;
       Bind bind;
@@ -164,13 +174,19 @@ struct Map
     {
       NodeLinkerGenerated(std::string name_) : NodeBase(std::move(name_)){};
       virtual ~NodeLinkerGenerated() = default;
+
+      virtual void Print(std::ostream&, unsigned long) const;
     };
 
     SymbolClosure() = default;
     virtual ~SymbolClosure() = default;
 
     virtual bool IsEmpty() override { return root.children.empty(); }
-    Error Read(const char*&, const char*, std::size_t&, std::list<std::string>&);
+    Error Scan(const char*&, const char*, std::size_t&, std::list<std::string>&);
+    virtual void Print(std::ostream&) const override;
+    static void PrintPrefix(std::ostream&, int);
+    static const char* GetName(Type);
+    static const char* GetName(Bind);
 
     NodeBase root;
   };
@@ -182,10 +198,12 @@ struct Map
     struct MergingUnit
     {
       MergingUnit(std::string first_name_, std::string second_name_, std::uint32_t size_,
-                  bool was_interchanged_, bool will_be_replaced_)
+                  bool will_be_replaced_, bool was_interchanged_)
           : first_name(std::move(first_name_)), second_name(std::move(second_name_)), size(size_),
             will_be_replaced(will_be_replaced_), was_interchanged(was_interchanged_){};
       ~MergingUnit() = default;
+
+      void Print(std::ostream&) const;
 
       std::string first_name;
       std::string second_name;
@@ -210,6 +228,8 @@ struct Map
               new_branch_function(new_branch_function_){};
         ~Unit() = default;
 
+        void Print(std::ostream&) const;
+
         std::string first_name;
         std::string second_name;
         std::uint32_t size;
@@ -217,6 +237,8 @@ struct Map
       };
 
       FoldingUnit(std::string name_) : name(std::move(name_)){};
+
+      void Print(std::ostream&) const;
 
       std::string name;
       std::list<Unit> units;
@@ -226,7 +248,8 @@ struct Map
     virtual ~EPPC_PatternMatching() = default;
 
     virtual bool IsEmpty() override { return merging_units.empty() || folding_units.empty(); }
-    Error Read(const char*&, const char*, std::size_t&);
+    Error Scan(const char*&, const char*, std::size_t&);
+    virtual void Print(std::ostream&) const override;
 
     std::list<MergingUnit> merging_units;
     std::list<FoldingUnit> folding_units;
@@ -287,7 +310,8 @@ struct Map
     virtual ~LinkerOpts() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
-    Error Read(const char*&, const char*, std::size_t&);
+    Error Scan(const char*&, const char*, std::size_t&);
+    virtual void Print(std::ostream&) const override;
 
     std::list<std::unique_ptr<UnitBase>> units;
   };
@@ -312,7 +336,8 @@ struct Map
     ~BranchIslands() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
-    Error Read(const char*&, const char*, std::size_t&);
+    Error Scan(const char*&, const char*, std::size_t&);
+    virtual void Print(std::ostream&) const override;
 
     std::list<Unit> units;
   };
@@ -337,7 +362,8 @@ struct Map
     ~MixedModeIslands() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
-    Error Read(const char*&, const char*, std::size_t&);
+    Error Scan(const char*&, const char*, std::size_t&);
+    virtual void Print(std::ostream&) const override;
 
     std::list<Unit> units;
   };
@@ -351,6 +377,9 @@ struct Map
       UnitBase(std::uint32_t size_, std::string name_) : size(size_), name(std::move(name_)){};
       virtual ~UnitBase() = default;
 
+      virtual void Print3Column(std::ostream&) const = 0;
+      virtual void Print4Column(std::ostream&) const = 0;
+
       std::uint32_t size;
       std::string name;
     };
@@ -360,7 +389,7 @@ struct Map
       UnitNormal(std::uint32_t starting_address_, std::uint32_t size_,
                  std::uint32_t virtual_address_, std::uint32_t alignment_, std::string name_,
                  std::string module_, std::string file_)
-          : UnitBase(size, std::move(name_)), starting_address(starting_address_),
+          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
             virtual_address(virtual_address_), alignment(alignment_), module(std::move(module_)),
             file(std::move(file_)){};
       UnitNormal(std::uint32_t starting_address_, std::uint32_t size_,
@@ -371,6 +400,9 @@ struct Map
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
             module(std::move(module_)), file(std::move(file_)){};
       virtual ~UnitNormal() = default;
+
+      virtual void Print3Column(std::ostream&) const override;
+      virtual void Print4Column(std::ostream&) const override;
 
       std::uint32_t starting_address;
       std::uint32_t virtual_address;
@@ -385,6 +417,9 @@ struct Map
       UnitUnused(std::uint32_t size_, std::string name_, std::string module_, std::string file_)
           : UnitBase(size_, std::move(name_)), module(std::move(module_)), file(std::move(file_)){};
       virtual ~UnitUnused() = default;
+
+      virtual void Print3Column(std::ostream&) const override;
+      virtual void Print4Column(std::ostream&) const override;
 
       std::string module;  // ELF object or static library name
       std::string file;    // Static library STT_FILE symbol name (optional)
@@ -407,6 +442,9 @@ struct Map
             file(std::move(file_)){};
       virtual ~UnitEntry() = default;
 
+      virtual void Print3Column(std::ostream&) const override;
+      virtual void Print4Column(std::ostream&) const override;
+
       std::uint32_t starting_address;
       std::uint32_t virtual_address;
       std::uint32_t file_offset;
@@ -418,16 +456,14 @@ struct Map
     struct UnitSpecial final : UnitBase  // e.g. "*fill*" or "**fill**"
     {
       UnitSpecial(std::uint32_t starting_address_, std::uint32_t size_,
-                  std::uint32_t virtual_address_, std::uint32_t alignment_, std::string name_)
-          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
-            virtual_address(virtual_address_),
-            alignment(alignment_){};  // Used for Twilight Princess modified linker maps
-      UnitSpecial(std::uint32_t starting_address_, std::uint32_t size_,
                   std::uint32_t virtual_address_, std::uint32_t file_offset_,
                   std::uint32_t alignment_, std::string name_)
           : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_){};
       virtual ~UnitSpecial() = default;
+
+      virtual void Print3Column(std::ostream&) const override{/* std::unreachable(); */};
+      virtual void Print4Column(std::ostream&) const override;
 
       std::uint32_t starting_address;
       std::uint32_t virtual_address;
@@ -439,9 +475,10 @@ struct Map
     virtual ~SectionLayout() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
-    Error Read3Column(const char*&, const char*, std::size_t&);
-    Error Read4Column(const char*&, const char*, std::size_t&);
-    Error ReadTLOZTP(const char*&, const char*, std::size_t&);
+    Error Scan3Column(const char*&, const char*, std::size_t&);
+    Error Scan4Column(const char*&, const char*, std::size_t&);
+    Error ScanTLOZTP(const char*&, const char*, std::size_t&);
+    virtual void Print(std::ostream&) const override;
 
     std::string name;
     std::list<std::unique_ptr<UnitBase>> units;
@@ -504,6 +541,17 @@ struct Map
             ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_),
             bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_)){};
 
+      void PrintSimple_old(std::ostream&) const;
+      void PrintRomRam_old(std::ostream&) const;
+      void PrintSimple(std::ostream&) const;
+      void PrintRomRam(std::ostream&) const;
+      void PrintSRecord(std::ostream&) const;
+      void PrintBinFile(std::ostream&) const;
+      void PrintRomRamSRecord(std::ostream&) const;
+      void PrintRomRamBinFile(std::ostream&) const;
+      void PrintSRecordBinFile(std::ostream&) const;
+      void PrintRomRamSRecordBinFile(std::ostream&) const;
+
       std::string name;
       std::uint32_t starting_address;
       std::uint32_t size;
@@ -522,6 +570,10 @@ struct Map
       UnitDebug(std::string name_, std::uint32_t size_, std::uint32_t file_offset_)
           : name(std::move(name_)), size(size_), file_offset(file_offset_){};
 
+      void Print_older(std::ostream&) const;
+      void Print_old(std::ostream&) const;
+      void Print(std::ostream&) const;
+
       std::string name;
       std::uint32_t size;
       std::uint32_t file_offset;
@@ -537,16 +589,31 @@ struct Map
     virtual ~MemoryMap() = default;
 
     virtual bool IsEmpty() override { return normal_units.empty() || debug_units.empty(); }
-    Error ReadSimple_old(const char*&, const char*, std::size_t&);
-    Error ReadRomRam_old(const char*&, const char*, std::size_t&);
-    Error ReadSimple(const char*&, const char*, std::size_t&);
-    Error ReadRomRam(const char*&, const char*, std::size_t&);
-    Error ReadSRecord(const char*&, const char*, std::size_t&);
-    Error ReadBinFile(const char*&, const char*, std::size_t&);
-    Error ReadRomRamSRecord(const char*&, const char*, std::size_t&);
-    Error ReadRomRamBinFile(const char*&, const char*, std::size_t&);
-    Error ReadSRecordBinFile(const char*&, const char*, std::size_t&);
-    Error ReadRomRamSRecordBinFile(const char*&, const char*, std::size_t&);
+    Error ScanSimple_old(const char*&, const char*, std::size_t&);
+    Error ScanRomRam_old(const char*&, const char*, std::size_t&);
+    Error ScanDebug_old(const char*&, const char*, std::size_t&);
+    Error ScanSimple(const char*&, const char*, std::size_t&);
+    Error ScanRomRam(const char*&, const char*, std::size_t&);
+    Error ScanSRecord(const char*&, const char*, std::size_t&);
+    Error ScanBinFile(const char*&, const char*, std::size_t&);
+    Error ScanRomRamSRecord(const char*&, const char*, std::size_t&);
+    Error ScanRomRamBinFile(const char*&, const char*, std::size_t&);
+    Error ScanSRecordBinFile(const char*&, const char*, std::size_t&);
+    Error ScanRomRamSRecordBinFile(const char*&, const char*, std::size_t&);
+    Error ScanDebug(const char*&, const char*, std::size_t&);
+    virtual void Print(std::ostream&) const override;
+    void PrintSimple_old(std::ostream&) const;
+    void PrintRomRam_old(std::ostream&) const;
+    void PrintDebug_old(std::ostream&) const;
+    void PrintSimple(std::ostream&) const;
+    void PrintRomRam(std::ostream&) const;
+    void PrintSRecord(std::ostream&) const;
+    void PrintBinFile(std::ostream&) const;
+    void PrintRomRamSRecord(std::ostream&) const;
+    void PrintRomRamBinFile(std::ostream&) const;
+    void PrintSRecordBinFile(std::ostream&) const;
+    void PrintRomRamSRecordBinFile(std::ostream&) const;
+    void PrintDebug(std::ostream&) const;
 
     std::list<UnitNormal> normal_units;
     std::list<UnitDebug> debug_units;
@@ -570,32 +637,35 @@ struct Map
     virtual ~LinkerGeneratedSymbols() = default;
 
     virtual bool IsEmpty() override { return units.empty(); }
-    Error Read(const char*&, const char*, std::size_t&);
+    Error Scan(const char*&, const char*, std::size_t&);
+    virtual void Print(std::ostream&) const override;
 
-    std::list<std::unique_ptr<Unit>> units;
+    std::list<Unit> units;
   };
 
   Map() = default;
   ~Map() = default;
 
-  Error Read(std::istream&, std::size_t&);
-  Error Read(const std::stringstream&, std::size_t&);
-  Error Read(std::string_view, std::size_t&);
-  Error Read(const char*, const char*, std::size_t&);
-  Error ReadTLOZTP(std::istream&, std::size_t&);
-  Error ReadTLOZTP(const std::stringstream&, std::size_t&);
-  Error ReadTLOZTP(std::string_view, std::size_t&);
-  Error ReadTLOZTP(const char*, const char*, std::size_t&);
-  Error ReadSMGalaxy(std::istream&, std::size_t&);
-  Error ReadSMGalaxy(const std::stringstream&, std::size_t&);
-  Error ReadSMGalaxy(std::string_view, std::size_t&);
-  Error ReadSMGalaxy(const char*, const char*, std::size_t&);
+  Error Scan(std::istream&, std::size_t&);
+  Error Scan(const std::stringstream&, std::size_t&);
+  Error Scan(std::string_view, std::size_t&);
+  Error Scan(const char*, const char*, std::size_t&);
+  Error ScanTLOZTP(std::istream&, std::size_t&);
+  Error ScanTLOZTP(const std::stringstream&, std::size_t&);
+  Error ScanTLOZTP(std::string_view, std::size_t&);
+  Error ScanTLOZTP(const char*, const char*, std::size_t&);
+  Error ScanSMGalaxy(std::istream&, std::size_t&);
+  Error ScanSMGalaxy(const std::stringstream&, std::size_t&);
+  Error ScanSMGalaxy(std::string_view, std::size_t&);
+  Error ScanSMGalaxy(const char*, const char*, std::size_t&);
+  void Print(std::ostream&) const;
 
-  Error ReadPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string);
-  Error ReadPrologue_MemoryMap(const char*&, const char*, std::size_t&);
+  Error ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string);
+  Error ScanPrologue_MemoryMap(const char*&, const char*, std::size_t&);
+  Error ScanForGarbage(const char*, const char*);
 
   std::string entry_point_name;
-  std::list<std::unique_ptr<PortionBase>> portions;
   std::list<std::string> unresolved_symbols;
+  std::list<std::unique_ptr<PortionBase>> portions;
 };
 }  // namespace MWLinker

@@ -1,7 +1,9 @@
 // TODO: speed test std::vector vs std::list
 
 #include <cstddef>
+#include <format>
 #include <istream>
+#include <ostream>
 #include <regex>
 #include <sstream>
 #include <string>
@@ -12,55 +14,68 @@
 
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
 
+namespace Common
+{
+template <class... Args>
+void Print(std::ostream& os, std::format_string<Args...> fmt, Args&&... args)
+{
+  const std::string s = std::format(std::move(fmt), args...);
+  os.write(s.c_str(), s.length());
+}
+}  // namespace Common
+
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
 
 namespace MWLinker
 {
-Map::Error Map::Read(std::istream& stream, std::size_t& line_number)
+Map::Error Map::Scan(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
   sstream << stream.rdbuf();
-  return this->Read(sstream, line_number);
+  return this->Scan(sstream, line_number);
 }
-Map::Error Map::Read(const std::stringstream& sstream, std::size_t& line_number)
+Map::Error Map::Scan(const std::stringstream& sstream, std::size_t& line_number)
 {
-  return this->Read(sstream.view(), line_number);
+  // This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
+  return this->Scan(std::move(sstream).str(), line_number);
 }
-Map::Error Map::Read(const std::string_view string_view, std::size_t& line_number)
+Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->Read(string_view.data(), string_view.data() + string_view.length(), line_number);
+  return this->Scan(string_view.data(), string_view.data() + string_view.length(), line_number);
 }
 
-Map::Error Map::ReadTLOZTP(std::istream& stream, std::size_t& line_number)
+Map::Error Map::ScanTLOZTP(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
   sstream << stream.rdbuf();
-  return this->ReadTLOZTP(sstream, line_number);
+  return this->ScanTLOZTP(sstream, line_number);
 }
-Map::Error Map::ReadTLOZTP(const std::stringstream& sstream, std::size_t& line_number)
+Map::Error Map::ScanTLOZTP(const std::stringstream& sstream, std::size_t& line_number)
 {
-  return this->ReadTLOZTP(sstream.view(), line_number);
+  // This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
+  return this->ScanTLOZTP(std::move(sstream).str(), line_number);
 }
-Map::Error Map::ReadTLOZTP(const std::string_view string_view, std::size_t& line_number)
+Map::Error Map::ScanTLOZTP(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->ReadTLOZTP(string_view.data(), string_view.data() + string_view.length(),
+  return this->ScanTLOZTP(string_view.data(), string_view.data() + string_view.length(),
                           line_number);
 }
 
-Map::Error Map::ReadSMGalaxy(std::istream& stream, std::size_t& line_number)
+Map::Error Map::ScanSMGalaxy(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
   sstream << stream.rdbuf();
-  return this->ReadSMGalaxy(sstream, line_number);
+  return this->ScanSMGalaxy(sstream, line_number);
 }
-Map::Error Map::ReadSMGalaxy(const std::stringstream& sstream, std::size_t& line_number)
+Map::Error Map::ScanSMGalaxy(const std::stringstream& sstream, std::size_t& line_number)
 {
-  return this->ReadSMGalaxy(sstream.view(), line_number);
+  // This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
+  return this->ScanSMGalaxy(std::move(sstream).str(), line_number);
 }
-Map::Error Map::ReadSMGalaxy(const std::string_view string_view, std::size_t& line_number)
+Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->ReadSMGalaxy(string_view.data(), string_view.data() + string_view.length(),
+  return this->ScanSMGalaxy(string_view.data(), string_view.data() + string_view.length(),
                             line_number);
 }
 
@@ -111,7 +126,7 @@ static const std::regex re_linker_generated_symbols_header{
 // "<<< Failure in %s: GetFilePos is %x, sect->calc_offset is %x\r\n"
 // "<<< Failure in %s: GetFilePos is %x, sect->bin_offset is %x\r\n"
 
-Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line_number)
+Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
@@ -127,7 +142,7 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 2, head += match.length();
-    const auto error = this->ReadPrologue_SectionLayout(head, tail, line_number, match.str(1));
+    const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE;
@@ -142,7 +157,7 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length();
-    const auto error = this->ReadPrologue_SectionLayout(head, tail, line_number, match.str(1));
+    const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE;
@@ -160,7 +175,7 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
   }
   {
     auto portion = std::make_unique<SymbolClosure>();
-    const auto error = portion->Read(head, tail, line_number, this->unresolved_symbols);
+    const auto error = portion->Scan(head, tail, line_number, this->unresolved_symbols);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
@@ -168,7 +183,7 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
   }
   {
     auto portion = std::make_unique<EPPC_PatternMatching>();
-    const auto error = portion->Read(head, tail, line_number);
+    const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
@@ -177,21 +192,21 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
   // With '-listdwarf' and DWARF debugging information enabled, a second symbol closure
   // containing info about the .dwarf and .debug sections will appear. Note that, without an
   // EPPC_PatternMatching in the middle, this will blend into the prior symbol closure in the
-  // eyes of this read function.
+  // eyes of this scan function.
   {
     auto portion = std::make_unique<SymbolClosure>();
     portion->SetMinVersion(Version::version_3_0_4);
-    const auto error = portion->Read(head, tail, line_number, this->unresolved_symbols);
+    const auto error = portion->Scan(head, tail, line_number, this->unresolved_symbols);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
       this->portions.push_back(std::move(portion));
   }
   // Unresolved symbol post-prints probably belong here (I have not confirmed if they preceed
-  // LinkerOpts), but the Symbol Closure reading code that just happened handles them well enough.
+  // LinkerOpts), but the Symbol Closure scanning code that just happened handles them well enough.
   {
     auto portion = std::make_unique<LinkerOpts>();
-    const auto error = portion->Read(head, tail, line_number);
+    const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
@@ -202,7 +217,7 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 2, head += match.length();
     auto portion = std::make_unique<MixedModeIslands>();
-    const auto error = portion->Read(head, tail, line_number);
+    const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     this->portions.push_back(std::move(portion));
@@ -212,7 +227,7 @@ Map::Error Map::Read(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 2, head += match.length();
     auto portion = std::make_unique<BranchIslands>();
-    const auto error = portion->Read(head, tail, line_number);
+    const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     this->portions.push_back(std::move(portion));
@@ -234,7 +249,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
                            std::regex_constants::match_continuous))
   {
     line_number += 3, head += match.length();
-    const auto error = this->ReadPrologue_SectionLayout(head, tail, line_number, match.str(1));
+    const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
       return error;
   }
@@ -242,7 +257,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
                         std::regex_constants::match_continuous))
   {
     line_number += 3, head += match.length();
-    const auto error = this->ReadPrologue_MemoryMap(head, tail, line_number);
+    const auto error = this->ScanPrologue_MemoryMap(head, tail, line_number);
     if (error != Error::None)
       return error;
   }
@@ -251,24 +266,15 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   {
     line_number += 3, head += match.length();
     auto portion = std::make_unique<LinkerGeneratedSymbols>();
-    const auto error = portion->Read(head, tail, line_number);
+    const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     this->portions.push_back(std::move(portion));
   }
-  if (head < tail)
-  {
-    // Gamecube ISO Tool is a tool that can extract and rebuild *.GCM images. This tool has a bug
-    // that appends null byte padding to the next multiple of 32 bytes at the end of any file it
-    // extracts. During my research, I ran into a lot of linker maps afflicted by this bug, enough
-    // to justify a special case for it. http://www.wiibackupmanager.co.uk/gcit.html
-    if (std::any_of(head, tail, [](const char c) { return c != '\0'; }))
-      return Error::GarbageFound;
-  }
-  return Error::None;
+  return this->ScanForGarbage(head, tail);
 }
 
-Map::Error Map::ReadTLOZTP(const char* head, const char* const tail, std::size_t& line_number)
+Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
@@ -276,31 +282,27 @@ Map::Error Map::ReadTLOZTP(const char* head, const char* const tail, std::size_t
   std::cmatch match;
   line_number = 0;
 
+  this->entry_point_name = "__start";
   // The Legend of Zelda: Twilight Princess features CodeWarrior for GCN 2.7 linker maps that have
   // been post-processed to appear similar to older linker maps. Nintendo EAD probably did this to
   // procrastinate updating the JUTException library. These linker maps contain prologue-free,
   // three-column section layout portions, and nothing else. Also, not that it matters to this
-  // read function, the line endings of the linker maps left on disc were Unix style (LF).
+  // scan function, the line endings of the linker maps left on disc were Unix style (LF).
   while (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
                            std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length();
     auto portion = std::make_unique<SectionLayout>(match.str(1));
-    const auto error = portion->ReadTLOZTP(head, tail, line_number);
+    portion->SetMinVersion(Version::version_3_0_4);
+    const auto error = portion->ScanTLOZTP(head, tail, line_number);
     if (error != Error::None)
       return error;
     this->portions.push_back(std::move(portion));
   }
-  if (head < tail)
-  {
-    // I already explained why this check is here.
-    if (std::any_of(head, tail, [](const char c) { return c != '\0'; }))
-      return Error::GarbageFound;
-  }
-  return Error::None;
+  return this->ScanForGarbage(head, tail);
 }
 
-Map::Error Map::ReadSMGalaxy(const char* head, const char* const tail, std::size_t& line_number)
+Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
@@ -316,7 +318,7 @@ Map::Error Map::ReadSMGalaxy(const char* head, const char* const tail, std::size
     line_number += 2, head += match.length();
     auto portion = std::make_unique<SectionLayout>(match.str(1));
     portion->SetMinVersion(Version::version_3_0_4);
-    const auto error = portion->Read4Column(head, tail, line_number);
+    const auto error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
       return error;
     this->portions.push_back(std::move(portion));
@@ -325,19 +327,21 @@ Map::Error Map::ReadSMGalaxy(const char* head, const char* const tail, std::size
   // headerless, CodeWarrior for Wii 1.0 (at minimum) Memory Map can be found.
   {
     auto portion = std::make_unique<MemoryMap>(false, false, false);
-    const auto error = portion->ReadSimple(head, tail, line_number);
+    const auto error = portion->ScanSimple(head, tail, line_number);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
       this->portions.push_back(std::move(portion));
   }
-  if (head < tail)
-  {
-    // I already explained why this check is here.
-    if (std::any_of(head, tail, [](const char c) { return c != '\0'; }))
-      return Error::GarbageFound;
-  }
-  return Error::None;
+  return this->ScanForGarbage(head, tail);
+}
+
+void Map::Print(std::ostream& stream) const
+{
+  // "Link map of %s\r\n"
+  Common::Print(stream, "Link map of {:s}\r\n", this->entry_point_name);
+  for (auto& portion : this->portions)
+    portion->Print(stream);
 }
 
 // clang-format off
@@ -361,7 +365,7 @@ static const std::regex re_section_layout_4column_prologue_3{
     "  ---------------------------------\r?\n"};
 // clang-format on
 
-Map::Error Map::ReadPrologue_SectionLayout(const char*& head, const char* const tail,
+Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const tail,
                                            std::size_t& line_number, std::string name)
 {
   std::cmatch match;
@@ -379,7 +383,7 @@ Map::Error Map::ReadPrologue_SectionLayout(const char*& head, const char* const 
       {
         line_number += 1, head += match.length();
         auto portion = std::make_unique<SectionLayout>(std::move(name));
-        const auto error = portion->Read3Column(head, tail, line_number);
+        const auto error = portion->Scan3Column(head, tail, line_number);
         if (error != Error::None)
           return error;
         this->portions.push_back(std::move(portion));
@@ -408,7 +412,7 @@ Map::Error Map::ReadPrologue_SectionLayout(const char*& head, const char* const 
         line_number += 1, head += match.length();
         auto portion = std::make_unique<SectionLayout>(std::move(name));
         portion->SetMinVersion(Version::version_3_0_4);
-        const auto error = portion->Read4Column(head, tail, line_number);
+        const auto error = portion->Scan4Column(head, tail, line_number);
         if (error != Error::None)
           return error;
         this->portions.push_back(std::move(portion));
@@ -493,7 +497,7 @@ static const std::regex re_memory_map_romram_srecord_binfile_prologue_2{
     "                       address           Offset   Address  Address       Line     Offset   Name\r?\n"};
 // clang-format on
 
-Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail,
+Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail,
                                        std::size_t& line_number)
 {
   std::cmatch match;
@@ -507,7 +511,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(false);
-      const auto error = portion->ReadSimple_old(head, tail, line_number);
+      const auto error = portion->ScanSimple_old(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -526,7 +530,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(true);
-      const auto error = portion->ReadRomRam_old(head, tail, line_number);
+      const auto error = portion->ScanRomRam_old(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -545,7 +549,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(false, false, false);
-      const auto error = portion->ReadSimple(head, tail, line_number);
+      const auto error = portion->ScanSimple(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -564,7 +568,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(true, false, false);
-      const auto error = portion->ReadRomRam(head, tail, line_number);
+      const auto error = portion->ScanRomRam(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -583,7 +587,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(false, true, false);
-      const auto error = portion->ReadSRecord(head, tail, line_number);
+      const auto error = portion->ScanSRecord(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -602,7 +606,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(false, false, true);
-      const auto error = portion->ReadBinFile(head, tail, line_number);
+      const auto error = portion->ScanBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -621,7 +625,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(true, true, false);
-      const auto error = portion->ReadRomRamSRecord(head, tail, line_number);
+      const auto error = portion->ScanRomRamSRecord(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -640,7 +644,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(true, false, true);
-      const auto error = portion->ReadRomRamBinFile(head, tail, line_number);
+      const auto error = portion->ScanRomRamBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -659,7 +663,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(false, true, true);
-      const auto error = portion->ReadSRecordBinFile(head, tail, line_number);
+      const auto error = portion->ScanSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -678,7 +682,7 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
     {
       line_number += 1, head += match.length();
       auto portion = std::make_unique<MemoryMap>(true, true, true);
-      const auto error = portion->ReadRomRamSRecordBinFile(head, tail, line_number);
+      const auto error = portion->ScanRomRamSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
       this->portions.push_back(std::move(portion));
@@ -691,6 +695,20 @@ Map::Error Map::ReadPrologue_MemoryMap(const char*& head, const char* const tail
   else
   {
     return Error::MemoryMapBadPrologue;
+  }
+  return Error::None;
+}
+
+Map::Error Map::ScanForGarbage(const char* const head, const char* const tail)
+{
+  if (head < tail)
+  {
+    // Gamecube ISO Tool (http://www.wiibackupmanager.co.uk/gcit.html) has a bug that appends null
+    // byte padding to the next multiple of 32 bytes at the end of any file it extracts. During my
+    // research, I ran into a lot of linker maps afflicted by this bug, enough to justify a special
+    // case for garbage consisting of only null bytes.
+    if (std::any_of(head, tail, [](const char c) { return c != '\0'; }))
+      return Error::GarbageFound;
   }
   return Error::None;
 }
@@ -729,7 +747,7 @@ static const std::unordered_map<std::string, const Map::SymbolClosure::Bind>
         {"unknown", Map::SymbolClosure::Bind::unknown},
     };
 
-Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
+Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
                                     std::size_t& line_number,
                                     std::list<std::string>& unresolved_symbols)
 {
@@ -829,10 +847,10 @@ Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
     // was looking for that symbol, but because no hierarchy level is given, it is impossible to be
     // certain without analyzing code. After that version, all unresolved symbols from the symbol
     // closure(s) and EPPC_PatternMatching would (I think) be printed after the DWARF symbol
-    // closure. The way it works out, this same reading code handles that as well. If symbol
-    // closures are disabled, this read function will still parse the unresolved symbol prints.
+    // closure. The way it works out, this same scanning code handles that as well. If symbol
+    // closures are disabled, this scan function will still parse the unresolved symbol prints.
     // There are also a few linker maps I've found where it appears the unresolved symbols are
-    // pre-printed before the first symbol closure. Wouldn't you know it, this reading code also
+    // pre-printed before the first symbol closure. Wouldn't you know it, this scanning code also
     // handles that.
     if (std::regex_search(head, tail, match, re_unresolved_symbol,
                           std::regex_constants::match_continuous))
@@ -848,6 +866,102 @@ Map::Error Map::SymbolClosure::Read(const char*& head, const char* const tail,
     break;
   }
   return Error::None;
+}
+
+void Map::SymbolClosure::PrintPrefix(std::ostream& stream, const int hierarchy_level)
+{
+  if (hierarchy_level >= 0)
+    for (int i = 0; i <= hierarchy_level; ++i)
+      stream.put(' ');
+  Common::Print(stream, "{:d}] ", hierarchy_level);  // "%i] "
+}
+const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Type st_type)
+{
+  switch (st_type)
+  {
+  case Type::notype:
+    return "notype";
+  case Type::object:
+    return "object";
+  case Type::func:
+    return "func";
+  case Type::section:
+    return "section";
+  case Type::file:
+    return "file";
+  default:
+    return "unknown";
+  }
+}
+const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Bind st_bind)
+{
+  switch (st_bind)
+  {
+  case Bind::local:
+    return "local";
+  case Bind::global:
+    return "global";
+  case Bind::weak:
+    return "weak";
+  default:
+    return "unknown";
+  case Bind::multidef:
+    return "multidef";
+  case Bind::overload:
+    return "overload";
+  }
+}
+
+void Map::SymbolClosure::Print(std::ostream& stream) const
+{
+  this->root.Print(stream, 0);
+}
+
+void Map::SymbolClosure::NodeBase::Print(std::ostream& stream,
+                                         const unsigned long hierarchy_level) const
+{
+  for (const auto& node : this->children)
+    node->Print(stream, hierarchy_level + 1);
+}
+
+void Map::SymbolClosure::NodeNormal::Print(std::ostream& stream,
+                                           const unsigned long hierarchy_level) const
+{
+  PrintPrefix(stream, hierarchy_level);
+  // libc++ std::format requires lvalue references for the args.
+  const char *type_s = GetName(type), *bind_s = GetName(bind);
+  // "%s (%s,%s) found in %s %s\r\n"
+  Common::Print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", name, type_s, bind_s, module,
+                file);
+  if (!this->unref_dups.empty())
+  {
+    PrintPrefix(stream, hierarchy_level);
+    // ">>> UNREFERENCED DUPLICATE %s\r\n"
+    Common::Print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", name);
+    for (const auto& unref_dup : unref_dups)
+      unref_dup.Print(stream, hierarchy_level);
+  }
+  for (const auto& node : children)
+    node->Print(stream, hierarchy_level + 1);
+}
+
+void Map::SymbolClosure::NodeNormal::UnreferencedDuplicate::Print(
+    std::ostream& stream, const unsigned long hierarchy_level) const
+{
+  PrintPrefix(stream, hierarchy_level);
+  const char *type_s = GetName(type), *bind_s = GetName(bind);
+  // ">>> (%s,%s) found in %s %s\r\n"
+  Common::Print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", type_s, bind_s, module, file);
+}
+
+void Map::SymbolClosure::NodeLinkerGenerated::Print(std::ostream& stream,
+                                                    const unsigned long hierarchy_level) const
+{
+  PrintPrefix(stream, hierarchy_level);
+  // "%s found as linker generated symbol\r\n"
+  Common::Print(stream, "{:s} found as linker generated symbol\r\n", name);
+  for (const auto& node : children)            // Linker generated symbols should have
+    node->Print(stream, hierarchy_level + 1);  // no children but we'll check anyway.
 }
 
 // clang-format off
@@ -871,7 +985,7 @@ static const std::regex re_code_folding_is_duplicated_new_branch{
     "--> (.*) is duplicated by (.*), size = (\\d+), new branch function (.*) \r?\n\r?\n"};
 // clang-format on
 
-Map::Error Map::EPPC_PatternMatching::Read(const char*& head, const char* const tail,
+Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const tail,
                                            std::size_t& line_number)
 {
   std::cmatch match;
@@ -978,6 +1092,70 @@ Map::Error Map::EPPC_PatternMatching::Read(const char*& head, const char* const 
   return Error::None;
 }
 
+void Map::EPPC_PatternMatching::Print(std::ostream& stream) const
+{
+  for (const auto& unit : merging_units)
+    unit.Print(stream);
+  for (const auto& unit : folding_units)
+    unit.Print(stream);
+}
+
+void Map::EPPC_PatternMatching::MergingUnit::Print(std::ostream& stream) const
+{
+  if (was_interchanged)
+  {
+    // "--> the function %s was interchanged with %s, size=%d \r\n"
+    Common::Print(stream, "--> the function {:s} was interchanged with {:s}, size={:d} \r\n",
+                  first_name, second_name, size);
+    if (will_be_replaced)
+    {
+      // "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
+      Common::Print(stream,
+                    "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
+                    first_name, second_name);
+    }
+    // "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
+    Common::Print(stream,
+                  "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
+                  first_name, second_name, size);
+  }
+  else
+  {
+    // "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
+    Common::Print(stream,
+                  "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
+                  first_name, second_name, size);
+    if (will_be_replaced)
+    {
+      // "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
+      Common::Print(stream,
+                    "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
+                    first_name, second_name);
+    }
+  }
+}
+
+void Map::EPPC_PatternMatching::FoldingUnit::Print(std::ostream& stream) const
+{
+  // "\r\n\r\n\r\nCode folded in file: %s \r\n"
+  Common::Print(stream, "\r\n\r\n\r\nCode folded in file: {:s} \r\n", name);
+  for (const auto& unit : units)
+    unit.Print(stream);
+}
+
+void Map::EPPC_PatternMatching::FoldingUnit::Unit::Print(std::ostream& stream) const
+{
+  if (new_branch_function)
+    // "--> %s is duplicated by %s, size = %d, new branch function %s \r\n\r\n"
+    Common::Print(stream,
+                  "--> {:s} is duplicated by {:s}, size = {:d}, new branch function {:s} \r\n\r\n",
+                  first_name, second_name, size, first_name);
+  else
+    // "--> %s is duplicated by %s, size = %d \r\n\r\n"
+    Common::Print(stream, "--> {:s} is duplicated by {:s}, size = {:d} \r\n\r\n", first_name,
+                  second_name, size);
+}
+
 // clang-format off
 static const std::regex re_linker_opts_unit_not_near{
 //  "  %s/ %s()/ %s - address not in near addressing range \r\n"
@@ -993,7 +1171,7 @@ static const std::regex re_linker_opts_unit_disassemble_error{
     "  (.*)/ (.*)\\(\\) - error disassembling function \r?\n"};
 // clang-format on
 
-Map::Error Map::LinkerOpts::Read(const char*& head, const char* const tail,
+Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
                                  std::size_t& line_number)
 
 {
@@ -1039,6 +1217,10 @@ Map::Error Map::LinkerOpts::Read(const char*& head, const char* const tail,
   return Error::None;
 }
 
+void Map::LinkerOpts::Print(std::ostream& stream) const
+{
+}
+
 // clang-format off
 static const std::regex re_branch_islands_created{
 //  "  branch island %s created for %s\r\n"
@@ -1048,7 +1230,7 @@ static const std::regex re_branch_islands_created_safe{
     "  safe branch island (.*) created for (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::BranchIslands::Read(const char*& head, const char* const tail,
+Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
                                     std::size_t& line_number)
 {
   std::cmatch match;
@@ -1076,6 +1258,10 @@ Map::Error Map::BranchIslands::Read(const char*& head, const char* const tail,
   return Error::None;
 }
 
+void Map::BranchIslands::Print(std::ostream& stream) const
+{
+}
+
 // clang-format off
 static const std::regex re_mixed_mode_islands_created{
 //  "  mixed mode island %s created for %s\r\n"
@@ -1085,7 +1271,7 @@ static const std::regex re_mixed_mode_islands_created_safe{
     "  safe mixed mode island (.*) created for (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MixedModeIslands::Read(const char*& head, const char* const tail,
+Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail,
                                        std::size_t& line_number)
 {
   std::cmatch match;
@@ -1113,6 +1299,10 @@ Map::Error Map::MixedModeIslands::Read(const char*& head, const char* const tail
   return Error::None;
 }
 
+void Map::MixedModeIslands::Print(std::ostream& stream) const
+{
+}
+
 // clang-format off
 static const std::regex re_section_layout_3column_unit_normal{
 //  "  %08x %06x %08x %2i %s \t%s %s\r\n"
@@ -1125,7 +1315,7 @@ static const std::regex re_section_layout_3column_unit_entry{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) (.*) \\(entry of (.*)\\) \t(.*) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::SectionLayout::Read3Column(const char*& head, const char* const tail,
+Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const tail,
                                            std::size_t& line_number)
 {
   std::cmatch match;
@@ -1178,7 +1368,7 @@ static const std::regex re_section_layout_4column_unit_special{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8}) ([0-9a-f]{8})  ?(\\d+) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::SectionLayout::Read4Column(const char*& head, const char* const tail,
+Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const tail,
                                            std::size_t& line_number)
 {
   std::cmatch match;
@@ -1235,7 +1425,7 @@ static const std::regex re_section_layout_tloztp_unit_special{
     "  ([0-9a-f]{8}) ([0-9a-f]{6}) ([0-9a-f]{8})  ?(\\d+) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::SectionLayout::ReadTLOZTP(const char*& head, const char* const tail,
+Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const tail,
                                           std::size_t& line_number)
 {
   std::cmatch match;
@@ -1247,7 +1437,7 @@ Map::Error Map::SectionLayout::ReadTLOZTP(const char*& head, const char* const t
     {
       line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitNormal>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
           std::stoul(match.str(4)), match.str(5), match.str(6), match.str(7)));
       continue;
     }
@@ -1256,7 +1446,7 @@ Map::Error Map::SectionLayout::ReadTLOZTP(const char*& head, const char* const t
     {
       line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitEntry>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
           match.str(5), match.str(6), match.str(7)));
       continue;
     }
@@ -1268,7 +1458,7 @@ Map::Error Map::SectionLayout::ReadTLOZTP(const char*& head, const char* const t
         return Error::SectionLayoutSpecialNotFill;
       line_number += 1, head += match.length();
       this->units.push_back(std::make_unique<UnitSpecial>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
           std::stoul(match.str(4)), std::move(name)));
       continue;
     }
@@ -1277,17 +1467,79 @@ Map::Error Map::SectionLayout::ReadTLOZTP(const char*& head, const char* const t
   return Error::None;
 }
 
+void Map::SectionLayout::Print(std::ostream& stream) const
+{
+  // "\r\n\r\n%s section layout\r\n"
+  Common::Print(stream, "\r\n\r\n{:s} section layout\r\n", name);
+  if (min_version < Version::version_3_0_4)
+  {
+    Common::Print(stream, "  Starting        Virtual\r\n");
+    Common::Print(stream, "  address  Size   address\r\n");
+    Common::Print(stream, "  -----------------------\r\n");
+    for (const auto& unit : this->units)
+      unit->Print3Column(stream);
+  }
+  else
+  {
+    Common::Print(stream, "  Starting        Virtual  File\r\n");
+    Common::Print(stream, "  address  Size   address  offset\r\n");
+    Common::Print(stream, "  ---------------------------------\r\n");
+    for (const auto& unit : this->units)
+      unit->Print4Column(stream);
+  }
+}
+
+void Map::SectionLayout::UnitNormal::Print3Column(std::ostream& stream) const
+{
+  // "  %08x %06x %08x %2i %s \t%s %s\r\n"
+  Common::Print(stream, "  {:08x} {:06x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n", starting_address, size,
+                virtual_address, alignment, name, module, file);
+}
+void Map::SectionLayout::UnitNormal::Print4Column(std::ostream& stream) const
+{
+  // "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
+  Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n",
+                starting_address, size, virtual_address, file_offset, alignment, name, module,
+                file);
+}
+void Map::SectionLayout::UnitUnused::Print3Column(std::ostream& stream) const
+{
+  // "  UNUSED   %06x ........ %s %s %s\r\n"
+  Common::Print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", size, name, module, file);
+}
+void Map::SectionLayout::UnitUnused::Print4Column(std::ostream& stream) const
+{
+  // "  UNUSED   %06x ........ ........    %s %s %s\r\n"
+  Common::Print(stream, "  UNUSED   {:06x} ........ ........    {:s} {:s} {:s}\r\n", size, name,
+                module, file);
+}
+void Map::SectionLayout::UnitEntry::Print3Column(std::ostream& stream) const
+{
+  // "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
+  Common::Print(stream, "  {:08x} {:06x} {:08x} {:s} (entry of {:s}) \t{:s} {:s}\r\n",
+                starting_address, size, virtual_address, name, entry_of_name, module, file);
+}
+void Map::SectionLayout::UnitEntry::Print4Column(std::ostream& stream) const
+{
+  // "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
+  Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x}    {:s} (entry of {:s}) \t{:s} {:s}\r\n",
+                starting_address, size, virtual_address, file_offset, name, entry_of_name, module,
+                file);
+}
+void Map::SectionLayout::UnitSpecial::Print4Column(std::ostream& stream) const
+{
+  // "  %08x %06x %08x %08x %2i %s\r\n"
+  Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s}\r\n", starting_address, size,
+                virtual_address, file_offset, alignment, name);
+}
+
 // clang-format off
 static const std::regex re_memory_map_unit_normal_simple_old{
 //  "  %15s  %08x %08x %08x\r\n"
     "   {0,15}(.*)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
-static const std::regex re_memory_map_unit_debug_old{
-//  "  %15s           %06x %08x\r\n" <-- Sometimes the size can overflow six digits
-//  "  %15s           %08x %08x\r\n" <-- Starting with CodeWarrior for GCN 2.7
-    "   {0,15}(.*)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadSimple_old(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const tail,
                                           std::size_t& line_number)
 {
   std::cmatch match;
@@ -1299,13 +1551,7 @@ Map::Error Map::MemoryMap::ReadSimple_old(const char*& head, const char* const t
     this->normal_units.emplace_back(  //
         match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)));
   }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug_old,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length();
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
+  return ScanDebug_old(head, tail, line_number);
 }
 
 // clang-format off
@@ -1314,7 +1560,7 @@ static const std::regex re_memory_map_unit_normal_romram_old{
     "   {0,15}(.*)  ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRam_old(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const tail,
                                           std::size_t& line_number)
 {
   std::cmatch match;
@@ -1327,6 +1573,21 @@ Map::Error Map::MemoryMap::ReadRomRam_old(const char*& head, const char* const t
         match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
         xstoul(match.str(5)), xstoul(match.str(6)));
   }
+  return ScanDebug_old(head, tail, line_number);
+}
+
+// clang-format off
+static const std::regex re_memory_map_unit_debug_old{
+//  "  %15s           %06x %08x\r\n" <-- Sometimes the size can overflow six digits
+//  "  %15s           %08x %08x\r\n" <-- Starting with CodeWarrior for GCN 2.7
+    "   {0,15}(.*)           ([0-9a-f]{6,8}) ([0-9a-f]{8})\r?\n"};
+// clang-format on
+
+Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const tail,
+                                         std::size_t& line_number)
+{
+  std::cmatch match;
+
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug_old,
                            std::regex_constants::match_continuous))
   {
@@ -1340,12 +1601,9 @@ Map::Error Map::MemoryMap::ReadRomRam_old(const char*& head, const char* const t
 static const std::regex re_memory_map_unit_normal_simple{
 //  "  %20s %08x %08x %08x\r\n"
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
-static const std::regex re_memory_map_unit_debug{
-//  "  %20s          %08x %08x\r\n"
-    "   {0,20}(.*)          ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadSimple(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
                                       std::size_t& line_number)
 {
   std::cmatch match;
@@ -1357,13 +1615,7 @@ Map::Error Map::MemoryMap::ReadSimple(const char*& head, const char* const tail,
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)));
   }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length();
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
+  return ScanDebug(head, tail, line_number);
 }
 
 // clang-format off
@@ -1372,7 +1624,7 @@ static const std::regex re_memory_map_unit_normal_romram{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRam(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
                                       std::size_t& line_number)
 {
   std::cmatch match;
@@ -1385,13 +1637,7 @@ Map::Error Map::MemoryMap::ReadRomRam(const char*& head, const char* const tail,
         match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
         xstoul(match.str(5)), xstoul(match.str(6)));
   }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length();
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
+  return ScanDebug(head, tail, line_number);
 }
 
 // clang-format off
@@ -1400,7 +1646,7 @@ static const std::regex re_memory_map_unit_normal_srecord{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})  {0,9}(\\d+)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadSRecord(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail,
                                        std::size_t& line_number)
 {
   std::cmatch match;
@@ -1412,13 +1658,7 @@ Map::Error Map::MemoryMap::ReadSRecord(const char*& head, const char* const tail
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), std::stoi(match.str(5)));
   }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length();
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
+  return ScanDebug(head, tail, line_number);
 }
 
 // clang-format off
@@ -1427,7 +1667,7 @@ static const std::regex re_memory_map_unit_normal_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadBinFile(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail,
                                        std::size_t& line_number)
 {
   std::cmatch match;
@@ -1439,13 +1679,7 @@ Map::Error Map::MemoryMap::ReadBinFile(const char*& head, const char* const tail
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), xstoul(match.str(5)), match.str(6));
   }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length();
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
+  return ScanDebug(head, tail, line_number);
 }
 
 // clang-format off
@@ -1454,7 +1688,7 @@ static const std::regex re_memory_map_unit_normal_romram_srecord{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})  {0,9}(\\d+)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRamSRecord(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* const tail,
                                              std::size_t& line_number)
 {
   std::cmatch match;
@@ -1467,13 +1701,7 @@ Map::Error Map::MemoryMap::ReadRomRamSRecord(const char*& head, const char* cons
         match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
         xstoul(match.str(5)), xstoul(match.str(6)), std::stoi(match.str(7)));
   }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length();
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
+  return ScanDebug(head, tail, line_number);
 }
 
 // clang-format off
@@ -1482,7 +1710,7 @@ static const std::regex re_memory_map_unit_normal_romram_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRamBinFile(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* const tail,
                                              std::size_t& line_number)
 {
   std::cmatch match;
@@ -1495,13 +1723,7 @@ Map::Error Map::MemoryMap::ReadRomRamBinFile(const char*& head, const char* cons
         match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
         xstoul(match.str(5)), xstoul(match.str(6)), xstoul(match.str(7)), match.str(8));
   }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length();
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
+  return ScanDebug(head, tail, line_number);
 }
 
 // clang-format off
@@ -1510,7 +1732,7 @@ static const std::regex re_memory_map_unit_normal_srecord_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})   {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadSRecordBinFile(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* const tail,
                                               std::size_t& line_number)
 {
   std::cmatch match;
@@ -1523,13 +1745,7 @@ Map::Error Map::MemoryMap::ReadSRecordBinFile(const char*& head, const char* con
         match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
         std::stoi(match.str(5)), xstoul(match.str(6)), match.str(7));
   }
-  while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
-                           std::regex_constants::match_continuous))
-  {
-    line_number += 1, head += match.length();
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
-  }
-  return Error::None;
+  return ScanDebug(head, tail, line_number);
 }
 
 // clang-format off
@@ -1538,7 +1754,7 @@ static const std::regex re_memory_map_unit_normal_romram_srecord_binfile{
     "   {0,20}(.*) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})     {0,9}(\\d+) ([0-9a-f]{8}) (.*)\r?\n"};
 // clang-format on
 
-Map::Error Map::MemoryMap::ReadRomRamSRecordBinFile(const char*& head, const char* const tail,
+Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const char* const tail,
                                                     std::size_t& line_number)
 {
   std::cmatch match;
@@ -1552,6 +1768,20 @@ Map::Error Map::MemoryMap::ReadRomRamSRecordBinFile(const char*& head, const cha
         xstoul(match.str(5)), xstoul(match.str(6)), std::stoi(match.str(7)), xstoul(match.str(8)),
         match.str(9));
   }
+  return ScanDebug(head, tail, line_number);
+}
+
+// clang-format off
+static const std::regex re_memory_map_unit_debug{
+//  "  %20s          %08x %08x\r\n"
+    "   {0,20}(.*)          ([0-9a-f]{8}) ([0-9a-f]{8})\r?\n"};
+// clang-format on
+
+Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
+                                     std::size_t& line_number)
+{
+  std::cmatch match;
+
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
                            std::regex_constants::match_continuous))
   {
@@ -1561,13 +1791,243 @@ Map::Error Map::MemoryMap::ReadRomRamSRecordBinFile(const char*& head, const cha
   return Error::None;
 }
 
+void Map::MemoryMap::Print(std::ostream& stream) const
+{
+  Common::Print(stream, "\r\n\r\nMemory map:\r\n");
+  if (min_version < Version::version_4_2_build_142)
+  {
+    if (has_rom_ram)
+      PrintRomRam_old(stream);
+    else
+      PrintSimple_old(stream);
+    PrintDebug_old(stream);
+  }
+  else
+  {
+    if (has_rom_ram)
+      if (has_s_record)
+        if (has_bin_file)
+          PrintRomRamSRecordBinFile(stream);
+        else
+          PrintRomRamSRecord(stream);
+      else if (has_bin_file)
+        PrintRomRamBinFile(stream);
+      else
+        PrintRomRam(stream);
+    else if (has_s_record)
+      if (has_bin_file)
+        PrintSRecordBinFile(stream);
+      else
+        PrintSRecord(stream);
+    else if (has_bin_file)
+      PrintBinFile(stream);
+    else
+      PrintSimple(stream);
+    PrintDebug(stream);
+  }
+}
+
+void Map::MemoryMap::PrintSimple_old(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                   Starting Size     File\r\n");
+  Common::Print(stream, "                   address           Offset\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintSimple_old(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintSimple_old(std::ostream& stream) const
+{
+  // "  %15s  %08x %08x %08x\r\n"
+  Common::Print(stream, "  {:15s}  {:08x} {:08x} {:08x}\r\n", name, starting_address, size,
+                file_offset);
+}
+
+void Map::MemoryMap::PrintRomRam_old(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                   Starting Size     File     ROM      RAM Buffer\r\n");
+  Common::Print(stream, "                   address           Offset   Address  Address\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintRomRam_old(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintRomRam_old(std::ostream& stream) const
+{
+  // "  %15s  %08x %08x %08x %08x %08x\r\n"
+  Common::Print(stream, "  {:15s}  {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", name, starting_address,
+                size, file_offset, rom_address, ram_buffer_address);
+}
+
+void Map::MemoryMap::PrintDebug_old(std::ostream& stream) const
+{
+  if (min_version < Version::version_3_0_4)
+    for (const auto& unit : debug_units)
+      unit.Print_older(stream);
+  else
+    for (const auto& unit : debug_units)
+      unit.Print_old(stream);
+}
+void Map::MemoryMap::UnitDebug::Print_older(std::ostream& stream) const
+{
+  // "  %15s           %06x %08x\r\n"
+  Common::Print(stream, "  {:15s}           {:06x} {:08x}\r\n", name, size, file_offset);
+}
+void Map::MemoryMap::UnitDebug::Print_old(std::ostream& stream) const
+{
+  // "  %15s           %08x %08x\r\n"
+  Common::Print(stream, "  {:15s}           {:08x} {:08x}\r\n", name, size, file_offset);
+}
+
+void Map::MemoryMap::PrintSimple(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                       Starting Size     File\r\n");
+  Common::Print(stream, "                       address           Offset\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintSimple(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintSimple(std::ostream& stream) const
+{
+  // "  %20s %08x %08x %08x\r\n"
+  Common::Print(stream, "  {:20s} {:08x} {:08x} {:08x}\r\n", name, starting_address, size,
+                file_offset);
+}
+
+void Map::MemoryMap::PrintRomRam(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                       Starting Size     File     ROM      RAM Buffer\r\n");
+  Common::Print(stream, "                       address           Offset   Address  Address\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintRomRam(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintRomRam(std::ostream& stream) const
+{
+  // "  %20s %08x %08x %08x %08x %08x\r\n"
+  Common::Print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", name, starting_address,
+                size, file_offset, rom_address, ram_buffer_address);
+}
+
+void Map::MemoryMap::PrintSRecord(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                       Starting Size     File       S-Record\r\n");
+  Common::Print(stream, "                       address           Offset     Line\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintSRecord(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintSRecord(std::ostream& stream) const
+{
+  // "  %20s %08x %08x %08x %10i\r\n"
+  Common::Print(stream, "  {:20s} {:08x} {:08x} {:08x} {:10d}\r\n", name, starting_address, size,
+                file_offset, s_record_line);
+}
+
+void Map::MemoryMap::PrintBinFile(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                       Starting Size     File     Bin File Bin File\r\n");
+  Common::Print(stream, "                       address           Offset   Offset   Name\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintBinFile(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintBinFile(std::ostream& stream) const
+{
+  // "  %20s %08x %08x %08x %08x %s\r\n"
+  Common::Print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:s}\r\n", name, starting_address,
+                size, file_offset, bin_file_offset, bin_file_name);
+}
+
+void Map::MemoryMap::PrintRomRamSRecord(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n");
+  Common::Print(stream, "                       address           Offset   Address  Address     Line\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintRomRamSRecord(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintRomRamSRecord(std::ostream& stream) const
+{
+  // "  %20s %08x %08x %08x %08x %08x %10i\r\n"
+  Common::Print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:08x} {:10d}\r\n", name,
+                starting_address, size, file_offset, rom_address, ram_buffer_address,
+                s_record_line);
+}
+
+void Map::MemoryMap::PrintRomRamBinFile(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n");
+  Common::Print(stream, "                       address           Offset   Address  Address    Offset   Name\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintRomRamBinFile(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintRomRamBinFile(std::ostream& stream) const
+{
+  // "  %20s %08x %08x %08x %08x %08x   %08x %s\r\n"
+  Common::Print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:08x}   {:08x} {:s}\r\n", name,
+                starting_address, size, file_offset, rom_address, ram_buffer_address,
+                bin_file_offset, bin_file_name);
+}
+
+void Map::MemoryMap::PrintSRecordBinFile(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                       Starting Size     File        S-Record Bin File Bin File\r\n");
+  Common::Print(stream, "                       address           Offset      Line     Offset   Name\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintSRecordBinFile(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintSRecordBinFile(std::ostream& stream) const
+{
+  // "  %20s %08x %08x %08x  %10i %08x %s\r\n"
+  Common::Print(stream, "  {:20s} {:08x} {:08x} {:08x}  {:10d} {:08x} {:s}\r\n", name,
+                starting_address, size, file_offset, s_record_line, bin_file_offset, bin_file_name);
+}
+
+void Map::MemoryMap::PrintRomRamSRecordBinFile(std::ostream& stream) const
+{
+  // clang-format off
+  Common::Print(stream, "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n");
+  Common::Print(stream, "                       address           Offset   Address  Address       Line     Offset   Name\r\n");
+  // clang-format on
+  for (const auto& unit : normal_units)
+    unit.PrintRomRamSRecordBinFile(stream);
+}
+void Map::MemoryMap::UnitNormal::PrintRomRamSRecordBinFile(std::ostream& stream) const
+{
+  // "  %20s %08x %08x %08x %08x %08x    %10i %08x %s\r\n"
+  Common::Print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:08x}    {:10d} {:08x} {:s}\r\n",
+                name, starting_address, size, file_offset, rom_address, ram_buffer_address,
+                s_record_line, bin_file_offset, bin_file_name);
+}
+
+void Map::MemoryMap::PrintDebug(std::ostream& stream) const
+{
+  for (const auto& unit : debug_units)
+    unit.Print(stream);
+}
+void Map::MemoryMap::UnitDebug::Print(std::ostream& stream) const
+{
+  // "  %20s          %08x %08x\r\n"
+  Common::Print(stream, "  {:20s}          {:08x} {:08x}\r\n", name, size, file_offset);
+}
+
 // clang-format off
 static const std::regex re_linker_generated_symbols_unit{
 //  "%25s %08x\r\n"
     " {0,25}(.*) ([0-9a-f]{8})\r?\n"};
 // clang-format on
 
-Map::Error Map::LinkerGeneratedSymbols::Read(const char*& head, const char* const tail,
+Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* const tail,
                                              std::size_t& line_number)
 {
   std::cmatch match;
@@ -1576,8 +2036,16 @@ Map::Error Map::LinkerGeneratedSymbols::Read(const char*& head, const char* cons
                            std::regex_constants::match_continuous))
   {
     line_number += 1, head += match.length();
-    this->units.push_back(std::make_unique<Unit>(match.str(1), xstoul(match.str(2))));
+    this->units.emplace_back(match.str(1), xstoul(match.str(2)));
   }
   return Error::None;
+}
+
+void Map::LinkerGeneratedSymbols::Print(std::ostream& stream) const
+{
+  Common::Print(stream, "\r\n\r\nLinker generated symbols:\r\n");
+  for (const auto& unit : units)
+    // "%25s %08x\r\n"
+    Common::Print(stream, "{:25s} {:08x}\r\n", unit.name, unit.value);
 }
 }  // namespace MWLinker

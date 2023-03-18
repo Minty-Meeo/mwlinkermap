@@ -25,13 +25,13 @@ void tempfunc(const char* name, int choice)
   switch (choice)
   {
   case 0:
-    error = linker_map.Read(infile, line_number);
+    error = linker_map.Scan(infile, line_number);
     break;
   case 1:
-    error = linker_map.ReadTLOZTP(infile, line_number);
+    error = linker_map.ScanTLOZTP(infile, line_number);
     break;
   case 2:
-    error = linker_map.ReadSMGalaxy(infile, line_number);
+    error = linker_map.ScanSMGalaxy(infile, line_number);
     break;
   default:
     std::cout << "bad choice" << std::endl;
@@ -39,6 +39,9 @@ void tempfunc(const char* name, int choice)
   }
 
   std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(error) << std::endl;
+
+  std::ofstream outfile(std::string{name} + "_new");
+  linker_map.Print(outfile);
 }
 
 int main(const int argc, const char** argv)
