@@ -86,7 +86,7 @@ struct Map
       min_version = std::max(min_version, version);
     }
     virtual void Print(std::ostream&) const = 0;
-    virtual bool IsEmpty() const noexcept = 0;
+    virtual bool Empty() const noexcept = 0;
 
     Version min_version = Version::Unknown;
   };
@@ -189,7 +189,7 @@ struct Map
     static void PrintPrefix(std::ostream&, int);
     static const char* GetName(Type) noexcept;
     static const char* GetName(Bind) noexcept;
-    virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
+    virtual bool Empty() const noexcept override { return root.children.empty(); }
 
     NodeBase root;
   };
@@ -252,7 +252,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool IsEmpty() const noexcept override
+    virtual bool Empty() const noexcept override
     {
       return merging_units.empty() || folding_units.empty();
     }
@@ -327,7 +327,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
+    virtual bool Empty() const noexcept override { return units.empty(); }
 
     std::list<std::unique_ptr<UnitBase>> units;
   };
@@ -355,7 +355,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
+    virtual bool Empty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
   };
@@ -383,7 +383,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
+    virtual bool Empty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
   };
@@ -395,7 +395,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool IsEmpty() const noexcept override { return true; }
+    virtual bool Empty() const noexcept override { return true; }
   };
 
   struct LinktimeSizeIncreasingOptimizations final : PortionBase
@@ -405,7 +405,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool IsEmpty() const noexcept override { return true; }
+    virtual bool Empty() const noexcept override { return true; }
   };
 
   // CodeWarrior for GCN 2.7
@@ -518,7 +518,7 @@ struct Map
     Error Scan4Column(const char*&, const char*, std::size_t&);
     Error ScanTLOZTP(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
+    virtual bool Empty() const noexcept override { return units.empty(); }
 
     std::string name;
     std::list<std::unique_ptr<UnitBase>> units;
@@ -653,7 +653,7 @@ struct Map
     void PrintSRecordBinFile(std::ostream&) const;
     void PrintRomRamSRecordBinFile(std::ostream&) const;
     void PrintDebug(std::ostream&) const;
-    virtual bool IsEmpty() const noexcept override
+    virtual bool Empty() const noexcept override
     {
       return normal_units.empty() || debug_units.empty();
     }
@@ -683,7 +683,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
+    virtual bool Empty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
   };

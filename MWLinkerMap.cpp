@@ -178,7 +178,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number, this->unresolved_symbols);
     if (error != Error::None)
       return error;
-    if (!portion->IsEmpty())
+    if (!portion->Empty())
       this->normal_symbol_closure = std::move(portion);
   }
   {
@@ -186,7 +186,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    if (!portion->IsEmpty())
+    if (!portion->Empty())
       this->eppc_pattern_matching = std::move(portion);
   }
   // With '-listdwarf' and DWARF debugging information enabled, a second symbol closure
@@ -199,7 +199,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number, this->unresolved_symbols);
     if (error != Error::None)
       return error;
-    if (!portion->IsEmpty())
+    if (!portion->Empty())
       this->dwarf_symbol_closure = std::move(portion);
   }
   // Unresolved symbol post-prints probably belong here (I have not confirmed if they preceed
@@ -209,7 +209,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    if (!portion->IsEmpty())
+    if (!portion->Empty())
       this->linker_opts = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
@@ -338,7 +338,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     const auto error = portion->ScanSimple(head, tail, line_number);
     if (error != Error::None)
       return error;
-    if (!portion->IsEmpty())
+    if (!portion->Empty())
       this->memory_map = std::move(portion);
   }
   return this->ScanForGarbage(head, tail);
