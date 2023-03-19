@@ -47,7 +47,8 @@ void tempfunc(const char* name, int choice)
   linker_map.Print(outfile);
   const bool matches = temp == std::move(outfile).str();
   std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(error)
-            << "   matches: " << matches << std::endl;
+            << "   matches: " << matches
+            << "   min_version: " << static_cast<int>(linker_map.GetMinVersion()) << std::endl;
 }
 
 int main(const int argc, const char** argv)

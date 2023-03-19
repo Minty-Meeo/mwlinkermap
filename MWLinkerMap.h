@@ -81,9 +81,12 @@ struct Map
     PortionBase() = default;
     virtual ~PortionBase() = default;
 
-    void SetMinVersion(const Version version) { min_version = std::max(min_version, version); }
-    virtual bool IsEmpty() = 0;
+    void SetMinVersion(const Version version) noexcept
+    {
+      min_version = std::max(min_version, version);
+    }
     virtual void Print(std::ostream&) const = 0;
+    virtual bool IsEmpty() const noexcept = 0;
 
     Version min_version = Version::Unknown;
   };
@@ -181,12 +184,12 @@ struct Map
     SymbolClosure() = default;
     virtual ~SymbolClosure() = default;
 
-    virtual bool IsEmpty() override { return root.children.empty(); }
     Error Scan(const char*&, const char*, std::size_t&, std::list<std::string>&);
     virtual void Print(std::ostream&) const override;
     static void PrintPrefix(std::ostream&, int);
-    static const char* GetName(Type);
-    static const char* GetName(Bind);
+    static const char* GetName(Type) noexcept;
+    static const char* GetName(Bind) noexcept;
+    virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
 
     NodeBase root;
   };
@@ -247,9 +250,12 @@ struct Map
     EPPC_PatternMatching() { SetMinVersion(Version::version_4_2_build_142); };
     virtual ~EPPC_PatternMatching() = default;
 
-    virtual bool IsEmpty() override { return merging_units.empty() || folding_units.empty(); }
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    virtual bool IsEmpty() const noexcept override
+    {
+      return merging_units.empty() || folding_units.empty();
+    }
 
     std::list<MergingUnit> merging_units;
     std::list<FoldingUnit> folding_units;
@@ -319,9 +325,9 @@ struct Map
     LinkerOpts() { SetMinVersion(Version::version_4_2_build_142); };
     virtual ~LinkerOpts() = default;
 
-    virtual bool IsEmpty() override { return units.empty(); }
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::list<std::unique_ptr<UnitBase>> units;
   };
@@ -347,9 +353,9 @@ struct Map
     BranchIslands() { SetMinVersion(Version::version_4_1_build_51213); };
     virtual ~BranchIslands() = default;
 
-    virtual bool IsEmpty() override { return units.empty(); }
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
   };
@@ -375,9 +381,9 @@ struct Map
     MixedModeIslands() { SetMinVersion(Version::version_4_1_build_51213); };
     virtual ~MixedModeIslands() = default;
 
-    virtual bool IsEmpty() override { return units.empty(); }
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
   };
@@ -387,9 +393,9 @@ struct Map
     LinktimeSizeDecreasingOptimizations() = default;
     virtual ~LinktimeSizeDecreasingOptimizations() = default;
 
-    virtual bool IsEmpty() override { return true; }
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    virtual bool IsEmpty() const noexcept override { return true; }
   };
 
   struct LinktimeSizeIncreasingOptimizations final : PortionBase
@@ -397,9 +403,9 @@ struct Map
     LinktimeSizeIncreasingOptimizations() = default;
     virtual ~LinktimeSizeIncreasingOptimizations() = default;
 
-    virtual bool IsEmpty() override { return true; }
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    virtual bool IsEmpty() const noexcept override { return true; }
   };
 
   // CodeWarrior for GCN 2.7
@@ -508,11 +514,11 @@ struct Map
     SectionLayout(std::string name_) : name(std::move(name_)){};
     virtual ~SectionLayout() = default;
 
-    virtual bool IsEmpty() override { return units.empty(); }
     Error Scan3Column(const char*&, const char*, std::size_t&);
     Error Scan4Column(const char*&, const char*, std::size_t&);
     Error ScanTLOZTP(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::string name;
     std::list<std::unique_ptr<UnitBase>> units;
@@ -622,7 +628,6 @@ struct Map
     }
     virtual ~MemoryMap() = default;
 
-    virtual bool IsEmpty() override { return normal_units.empty() || debug_units.empty(); }
     Error ScanSimple_old(const char*&, const char*, std::size_t&);
     Error ScanRomRam_old(const char*&, const char*, std::size_t&);
     Error ScanDebug_old(const char*&, const char*, std::size_t&);
@@ -648,6 +653,10 @@ struct Map
     void PrintSRecordBinFile(std::ostream&) const;
     void PrintRomRamSRecordBinFile(std::ostream&) const;
     void PrintDebug(std::ostream&) const;
+    virtual bool IsEmpty() const noexcept override
+    {
+      return normal_units.empty() || debug_units.empty();
+    }
 
     std::list<UnitNormal> normal_units;
     std::list<UnitDebug> debug_units;
@@ -672,9 +681,9 @@ struct Map
     LinkerGeneratedSymbols() = default;
     virtual ~LinkerGeneratedSymbols() = default;
 
-    virtual bool IsEmpty() override { return units.empty(); }
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
   };
@@ -694,11 +703,13 @@ struct Map
   Error ScanSMGalaxy(const std::stringstream&, std::size_t&);
   Error ScanSMGalaxy(std::string_view, std::size_t&);
   Error ScanSMGalaxy(const char*, const char*, std::size_t&);
-  void Print(std::ostream&) const;
 
   Error ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string);
   Error ScanPrologue_MemoryMap(const char*&, const char*, std::size_t&);
   Error ScanForGarbage(const char*, const char*);
+
+  void Print(std::ostream&) const;
+  Version GetMinVersion() const noexcept;
 
   std::string entry_point_name;
   std::unique_ptr<SymbolClosure> normal_symbol_closure;

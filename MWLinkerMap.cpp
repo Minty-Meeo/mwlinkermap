@@ -375,6 +375,27 @@ void Map::Print(std::ostream& stream) const
     linker_generated_symbols->Print(stream);
 }
 
+Version Map::GetMinVersion() const noexcept
+{
+  Version min_version = std::max({
+      normal_symbol_closure ? normal_symbol_closure->min_version : Version::Unknown,
+      eppc_pattern_matching ? eppc_pattern_matching->min_version : Version::Unknown,
+      dwarf_symbol_closure ? dwarf_symbol_closure->min_version : Version::Unknown,
+      linker_opts ? linker_opts->min_version : Version::Unknown,
+      mixed_mode_islands ? mixed_mode_islands->min_version : Version::Unknown,
+      branch_islands ? branch_islands->min_version : Version::Unknown,
+      linktime_size_decreasing_optimizations ? linktime_size_decreasing_optimizations->min_version :
+                                               Version::Unknown,
+      linktime_size_increasing_optimizations ? linktime_size_increasing_optimizations->min_version :
+                                               Version::Unknown,
+      memory_map ? memory_map->min_version : Version::Unknown,
+      linker_generated_symbols ? linker_generated_symbols->min_version : Version::Unknown,
+  });
+  for (const auto& section_layout : section_layouts)
+    min_version = std::max(section_layout->min_version, min_version);
+  return min_version;
+};
+
 // clang-format off
 static const std::regex re_section_layout_3column_prologue_1{
 //  "  Starting        Virtual\r\n"
@@ -906,7 +927,7 @@ void Map::SymbolClosure::PrintPrefix(std::ostream& stream, const int hierarchy_l
       stream.put(' ');
   Common::Print(stream, "{:d}] ", hierarchy_level);  // "%i] "
 }
-const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Type st_type)
+const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Type st_type) noexcept
 {
   switch (st_type)
   {
@@ -924,7 +945,7 @@ const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Type st_type)
     return "unknown";
   }
 }
-const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Bind st_bind)
+const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Bind st_bind) noexcept
 {
   switch (st_bind)
   {
