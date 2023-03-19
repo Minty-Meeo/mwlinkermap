@@ -265,6 +265,8 @@ struct Map
           : module(std::move(module_)), name(std::move(name_)){};
       virtual ~UnitBase() = default;
 
+      virtual void Print(std::ostream&) const = 0;
+
       std::string module;
       std::string name;
     };
@@ -276,6 +278,8 @@ struct Map
             reference_name(std::move(reference_name_)){};
       virtual ~UnitNotNear() = default;
 
+      virtual void Print(std::ostream&) const;
+
       std::string reference_name;
     };
 
@@ -285,6 +289,8 @@ struct Map
           : UnitBase(std::move(module_), std::move(name_)),
             reference_name(std::move(reference_name_)){};
       virtual ~UnitNotComputed() = default;
+
+      virtual void Print(std::ostream&) const;
 
       std::string reference_name;
     };
@@ -296,6 +302,8 @@ struct Map
             reference_name(std::move(reference_name_)){};
       virtual ~UnitOptimized() = default;
 
+      virtual void Print(std::ostream&) const;
+
       std::string reference_name;
     };
 
@@ -304,6 +312,8 @@ struct Map
       UnitDisassembleError(std::string module_, std::string name_)
           : UnitBase(std::move(module_), std::move(name_)){};
       virtual ~UnitDisassembleError() = default;
+
+      virtual void Print(std::ostream&) const;
     };
 
     LinkerOpts() { SetMinVersion(Version::version_4_2_build_142); };

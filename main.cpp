@@ -18,6 +18,9 @@ void tempfunc(const char* name, int choice)
     std::cout << "Could not open!" << std::endl;
     return;
   }
+  std::stringstream sstream;
+  sstream << infile.rdbuf();
+  const std::string temp = std::move(sstream).str();
 
   MWLinker::Map linker_map;
   std::size_t line_number;
@@ -25,23 +28,24 @@ void tempfunc(const char* name, int choice)
   switch (choice)
   {
   case 0:
-    error = linker_map.Scan(infile, line_number);
+    error = linker_map.Scan(temp, line_number);
     break;
   case 1:
-    error = linker_map.ScanTLOZTP(infile, line_number);
+    error = linker_map.ScanTLOZTP(temp, line_number);
     break;
   case 2:
-    error = linker_map.ScanSMGalaxy(infile, line_number);
+    error = linker_map.ScanSMGalaxy(temp, line_number);
     break;
   default:
     std::cout << "bad choice" << std::endl;
     return;
   }
 
-  std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(error) << std::endl;
-
-  std::ofstream outfile(std::string{name} + "_new");
+  std::stringstream outfile;
   linker_map.Print(outfile);
+  const bool matches = temp == std::move(outfile).str();
+  std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(error)
+            << "   matches: " << matches << std::endl;
 }
 
 int main(const int argc, const char** argv)

@@ -1227,6 +1227,32 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
 
 void Map::LinkerOpts::Print(std::ostream& stream) const
 {
+  for (const auto& unit : units)
+    unit->Print(stream);
+}
+
+void Map::LinkerOpts::UnitNotNear::Print(std::ostream& stream) const
+{
+  // "  %s/ %s()/ %s - address not in near addressing range \r\n"
+  Common::Print(stream, "  {:s}/ {:s}()/ {:s} - address not in near addressing range \r\n", module,
+                name, reference_name);
+}
+void Map::LinkerOpts::UnitNotComputed::Print(std::ostream& stream) const
+{
+  // "  %s/ %s()/ %s - final address not yet computed \r\n"
+  Common::Print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", module, name,
+                reference_name);
+}
+void Map::LinkerOpts::UnitOptimized::Print(std::ostream& stream) const
+{
+  // "! %s/ %s()/ %s - optimized addressing \r\n"
+  Common::Print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", module, name,
+                reference_name);
+}
+void Map::LinkerOpts::UnitDisassembleError::Print(std::ostream& stream) const
+{
+  // "  %s/ %s() - error disassembling function \r\n"
+  Common::Print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", module, name);
 }
 
 // clang-format off
