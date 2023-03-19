@@ -35,7 +35,7 @@ Map::Error Map::Scan(std::istream& stream, std::size_t& line_number)
 }
 Map::Error Map::Scan(const std::stringstream& sstream, std::size_t& line_number)
 {
-  // This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
+  // TODO: This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
   return this->Scan(std::move(sstream).str(), line_number);
 }
 Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
@@ -51,7 +51,7 @@ Map::Error Map::ScanTLOZTP(std::istream& stream, std::size_t& line_number)
 }
 Map::Error Map::ScanTLOZTP(const std::stringstream& sstream, std::size_t& line_number)
 {
-  // This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
+  // TODO: This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
   return this->ScanTLOZTP(std::move(sstream).str(), line_number);
 }
 Map::Error Map::ScanTLOZTP(const std::string_view string_view, std::size_t& line_number)
@@ -68,7 +68,7 @@ Map::Error Map::ScanSMGalaxy(std::istream& stream, std::size_t& line_number)
 }
 Map::Error Map::ScanSMGalaxy(const std::stringstream& sstream, std::size_t& line_number)
 {
-  // This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
+  // TODO: This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
   return this->ScanSMGalaxy(std::move(sstream).str(), line_number);
 }
 Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& line_number)
