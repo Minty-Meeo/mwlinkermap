@@ -20,7 +20,7 @@ void tempfunc(const char* name, int choice)
   }
   std::stringstream sstream;
   sstream << infile.rdbuf();
-  const std::string temp = std::move(sstream).str();
+  std::string temp = std::move(sstream).str();
 
   MWLinker::Map linker_map;
   std::size_t line_number;
@@ -41,6 +41,8 @@ void tempfunc(const char* name, int choice)
     return;
   }
 
+  while (temp.back() == '\0')
+    temp.pop_back();
   std::stringstream outfile;
   linker_map.Print(outfile);
   const bool matches = temp == std::move(outfile).str();

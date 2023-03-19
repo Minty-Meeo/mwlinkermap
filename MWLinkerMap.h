@@ -651,9 +651,9 @@ struct Map
 
     std::list<UnitNormal> normal_units;
     std::list<UnitDebug> debug_units;
-    const bool has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
-    const bool has_s_record;  // Enabled by '-srec [filename]' option
-    const bool has_bin_file;  // Enabled by '-genbinary keyword' option
+    bool has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
+    bool has_s_record;  // Enabled by '-srec [filename]' option
+    bool has_bin_file;  // Enabled by '-genbinary keyword' option
   };
 
   struct LinkerGeneratedSymbols final : PortionBase
@@ -701,7 +701,17 @@ struct Map
   Error ScanForGarbage(const char*, const char*);
 
   std::string entry_point_name;
+  std::unique_ptr<SymbolClosure> normal_symbol_closure;
+  std::unique_ptr<EPPC_PatternMatching> eppc_pattern_matching;
+  std::unique_ptr<SymbolClosure> dwarf_symbol_closure;
   std::list<std::string> unresolved_symbols;
-  std::list<std::unique_ptr<PortionBase>> portions;
+  std::unique_ptr<LinkerOpts> linker_opts;
+  std::unique_ptr<MixedModeIslands> mixed_mode_islands;
+  std::unique_ptr<BranchIslands> branch_islands;
+  std::unique_ptr<LinktimeSizeDecreasingOptimizations> linktime_size_decreasing_optimizations;
+  std::unique_ptr<LinktimeSizeIncreasingOptimizations> linktime_size_increasing_optimizations;
+  std::list<std::unique_ptr<SectionLayout>> section_layouts;
+  std::unique_ptr<MemoryMap> memory_map;
+  std::unique_ptr<LinkerGeneratedSymbols> linker_generated_symbols;
 };
 }  // namespace MWLinker

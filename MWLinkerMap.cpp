@@ -179,7 +179,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      this->portions.push_back(std::move(portion));
+      this->normal_symbol_closure = std::move(portion);
   }
   {
     auto portion = std::make_unique<EPPC_PatternMatching>();
@@ -187,7 +187,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      this->portions.push_back(std::move(portion));
+      this->eppc_pattern_matching = std::move(portion);
   }
   // With '-listdwarf' and DWARF debugging information enabled, a second symbol closure
   // containing info about the .dwarf and .debug sections will appear. Note that, without an
@@ -200,7 +200,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      this->portions.push_back(std::move(portion));
+      this->dwarf_symbol_closure = std::move(portion);
   }
   // Unresolved symbol post-prints probably belong here (I have not confirmed if they preceed
   // LinkerOpts), but the Symbol Closure scanning code that just happened handles them well enough.
@@ -210,7 +210,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      this->portions.push_back(std::move(portion));
+      this->linker_opts = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
                         std::regex_constants::match_continuous))
@@ -220,7 +220,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
+    this->mixed_mode_islands = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_branch_islands_header,
                         std::regex_constants::match_continuous))
@@ -230,7 +230,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
+    this->branch_islands = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_linktime_size_decreasing_optimizations_header,
                         std::regex_constants::match_continuous))
@@ -240,7 +240,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
+    this->linktime_size_decreasing_optimizations = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_linktime_size_increasing_optimizations_header,
                         std::regex_constants::match_continuous))
@@ -250,7 +250,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
+    this->linktime_size_increasing_optimizations = std::move(portion);
   }
 NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   while (std::regex_search(head, tail, match, re_section_layout_header,
@@ -277,7 +277,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
+    this->linker_generated_symbols = std::move(portion);
   }
   return this->ScanForGarbage(head, tail);
 }
@@ -305,7 +305,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
     const auto error = portion->ScanTLOZTP(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
+    this->section_layouts.push_back(std::move(portion));
   }
   return this->ScanForGarbage(head, tail);
 }
@@ -329,7 +329,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     const auto error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->portions.push_back(std::move(portion));
+    this->section_layouts.push_back(std::move(portion));
   }
   // It seems like a mistake, but for a few examples, a tiny bit of simple-style,
   // headerless, CodeWarrior for Wii 1.0 (at minimum) Memory Map can be found.
@@ -339,7 +339,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
   }
   return this->ScanForGarbage(head, tail);
 }
@@ -347,9 +347,32 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
 void Map::Print(std::ostream& stream) const
 {
   // "Link map of %s\r\n"
-  Common::Print(stream, "Link map of {:s}\r\n", this->entry_point_name);
-  for (auto& portion : this->portions)
-    portion->Print(stream);
+  Common::Print(stream, "Link map of {:s}\r\n", entry_point_name);
+  if (normal_symbol_closure)
+    normal_symbol_closure->Print(stream);
+  if (eppc_pattern_matching)
+    eppc_pattern_matching->Print(stream);
+  if (dwarf_symbol_closure)
+    dwarf_symbol_closure->Print(stream);
+  for (const auto& name : unresolved_symbols)
+    // ">>> SYMBOL NOT FOUND: %s\r\n"
+    Common::Print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", name);
+  if (linker_opts)
+    linker_opts->Print(stream);
+  if (mixed_mode_islands)
+    mixed_mode_islands->Print(stream);
+  if (branch_islands)
+    branch_islands->Print(stream);
+  if (linktime_size_decreasing_optimizations)
+    linktime_size_decreasing_optimizations->Print(stream);
+  if (linktime_size_increasing_optimizations)
+    linktime_size_increasing_optimizations->Print(stream);
+  for (const auto& section_layout : section_layouts)
+    section_layout->Print(stream);
+  if (memory_map)
+    memory_map->Print(stream);
+  if (linker_generated_symbols)
+    linker_generated_symbols->Print(stream);
 }
 
 // clang-format off
@@ -394,7 +417,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
         const auto error = portion->Scan3Column(head, tail, line_number);
         if (error != Error::None)
           return error;
-        this->portions.push_back(std::move(portion));
+        this->section_layouts.push_back(std::move(portion));
       }
       else
       {
@@ -423,7 +446,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
         const auto error = portion->Scan4Column(head, tail, line_number);
         if (error != Error::None)
           return error;
-        this->portions.push_back(std::move(portion));
+        this->section_layouts.push_back(std::move(portion));
       }
       else
       {
@@ -522,7 +545,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanSimple_old(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
@@ -541,7 +564,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRam_old(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
@@ -560,7 +583,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanSimple(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
@@ -579,7 +602,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRam(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
@@ -598,7 +621,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanSRecord(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
@@ -617,7 +640,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
@@ -636,7 +659,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRamSRecord(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
@@ -655,7 +678,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRamBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
@@ -674,7 +697,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
@@ -693,7 +716,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRamSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->portions.push_back(std::move(portion));
+      this->memory_map = std::move(portion);
     }
     else
     {
