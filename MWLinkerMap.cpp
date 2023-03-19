@@ -1,5 +1,3 @@
-// TODO: speed test std::vector vs std::list
-
 #include <cstddef>
 #include <format>
 #include <istream>
@@ -806,14 +804,16 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
   std::cmatch match;
 
   NodeBase* curr_node = &this->root;
-  unsigned long curr_hierarchy_level = 0;
+  int curr_hierarchy_level = 0;
 
   while (true)
   {
     if (std::regex_search(head, tail, match, re_symbol_closure_node_normal,
                           std::regex_constants::match_continuous))
     {
-      const unsigned long next_hierarchy_level = std::stoul(match.str(1));
+      const int next_hierarchy_level = std::stoi(match.str(1));
+      if (next_hierarchy_level <= 0)
+        return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
       const std::string type = match.str(3), bind = match.str(4);
@@ -827,14 +827,14 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
           match.str(2), map_symbol_closure_st_type.at(type), map_symbol_closure_st_bind.at(bind),
           match.str(5), match.str(6));
 
-      for (auto i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
+      for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
       curr_hierarchy_level = next_hierarchy_level;
 
       if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
                             std::regex_constants::match_continuous))
       {
-        if (std::stoul(match.str(1)) != curr_hierarchy_level)
+        if (std::stoi(match.str(1)) != curr_hierarchy_level)
           return Error::SymbolClosureUnrefDupsHierarchyMismatch;
         if (match.str(2) != next_node->name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
@@ -842,7 +842,7 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
         while (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                  std::regex_constants::match_continuous))
         {
-          if (std::stoul(match.str(1)) != curr_hierarchy_level)
+          if (std::stoi(match.str(1)) != curr_hierarchy_level)
             return Error::SymbolClosureUnrefDupsHierarchyMismatch;
           const std::string type = match.str(2), bind = match.str(3);
           if (!map_symbol_closure_st_type.contains(type))
@@ -879,14 +879,16 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_symbol_closure_node_linker_generated,
                           std::regex_constants::match_continuous))
     {
-      const unsigned long next_hierarchy_level = std::stoul(match.str(1));
+      const int next_hierarchy_level = std::stoi(match.str(1));
+      if (next_hierarchy_level <= 0)
+        return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
       line_number += 1, head += match.length();
 
       auto next_node = std::make_unique<NodeLinkerGenerated>(match.str(2));
 
-      for (auto i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
+      for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
       curr_hierarchy_level = next_hierarchy_level;
 
@@ -969,15 +971,13 @@ void Map::SymbolClosure::Print(std::ostream& stream) const
   this->root.Print(stream, 0);
 }
 
-void Map::SymbolClosure::NodeBase::Print(std::ostream& stream,
-                                         const unsigned long hierarchy_level) const
+void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarchy_level) const
 {
   for (const auto& node : this->children)
     node->Print(stream, hierarchy_level + 1);
 }
 
-void Map::SymbolClosure::NodeNormal::Print(std::ostream& stream,
-                                           const unsigned long hierarchy_level) const
+void Map::SymbolClosure::NodeNormal::Print(std::ostream& stream, const int hierarchy_level) const
 {
   PrintPrefix(stream, hierarchy_level);
   // libc++ std::format requires lvalue references for the args.
@@ -997,8 +997,8 @@ void Map::SymbolClosure::NodeNormal::Print(std::ostream& stream,
     node->Print(stream, hierarchy_level + 1);
 }
 
-void Map::SymbolClosure::NodeNormal::UnreferencedDuplicate::Print(
-    std::ostream& stream, const unsigned long hierarchy_level) const
+void Map::SymbolClosure::NodeNormal::UnreferencedDuplicate::Print(std::ostream& stream,
+                                                                  const int hierarchy_level) const
 {
   PrintPrefix(stream, hierarchy_level);
   const char *type_s = GetName(type), *bind_s = GetName(bind);
@@ -1007,7 +1007,7 @@ void Map::SymbolClosure::NodeNormal::UnreferencedDuplicate::Print(
 }
 
 void Map::SymbolClosure::NodeLinkerGenerated::Print(std::ostream& stream,
-                                                    const unsigned long hierarchy_level) const
+                                                    const int hierarchy_level) const
 {
   PrintPrefix(stream, hierarchy_level);
   // "%s found as linker generated symbol\r\n"

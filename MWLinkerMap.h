@@ -58,6 +58,7 @@ struct Map
     SMGalaxyYouHadOneJob,
 
     SymbolClosureHierarchySkip,
+    SymbolClosureInvalidHierarchy,
     SymbolClosureInvalidSymbolType,
     SymbolClosureInvalidSymbolBind,
     SymbolClosureUnrefDupsHierarchyMismatch,
@@ -136,7 +137,7 @@ struct Map
       NodeBase(std::string name_) : name(std::move(name_)){};
       virtual ~NodeBase() = default;
 
-      virtual void Print(std::ostream&, unsigned long) const;  // Necessary for root node
+      virtual void Print(std::ostream&, int) const;  // Necessary for root node
 
       NodeBase* parent = nullptr;
       std::list<std::unique_ptr<NodeBase>> children;
@@ -151,7 +152,7 @@ struct Map
         UnreferencedDuplicate(Type type_, Bind bind_, std::string module_, std::string file_)
             : type(type_), bind(bind_), module(std::move(module_)), file(std::move(file_)){};
 
-        void Print(std::ostream&, unsigned long) const;
+        void Print(std::ostream&, int) const;
 
         Type type;
         Bind bind;
@@ -164,7 +165,7 @@ struct Map
             file(std::move(file_)){};
       virtual ~NodeNormal() = default;
 
-      virtual void Print(std::ostream&, unsigned long) const;
+      virtual void Print(std::ostream&, int) const;
 
       Type type;
       Bind bind;
@@ -178,7 +179,7 @@ struct Map
       NodeLinkerGenerated(std::string name_) : NodeBase(std::move(name_)){};
       virtual ~NodeLinkerGenerated() = default;
 
-      virtual void Print(std::ostream&, unsigned long) const;
+      virtual void Print(std::ostream&, int) const;
     };
 
     SymbolClosure() = default;
