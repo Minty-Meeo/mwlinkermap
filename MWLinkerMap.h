@@ -282,71 +282,33 @@ struct Map
   //  - Added LinkerOpts
   struct LinkerOpts final : PortionBase
   {
-    struct UnitBase
+    struct Unit
     {
-      UnitBase(std::string module_, std::string name_)
-          : module(std::move(module_)), name(std::move(name_))
+      enum class Kind
+      {
+        NotNear,
+        NotComputed,
+        Optimized,
+        DisassembleError,
+      };
+
+      Unit(std::string module_, std::string name_)
+          : unit_kind(Kind::DisassembleError), module(std::move(module_)), name(std::move(name_))
       {
       }
-      virtual ~UnitBase() = default;
+      Unit(const Kind unit_kind_, std::string module_, std::string name_,
+           std::string reference_name_)
+          : unit_kind(unit_kind_), module(std::move(module_)), name(std::move(name_)),
+            reference_name(std::move(reference_name_))
+      {
+      }
 
-      virtual void Print(std::ostream&) const = 0;
+      void Print(std::ostream&) const;
 
+      const Kind unit_kind;
       std::string module;
       std::string name;
-    };
-
-    struct UnitNotNear final : UnitBase
-    {
-      UnitNotNear(std::string module_, std::string name_, std::string reference_name_)
-          : UnitBase(std::move(module_), std::move(name_)),
-            reference_name(std::move(reference_name_))
-      {
-      }
-      virtual ~UnitNotNear() override = default;
-
-      virtual void Print(std::ostream&) const override;
-
       std::string reference_name;
-    };
-
-    struct UnitNotComputed final : UnitBase
-    {
-      UnitNotComputed(std::string module_, std::string name_, std::string reference_name_)
-          : UnitBase(std::move(module_), std::move(name_)),
-            reference_name(std::move(reference_name_))
-      {
-      }
-      virtual ~UnitNotComputed() override = default;
-
-      virtual void Print(std::ostream&) const override;
-
-      std::string reference_name;
-    };
-
-    struct UnitOptimized final : UnitBase
-    {
-      UnitOptimized(std::string module_, std::string name_, std::string reference_name_)
-          : UnitBase(std::move(module_), std::move(name_)),
-            reference_name(std::move(reference_name_))
-      {
-      }
-      virtual ~UnitOptimized() override = default;
-
-      virtual void Print(std::ostream&) const override;
-
-      std::string reference_name;
-    };
-
-    struct UnitDisassembleError final : UnitBase
-    {
-      UnitDisassembleError(std::string module_, std::string name_)
-          : UnitBase(std::move(module_), std::move(name_))
-      {
-      }
-      virtual ~UnitDisassembleError() override = default;
-
-      virtual void Print(std::ostream&) const override;
     };
 
     LinkerOpts() { SetMinVersion(Version::version_4_2_build_142); }
@@ -356,7 +318,7 @@ struct Map
     virtual void Print(std::ostream&) const override;
     virtual bool Empty() const noexcept override { return units.empty(); }
 
-    std::list<std::unique_ptr<UnitBase>> units;
+    std::list<Unit> units;
   };
 
   // CodeWarror for GCN 3.0a3 (at the earliest)

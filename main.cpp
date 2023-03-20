@@ -8,7 +8,7 @@
 
 #include "MWLinkerMap.h"
 
-void tempfunc(const char* name, int choice)
+static void tempfunc(const char* name, int choice)
 {
   std::cout << name << std::endl;
 

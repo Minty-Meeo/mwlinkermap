@@ -868,7 +868,7 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
       line_number += 1;
       head += match.length();
 
-      auto next_node = std::make_unique<NodeNormal>(  //
+      auto next_node = std::make_unique<NodeNormal>(
           match.str(2), map_symbol_closure_st_type.at(type), map_symbol_closure_st_bind.at(bind),
           match.str(5), match.str(6));
 
@@ -897,9 +897,9 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
             return Error::SymbolClosureInvalidSymbolType;
           line_number += 1;
           head += match.length();
-          next_node->unref_dups.emplace_back(  //
-              map_symbol_closure_st_type.at(unref_dup_type),
-              map_symbol_closure_st_bind.at(unref_dup_bind), match.str(4), match.str(5));
+          next_node->unref_dups.emplace_back(map_symbol_closure_st_type.at(unref_dup_type),
+                                             map_symbol_closure_st_bind.at(unref_dup_bind),
+                                             match.str(4), match.str(5));
         }
         if (next_node->unref_dups.empty())
           return Error::SymbolClosureUnrefDupsEmpty;
@@ -1117,8 +1117,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         head += match.length();
         will_be_replaced = true;
       }
-      this->merging_units.emplace_back(  //
-          std::move(first_name), std::move(second_name), size, will_be_replaced, was_interchanged);
+      this->merging_units.emplace_back(std::move(first_name), std::move(second_name), size,
+                                       will_be_replaced, was_interchanged);
       continue;
     }
     if (std::regex_search(head, tail, match, re_code_merging_was_interchanged,
@@ -1158,8 +1158,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       {
         return Error::EPPC_PatternMatchingMergingInterchangeMissingEpilogue;
       }
-      this->merging_units.emplace_back(  //
-          std::move(first_name), std::move(second_name), size, will_be_replaced, was_interchanged);
+      this->merging_units.emplace_back(std::move(first_name), std::move(second_name), size,
+                                       will_be_replaced, was_interchanged);
       continue;
     }
     break;
@@ -1178,8 +1178,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       {
         line_number += 1;
         head += match.length();
-        folding_unit.units.emplace_back(  //
-            match.str(1), match.str(2), std::stoul(match.str(3)), false);
+        folding_unit.units.emplace_back(match.str(1), match.str(2), std::stoul(match.str(3)),
+                                        false);
         continue;
       }
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
@@ -1189,8 +1189,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
         line_number += 1;
         head += match.length();
-        folding_unit.units.emplace_back(  //
-            match.str(1), match.str(2), std::stoul(match.str(3)), true);
+        folding_unit.units.emplace_back(match.str(1), match.str(2), std::stoul(match.str(3)), true);
         continue;
       }
       break;
@@ -1292,8 +1291,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     {
       line_number += 1;
       head += match.length();
-      this->units.push_back(  //
-          std::make_unique<UnitNotNear>(match.str(1), match.str(2), match.str(3)));
+      this->units.emplace_back(Unit::Kind::NotNear, match.str(1), match.str(2), match.str(3));
       continue;
     }
     if (std::regex_search(head, tail, match, re_linker_opts_unit_disassemble_error,
@@ -1301,8 +1299,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     {
       line_number += 1;
       head += match.length();
-      this->units.push_back(  //
-          std::make_unique<UnitDisassembleError>(match.str(1), match.str(2)));
+      this->units.emplace_back(match.str(1), match.str(2));
       continue;
     }
     if (std::regex_search(head, tail, match, re_linker_opts_unit_address_not_computed,
@@ -1310,18 +1307,16 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     {
       line_number += 1;
       head += match.length();
-      this->units.push_back(  //
-          std::make_unique<UnitNotComputed>(match.str(1), match.str(2), match.str(3)));
+      this->units.emplace_back(Unit::Kind::NotComputed, match.str(1), match.str(2), match.str(3));
       continue;
     }
+    // I have not seen a single linker map with this
     if (std::regex_search(head, tail, match, re_linker_opts_unit_optimized,
                           std::regex_constants::match_continuous))
     {
-      // I have not seen a single linker map with this
       line_number += 1;
       head += match.length();
-      this->units.push_back(  //
-          std::make_unique<UnitOptimized>(match.str(1), match.str(2), match.str(3)));
+      this->units.emplace_back(Unit::Kind::Optimized, match.str(1), match.str(2), match.str(3));
       continue;
     }
     break;
@@ -1332,31 +1327,33 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
 void Map::LinkerOpts::Print(std::ostream& stream) const
 {
   for (const auto& unit : units)
-    unit->Print(stream);
+    unit.Print(stream);
 }
 
-void Map::LinkerOpts::UnitNotNear::Print(std::ostream& stream) const
+void Map::LinkerOpts::Unit::Print(std::ostream& stream) const
 {
-  // "  %s/ %s()/ %s - address not in near addressing range \r\n"
-  Common::Print(stream, "  {:s}/ {:s}()/ {:s} - address not in near addressing range \r\n", module,
-                name, reference_name);
-}
-void Map::LinkerOpts::UnitNotComputed::Print(std::ostream& stream) const
-{
-  // "  %s/ %s()/ %s - final address not yet computed \r\n"
-  Common::Print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", module, name,
-                reference_name);
-}
-void Map::LinkerOpts::UnitOptimized::Print(std::ostream& stream) const
-{
-  // "! %s/ %s()/ %s - optimized addressing \r\n"
-  Common::Print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", module, name,
-                reference_name);
-}
-void Map::LinkerOpts::UnitDisassembleError::Print(std::ostream& stream) const
-{
-  // "  %s/ %s() - error disassembling function \r\n"
-  Common::Print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", module, name);
+  switch (this->unit_kind)
+  {
+  case Kind::NotNear:
+    // "  %s/ %s()/ %s - address not in near addressing range \r\n"
+    Common::Print(stream, "  {:s}/ {:s}()/ {:s} - address not in near addressing range \r\n",
+                  module, name, reference_name);
+    return;
+  case Kind::NotComputed:
+    // "  %s/ %s()/ %s - final address not yet computed \r\n"
+    Common::Print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", module,
+                  name, reference_name);
+    return;
+  case Kind::Optimized:
+    // "! %s/ %s()/ %s - optimized addressing \r\n"
+    Common::Print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", module, name,
+                  reference_name);
+    return;
+  case Kind::DisassembleError:
+    // "  %s/ %s() - error disassembling function \r\n"
+    Common::Print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", module, name);
+    return;
+  }
 }
 
 // clang-format off
@@ -1471,8 +1468,8 @@ void Map::BranchIslands::Unit::Print(std::ostream& stream) const
     Common::Print(stream, "  branch island {:s} created for {:s}\r\n", first_name, second_name);
 }
 
-Map::Error Map::LinktimeSizeDecreasingOptimizations::Scan(  //
-    const char*& /*head*/, const char* const /*tail*/, std::size_t& /*line_number*/)
+Map::Error Map::LinktimeSizeDecreasingOptimizations::Scan(const char*&, const char* const,
+                                                          std::size_t&)
 {
   // TODO?  I am not convinced this portion is capable of containing anything.
   return Error::None;
@@ -1483,8 +1480,8 @@ void Map::LinktimeSizeDecreasingOptimizations::Print(std::ostream& stream) const
   Common::Print(stream, "\r\nLinktime size-decreasing optimizations\r\n");
 }
 
-Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(  //
-    const char*& /*head*/, const char* const /*tail*/, std::size_t& /*line_number*/)
+Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(const char*&, const char* const,
+                                                          std::size_t&)
 {
   // TODO?  I am not convinced this portion is capable of containing anything.
   return Error::None;
@@ -1814,8 +1811,8 @@ Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const t
   {
     line_number += 1;
     head += match.length();
-    this->normal_units.emplace_back(  //
-        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)));
+    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
+                                    xstoul(match.str(4)));
   }
   return ScanDebug_old(head, tail, line_number);
 }
@@ -1836,9 +1833,9 @@ Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const t
   {
     line_number += 1;
     head += match.length();
-    this->normal_units.emplace_back(  //
-        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-        xstoul(match.str(5)), xstoul(match.str(6)));
+    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
+                                    xstoul(match.str(4)), xstoul(match.str(5)),
+                                    xstoul(match.str(6)));
   }
   return ScanDebug_old(head, tail, line_number);
 }
@@ -1906,9 +1903,9 @@ Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
   {
     line_number += 1;
     head += match.length();
-    this->normal_units.emplace_back(  //
-        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-        xstoul(match.str(5)), xstoul(match.str(6)));
+    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
+                                    xstoul(match.str(4)), xstoul(match.str(5)),
+                                    xstoul(match.str(6)));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -1973,9 +1970,9 @@ Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* cons
   {
     line_number += 1;
     head += match.length();
-    this->normal_units.emplace_back(  //
-        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-        xstoul(match.str(5)), xstoul(match.str(6)), std::stoi(match.str(7)));
+    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
+                                    xstoul(match.str(4)), xstoul(match.str(5)),
+                                    xstoul(match.str(6)), std::stoi(match.str(7)));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -1996,9 +1993,9 @@ Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* cons
   {
     line_number += 1;
     head += match.length();
-    this->normal_units.emplace_back(  //
-        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-        xstoul(match.str(5)), xstoul(match.str(6)), xstoul(match.str(7)), match.str(8));
+    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
+                                    xstoul(match.str(4)), xstoul(match.str(5)),
+                                    xstoul(match.str(6)), xstoul(match.str(7)), match.str(8));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2019,9 +2016,9 @@ Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* con
   {
     line_number += 1;
     head += match.length();
-    this->normal_units.emplace_back(  //
-        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-        std::stoi(match.str(5)), xstoul(match.str(6)), match.str(7));
+    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
+                                    xstoul(match.str(4)), std::stoi(match.str(5)),
+                                    xstoul(match.str(6)), match.str(7));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2042,10 +2039,10 @@ Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const cha
   {
     line_number += 1;
     head += match.length();
-    this->normal_units.emplace_back(  //
-        match.str(1), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-        xstoul(match.str(5)), xstoul(match.str(6)), std::stoi(match.str(7)), xstoul(match.str(8)),
-        match.str(9));
+    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
+                                    xstoul(match.str(4)), xstoul(match.str(5)),
+                                    xstoul(match.str(6)), std::stoi(match.str(7)),
+                                    xstoul(match.str(8)), match.str(9));
   }
   return ScanDebug(head, tail, line_number);
 }
