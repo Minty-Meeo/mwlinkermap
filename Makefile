@@ -1,5 +1,5 @@
 CXX=clang++ -stdlib=libc++ -fexperimental-library
-CXX_FLAGS=-c -g -O3 -std=c++20 -fno-exceptions
+CXX_FLAGS=-c -g -O3 -std=c++20 -fno-exceptions -Wall -Wextra
 
 all: main.o MWLinkerMap.o
 	$(CXX) -o test main.o MWLinkerMap.o

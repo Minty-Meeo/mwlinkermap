@@ -1412,8 +1412,8 @@ void Map::BranchIslands::Unit::Print(std::ostream& stream) const
     Common::Print(stream, "  branch island {:s} created for {:s}\r\n", first_name, second_name);
 }
 
-Map::Error Map::LinktimeSizeDecreasingOptimizations::Scan(const char*& head, const char* const tail,
-                                                          std::size_t& line_number)
+Map::Error Map::LinktimeSizeDecreasingOptimizations::Scan(  //
+    const char*& /*head*/, const char* const /*tail*/, std::size_t& /*line_number*/)
 {
   // TODO?  I am not convinced this portion is capable of containing anything.
   return Error::None;
@@ -1424,8 +1424,8 @@ void Map::LinktimeSizeDecreasingOptimizations::Print(std::ostream& stream) const
   Common::Print(stream, "\r\nLinktime size-decreasing optimizations\r\n");
 }
 
-Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(const char*& head, const char* const tail,
-                                                          std::size_t& line_number)
+Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(  //
+    const char*& /*head*/, const char* const /*tail*/, std::size_t& /*line_number*/)
 {
   // TODO?  I am not convinced this portion is capable of containing anything.
   return Error::None;
