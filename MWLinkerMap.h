@@ -90,7 +90,6 @@ struct Map
 
   struct PortionBase
   {
-    PortionBase() = default;
     virtual ~PortionBase() = default;
 
     void SetMinVersion(const Version version) noexcept
@@ -145,7 +144,7 @@ struct Map
     struct NodeBase
     {
       NodeBase() = default;  // Necessary for root node
-      NodeBase(std::string name_) : name(std::move(name_)){};
+      NodeBase(std::string name_) : name(std::move(name_)) {}
       virtual ~NodeBase() = default;
 
       virtual void Print(std::ostream&, int) const;  // Necessary for root node
@@ -161,7 +160,9 @@ struct Map
       struct UnreferencedDuplicate
       {
         UnreferencedDuplicate(Type type_, Bind bind_, std::string module_, std::string file_)
-            : type(type_), bind(bind_), module(std::move(module_)), file(std::move(file_)){};
+            : type(type_), bind(bind_), module(std::move(module_)), file(std::move(file_))
+        {
+        }
 
         void Print(std::ostream&, int) const;
 
@@ -173,8 +174,10 @@ struct Map
 
       NodeNormal(std::string name_, Type type_, Bind bind_, std::string module_, std::string file_)
           : NodeBase(std::move(name_)), type(type_), bind(bind_), module(std::move(module_)),
-            file(std::move(file_)){};
-      virtual ~NodeNormal() = default;
+            file(std::move(file_))
+      {
+      }
+      virtual ~NodeNormal() override = default;
 
       virtual void Print(std::ostream&, int) const override;
 
@@ -187,14 +190,14 @@ struct Map
 
     struct NodeLinkerGenerated final : NodeBase
     {
-      NodeLinkerGenerated(std::string name_) : NodeBase(std::move(name_)){};
-      virtual ~NodeLinkerGenerated() = default;
+      NodeLinkerGenerated(std::string name_) : NodeBase(std::move(name_)) {}
+      virtual ~NodeLinkerGenerated() override = default;
 
       virtual void Print(std::ostream&, int) const override;
     };
 
     SymbolClosure() = default;
-    virtual ~SymbolClosure() = default;
+    virtual ~SymbolClosure() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&, std::list<std::string>&);
     virtual void Print(std::ostream&) const override;
@@ -215,8 +218,9 @@ struct Map
       MergingUnit(std::string first_name_, std::string second_name_, u32 size_,
                   bool will_be_replaced_, bool was_interchanged_)
           : first_name(std::move(first_name_)), second_name(std::move(second_name_)), size(size_),
-            will_be_replaced(will_be_replaced_), was_interchanged(was_interchanged_){};
-      ~MergingUnit() = default;
+            will_be_replaced(will_be_replaced_), was_interchanged(was_interchanged_)
+      {
+      }
 
       void Print(std::ostream&) const;
 
@@ -240,8 +244,9 @@ struct Map
         Unit(std::string first_name_, std::string second_name_, u32 size_,
              bool new_branch_function_)
             : first_name(first_name_), second_name(std::move(second_name_)), size(size_),
-              new_branch_function(new_branch_function_){};
-        ~Unit() = default;
+              new_branch_function(new_branch_function_)
+        {
+        }
 
         void Print(std::ostream&) const;
 
@@ -251,7 +256,7 @@ struct Map
         bool new_branch_function;
       };
 
-      FoldingUnit(std::string name_) : name(std::move(name_)){};
+      FoldingUnit(std::string name_) : name(std::move(name_)) {}
 
       void Print(std::ostream&) const;
 
@@ -259,8 +264,8 @@ struct Map
       std::list<Unit> units;
     };
 
-    EPPC_PatternMatching() { SetMinVersion(Version::version_4_2_build_142); };
-    virtual ~EPPC_PatternMatching() = default;
+    EPPC_PatternMatching() { SetMinVersion(Version::version_4_2_build_142); }
+    virtual ~EPPC_PatternMatching() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
@@ -280,7 +285,9 @@ struct Map
     struct UnitBase
     {
       UnitBase(std::string module_, std::string name_)
-          : module(std::move(module_)), name(std::move(name_)){};
+          : module(std::move(module_)), name(std::move(name_))
+      {
+      }
       virtual ~UnitBase() = default;
 
       virtual void Print(std::ostream&) const = 0;
@@ -293,10 +300,12 @@ struct Map
     {
       UnitNotNear(std::string module_, std::string name_, std::string reference_name_)
           : UnitBase(std::move(module_), std::move(name_)),
-            reference_name(std::move(reference_name_)){};
-      virtual ~UnitNotNear() = default;
+            reference_name(std::move(reference_name_))
+      {
+      }
+      virtual ~UnitNotNear() override = default;
 
-      virtual void Print(std::ostream&) const;
+      virtual void Print(std::ostream&) const override;
 
       std::string reference_name;
     };
@@ -305,10 +314,12 @@ struct Map
     {
       UnitNotComputed(std::string module_, std::string name_, std::string reference_name_)
           : UnitBase(std::move(module_), std::move(name_)),
-            reference_name(std::move(reference_name_)){};
-      virtual ~UnitNotComputed() = default;
+            reference_name(std::move(reference_name_))
+      {
+      }
+      virtual ~UnitNotComputed() override = default;
 
-      virtual void Print(std::ostream&) const;
+      virtual void Print(std::ostream&) const override;
 
       std::string reference_name;
     };
@@ -317,10 +328,12 @@ struct Map
     {
       UnitOptimized(std::string module_, std::string name_, std::string reference_name_)
           : UnitBase(std::move(module_), std::move(name_)),
-            reference_name(std::move(reference_name_)){};
-      virtual ~UnitOptimized() = default;
+            reference_name(std::move(reference_name_))
+      {
+      }
+      virtual ~UnitOptimized() override = default;
 
-      virtual void Print(std::ostream&) const;
+      virtual void Print(std::ostream&) const override;
 
       std::string reference_name;
     };
@@ -328,14 +341,16 @@ struct Map
     struct UnitDisassembleError final : UnitBase
     {
       UnitDisassembleError(std::string module_, std::string name_)
-          : UnitBase(std::move(module_), std::move(name_)){};
-      virtual ~UnitDisassembleError() = default;
+          : UnitBase(std::move(module_), std::move(name_))
+      {
+      }
+      virtual ~UnitDisassembleError() override = default;
 
-      virtual void Print(std::ostream&) const;
+      virtual void Print(std::ostream&) const override;
     };
 
-    LinkerOpts() { SetMinVersion(Version::version_4_2_build_142); };
-    virtual ~LinkerOpts() = default;
+    LinkerOpts() { SetMinVersion(Version::version_4_2_build_142); }
+    virtual ~LinkerOpts() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
@@ -352,8 +367,9 @@ struct Map
     {
       Unit(std::string first_name_, std::string second_name_, bool is_safe_)
           : first_name(std::move(first_name_)), second_name(std::move(second_name_)),
-            is_safe(is_safe_){};
-      ~Unit() = default;
+            is_safe(is_safe_)
+      {
+      }
 
       void Print(std::ostream&) const;
 
@@ -362,8 +378,8 @@ struct Map
       bool is_safe;
     };
 
-    BranchIslands() { SetMinVersion(Version::version_4_1_build_51213); };
-    virtual ~BranchIslands() = default;
+    BranchIslands() { SetMinVersion(Version::version_4_1_build_51213); }
+    virtual ~BranchIslands() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
@@ -380,8 +396,9 @@ struct Map
     {
       Unit(std::string first_name_, std::string second_name_, bool is_safe_)
           : first_name(std::move(first_name_)), second_name(std::move(second_name_)),
-            is_safe(is_safe_){};
-      ~Unit() = default;
+            is_safe(is_safe_)
+      {
+      }
 
       void Print(std::ostream&) const;
 
@@ -390,8 +407,8 @@ struct Map
       bool is_safe;
     };
 
-    MixedModeIslands() { SetMinVersion(Version::version_4_1_build_51213); };
-    virtual ~MixedModeIslands() = default;
+    MixedModeIslands() { SetMinVersion(Version::version_4_1_build_51213); }
+    virtual ~MixedModeIslands() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
@@ -403,7 +420,7 @@ struct Map
   struct LinktimeSizeDecreasingOptimizations final : PortionBase
   {
     LinktimeSizeDecreasingOptimizations() = default;
-    virtual ~LinktimeSizeDecreasingOptimizations() = default;
+    virtual ~LinktimeSizeDecreasingOptimizations() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
@@ -413,7 +430,7 @@ struct Map
   struct LinktimeSizeIncreasingOptimizations final : PortionBase
   {
     LinktimeSizeIncreasingOptimizations() = default;
-    virtual ~LinktimeSizeIncreasingOptimizations() = default;
+    virtual ~LinktimeSizeIncreasingOptimizations() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
@@ -437,37 +454,49 @@ struct Map
       // UNUSED symbols
       Unit(u32 size_, std::string name_, std::string module_, std::string file_)
           : unit_kind(Kind::Unused), size(size_), name(std::move(name_)),
-            module(std::move(module_)), file(std::move(file_)){};
+            module(std::move(module_)), file(std::move(file_))
+      {
+      }
       // 3-column normal symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, int alignment_,
            std::string name_, std::string module_, std::string file_)
           : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), alignment(alignment_), name(std::move(name_)),
-            module(std::move(module_)), file(std::move(file_)){};
+            module(std::move(module_)), file(std::move(file_))
+      {
+      }
       // 4-column normal symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
            std::string name_, std::string module_, std::string file_)
           : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            name(std::move(name_)), module(std::move(module_)), file(std::move(file_)){};
+            name(std::move(name_)), module(std::move(module_)), file(std::move(file_))
+      {
+      }
       // 3-column entry symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, std::string name_,
            Unit* entry_parent_, std::string module_, std::string file_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), name(std::move(name_)), entry_parent(entry_parent_),
-            module(std::move(module_)), file(std::move(file_)){};
+            module(std::move(module_)), file(std::move(file_))
+      {
+      }
       // 4-column entry symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_,
            std::string name_, Unit* entry_parent_, std::string module_, std::string file_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), name(std::move(name_)),
-            entry_parent(entry_parent_), module(std::move(module_)), file(std::move(file_)){};
+            entry_parent(entry_parent_), module(std::move(module_)), file(std::move(file_))
+      {
+      }
       // 4-column special symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
            std::string name_)
           : unit_kind(Kind::Special), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            name(std::move(name_)){};
+            name(std::move(name_))
+      {
+      }
 
       void Print3Column(std::ostream&) const;
       void Print4Column(std::ostream&) const;
@@ -485,8 +514,8 @@ struct Map
       std::string file;
     };
 
-    SectionLayout(std::string name_) : name(std::move(name_)){};
-    virtual ~SectionLayout() = default;
+    SectionLayout(std::string name_) : name(std::move(name_)) {}
+    virtual ~SectionLayout() override = default;
 
     Error Scan3Column(const char*&, const char*, std::size_t&);
     Error Scan4Column(const char*&, const char*, std::size_t&);
@@ -508,45 +537,61 @@ struct Map
     {
       UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_)
           : name(std::move(name_)), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_){};
+            file_offset(file_offset_)
+      {
+      }
       UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  int s_record_line_)
           : name(std::move(name_)), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), s_record_line(s_record_line_){};
+            file_offset(file_offset_), s_record_line(s_record_line_)
+      {
+      }
       UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  u32 rom_address_, u32 ram_buffer_address_)
           : name(std::move(name_)), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
-            ram_buffer_address(ram_buffer_address_){};
+            ram_buffer_address(ram_buffer_address_)
+      {
+      }
       UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  u32 rom_address_, u32 ram_buffer_address_, int s_record_line_)
           : name(std::move(name_)), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
-            ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_){};
+            ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_)
+      {
+      }
       UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  u32 bin_file_offset_, std::string bin_file_name_)
           : name(std::move(name_)), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), bin_file_offset(bin_file_offset_),
-            bin_file_name(std::move(bin_file_name_)){};
+            bin_file_name(std::move(bin_file_name_))
+      {
+      }
       UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  int s_record_line_, u32 bin_file_offset_, std::string bin_file_name_)
           : name(std::move(name_)), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), s_record_line(s_record_line_),
-            bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_)){};
+            bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_))
+      {
+      }
       UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  u32 rom_address_, u32 ram_buffer_address_, u32 bin_file_offset_,
                  std::string bin_file_name_)
           : name(std::move(name_)), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), bin_file_offset(bin_file_offset_),
-            bin_file_name(std::move(bin_file_name_)){};
+            bin_file_name(std::move(bin_file_name_))
+      {
+      }
       UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  u32 rom_address_, u32 ram_buffer_address_, int s_record_line_,
                  u32 bin_file_offset_, std::string bin_file_name_)
           : name(std::move(name_)), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_),
-            bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_)){};
+            bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_))
+      {
+      }
 
       void PrintSimple_old(std::ostream&) const;
       void PrintRomRam_old(std::ostream&) const;
@@ -575,7 +620,9 @@ struct Map
     struct UnitDebug
     {
       UnitDebug(std::string name_, u32 size_, u32 file_offset_)
-          : name(std::move(name_)), size(size_), file_offset(file_offset_){};
+          : name(std::move(name_)), size(size_), file_offset(file_offset_)
+      {
+      }
 
       void Print_older(std::ostream&) const;
       void Print_old(std::ostream&) const;
@@ -587,13 +634,15 @@ struct Map
     };
 
     MemoryMap(bool has_rom_ram_)  // ctor for old memory map
-        : has_rom_ram(has_rom_ram_), has_s_record(false), has_bin_file(false){};
+        : has_rom_ram(has_rom_ram_), has_s_record(false), has_bin_file(false)
+    {
+    }
     MemoryMap(bool has_rom_ram_, bool has_s_record_, bool has_bin_file_)
         : has_rom_ram(has_rom_ram_), has_s_record(has_s_record_), has_bin_file(has_bin_file_)
     {
       SetMinVersion(Version::version_4_2_build_142);
     }
-    virtual ~MemoryMap() = default;
+    virtual ~MemoryMap() override = default;
 
     Error ScanSimple_old(const char*&, const char*, std::size_t&);
     Error ScanRomRam_old(const char*&, const char*, std::size_t&);
@@ -636,8 +685,7 @@ struct Map
   {
     struct Unit
     {
-      Unit() = default;
-      Unit(std::string name_, u32 value_) : name(std::move(name_)), value(value_){};
+      Unit(std::string name_, u32 value_) : name(std::move(name_)), value(value_) {}
 
       void Print(std::ostream&) const;
 
@@ -646,7 +694,7 @@ struct Map
     };
 
     LinkerGeneratedSymbols() = default;
-    virtual ~LinkerGeneratedSymbols() = default;
+    virtual ~LinkerGeneratedSymbols() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
@@ -654,9 +702,6 @@ struct Map
 
     std::list<Unit> units;
   };
-
-  Map() = default;
-  ~Map() = default;
 
   Error Scan(std::istream&, std::size_t&);
   Error Scan(const std::stringstream&, std::size_t&);
