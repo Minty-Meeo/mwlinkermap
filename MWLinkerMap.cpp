@@ -1,14 +1,20 @@
+#include "MWLinkerMap.h"
+
+#include <cassert>
 #include <cstddef>
-#include <format>
 #include <istream>
 #include <ostream>
+#include <ranges>
 #include <regex>
 #include <sstream>
 #include <string>
+#include <string_view>
+#include <typeinfo>
 #include <unordered_map>
 #include <utility>
 
-#include "MWLinkerMap.h"
+#include <format>
+#include <iostream>
 
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
 
@@ -35,7 +41,7 @@ Map::Error Map::Scan(std::istream& stream, std::size_t& line_number)
 }
 Map::Error Map::Scan(const std::stringstream& sstream, std::size_t& line_number)
 {
-  // TODO: This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
+  // TODO: donkey dick
   return this->Scan(std::move(sstream).str(), line_number);
 }
 Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
@@ -51,7 +57,7 @@ Map::Error Map::ScanTLOZTP(std::istream& stream, std::size_t& line_number)
 }
 Map::Error Map::ScanTLOZTP(const std::stringstream& sstream, std::size_t& line_number)
 {
-  // TODO: This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
+  // TODO: donkey dick
   return this->ScanTLOZTP(std::move(sstream).str(), line_number);
 }
 Map::Error Map::ScanTLOZTP(const std::string_view string_view, std::size_t& line_number)
@@ -68,7 +74,7 @@ Map::Error Map::ScanSMGalaxy(std::istream& stream, std::size_t& line_number)
 }
 Map::Error Map::ScanSMGalaxy(const std::stringstream& sstream, std::size_t& line_number)
 {
-  // TODO: This is supposed to use the stringstream::view() method, but libc++ sucks donkey dick.
+  // TODO: donkey dick
   return this->ScanSMGalaxy(std::move(sstream).str(), line_number);
 }
 Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& line_number)
@@ -844,15 +850,15 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
         {
           if (std::stoi(match.str(1)) != curr_hierarchy_level)
             return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-          const std::string type = match.str(2), bind = match.str(3);
-          if (!map_symbol_closure_st_type.contains(type))
+          const std::string unref_dup_type = match.str(2), unref_dup_bind = match.str(3);
+          if (!map_symbol_closure_st_type.contains(unref_dup_type))
             return Error::SymbolClosureInvalidSymbolType;
-          if (!map_symbol_closure_st_bind.contains(bind))
+          if (!map_symbol_closure_st_bind.contains(unref_dup_bind))
             return Error::SymbolClosureInvalidSymbolType;
           line_number += 1, head += match.length();
           next_node->unref_dups.emplace_back(  //
-              map_symbol_closure_st_type.at(type), map_symbol_closure_st_bind.at(bind),
-              match.str(4), match.str(5));
+              map_symbol_closure_st_type.at(unref_dup_type),
+              map_symbol_closure_st_bind.at(unref_dup_bind), match.str(4), match.str(5));
         }
         if (next_node->unref_dups.empty())
           return Error::SymbolClosureUnrefDupsEmpty;
@@ -1454,26 +1460,34 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitNormal>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-          std::stoul(match.str(4)), match.str(5), match.str(6), match.str(7)));
+      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+                               std::stoi(match.str(4)), match.str(5), match.str(6), match.str(7));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitUnused>(  //
-          xstoul(match.str(1)), match.str(2), match.str(3), match.str(4)));
+      this->units.emplace_back(xstoul(match.str(1)), match.str(2), match.str(3), match.str(4));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitEntry>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
-          match.str(5), match.str(6), match.str(7)));
+      std::string entry_parent_name = match.str(5), module = match.str(6), file = match.str(7);
+      for (auto& unit : std::ranges::reverse_view{this->units})
+      {
+        if (file != unit.file || module != unit.module)
+          return Error::SectionLayoutOrphanedEntry;
+        if (entry_parent_name != unit.name)
+          continue;
+        line_number += 1, head += match.length();
+        this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+                                 match.str(4), &unit, std::move(module), std::move(file));
+        goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
+      }
+      return Error::SectionLayoutOrphanedEntry;
+    ENTRY_PARENT_FOUND:
       continue;
     }
     break;
@@ -1507,38 +1521,48 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitNormal>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-          std::stoul(match.str(5)), match.str(6), match.str(7), match.str(8)));
+      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+                               xstoul(match.str(4)), std::stoi(match.str(5)), match.str(6),
+                               match.str(7), match.str(8));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitUnused>(  //
-          xstoul(match.str(1)), match.str(2), match.str(3), match.str(4)));
+      this->units.emplace_back(xstoul(match.str(1)), match.str(2), match.str(3), match.str(4));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitEntry>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-          match.str(5), match.str(6), match.str(7), match.str(8)));
+      std::string entry_parent_name = match.str(6), module = match.str(7), file = match.str(8);
+      for (auto& unit : std::ranges::reverse_view{this->units})
+      {
+        if (file != unit.file || module != unit.module)
+          return Error::SectionLayoutOrphanedEntry;
+        if (entry_parent_name != unit.name)
+          continue;
+        line_number += 1, head += match.length();
+        this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+                                 xstoul(match.str(4)), match.str(5), &unit, std::move(module),
+                                 std::move(file));
+        goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
+      }
+      return Error::SectionLayoutOrphanedEntry;
+    ENTRY_PARENT_FOUND:
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_special,
                           std::regex_constants::match_continuous))
     {
-      std::string name = match.str(6);
-      if (name != "*fill*" && name != "**fill**")
+      std::string special_name = match.str(6);
+      if (special_name != "*fill*" && special_name != "**fill**")
         return Error::SectionLayoutSpecialNotFill;
       line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitSpecial>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-          std::stoul(match.str(5)), std::move(name)));
+      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+                               xstoul(match.str(4)), std::stoi(match.str(5)),
+                               std::move(special_name));
       continue;
     }
     break;
@@ -1564,30 +1588,38 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                           std::regex_constants::match_continuous))
     {
       line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitNormal>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
-          std::stoul(match.str(4)), match.str(5), match.str(6), match.str(7)));
+      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
+                               std::stoi(match.str(4)), match.str(5), match.str(6), match.str(7));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitEntry>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
-          match.str(5), match.str(6), match.str(7)));
+      std::string entry_parent_name = match.str(5), module = match.str(6), file = match.str(7);
+      for (auto& unit : std::ranges::reverse_view{this->units})
+      {
+        if (file != unit.file || module != unit.module)
+          return Error::SectionLayoutOrphanedEntry;
+        if (entry_parent_name != unit.name)
+          continue;
+        line_number += 1, head += match.length();
+        this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+                                 0, match.str(4), &unit, std::move(module), std::move(file));
+        goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
+      }
+      return Error::SectionLayoutOrphanedEntry;
+    ENTRY_PARENT_FOUND:
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_special,
                           std::regex_constants::match_continuous))
     {
-      std::string name = match.str(5);
-      if (name != "*fill*" && name != "**fill**")
+      std::string special_name = match.str(5);
+      if (special_name != "*fill*" && special_name != "**fill**")
         return Error::SectionLayoutSpecialNotFill;
       line_number += 1, head += match.length();
-      this->units.push_back(std::make_unique<UnitSpecial>(  //
-          xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
-          std::stoul(match.str(4)), std::move(name)));
+      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
+                               std::stoi(match.str(4)), std::move(special_name));
       continue;
     }
     break;
@@ -1605,7 +1637,7 @@ void Map::SectionLayout::Print(std::ostream& stream) const
     Common::Print(stream, "  address  Size   address\r\n");
     Common::Print(stream, "  -----------------------\r\n");
     for (const auto& unit : this->units)
-      unit->Print3Column(stream);
+      unit.Print3Column(stream);
   }
   else
   {
@@ -1613,53 +1645,88 @@ void Map::SectionLayout::Print(std::ostream& stream) const
     Common::Print(stream, "  address  Size   address  offset\r\n");
     Common::Print(stream, "  ---------------------------------\r\n");
     for (const auto& unit : this->units)
-      unit->Print4Column(stream);
+      unit.Print4Column(stream);
   }
 }
 
-void Map::SectionLayout::UnitNormal::Print3Column(std::ostream& stream) const
+void Map::SectionLayout::Unit::Print3Column(std::ostream& stream) const
 {
-  // "  %08x %06x %08x %2i %s \t%s %s\r\n"
-  Common::Print(stream, "  {:08x} {:06x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n", starting_address, size,
-                virtual_address, alignment, name, module, file);
+  switch (this->unit_kind)
+  {
+  case Kind::Normal:
+    // "  %08x %06x %08x %2i %s \t%s %s\r\n"
+    Common::Print(stream, "  {:08x} {:06x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n", starting_address,
+                  size, virtual_address, alignment, name, module, file);
+    return;
+  case Kind::Unused:
+    // "  UNUSED   %06x ........ %s %s %s\r\n"
+    Common::Print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", size, name, module,
+                  file);
+    return;
+  case Kind::Entry:
+    // "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
+    Common::Print(stream, "  {:08x} {:06x} {:08x} {:s} (entry of {:s}) \t{:s} {:s}\r\n",
+                  starting_address, size, virtual_address, name, entry_parent->name, module, file);
+    return;
+  case Kind::Special:
+    assert(false);
+    return;
+  }
 }
-void Map::SectionLayout::UnitNormal::Print4Column(std::ostream& stream) const
+
+void Map::SectionLayout::Unit::Print4Column(std::ostream& stream) const
 {
-  // "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
-  Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n",
-                starting_address, size, virtual_address, file_offset, alignment, name, module,
-                file);
+  switch (this->unit_kind)
+  {
+  case Kind::Normal:
+    // "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
+    Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n",
+                  starting_address, size, virtual_address, file_offset, alignment, name, module,
+                  file);
+    return;
+  case Kind::Unused:
+    // "  UNUSED   %06x ........ ........    %s %s %s\r\n"
+    Common::Print(stream, "  UNUSED   {:06x} ........ ........    {:s} {:s} {:s}\r\n", size, name,
+                  module, file);
+    return;
+  case Kind::Entry:
+    // "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
+    Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x}    {:s} (entry of {:s}) \t{:s} {:s}\r\n",
+                  starting_address, size, virtual_address, file_offset, name, entry_parent->name,
+                  module, file);
+    return;
+  case Kind::Special:
+    // "  %08x %06x %08x %08x %2i %s\r\n"
+    Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s}\r\n", starting_address, size,
+                  virtual_address, file_offset, alignment, name);
+    return;
+  }
 }
-void Map::SectionLayout::UnitUnused::Print3Column(std::ostream& stream) const
-{
-  // "  UNUSED   %06x ........ %s %s %s\r\n"
-  Common::Print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", size, name, module, file);
-}
-void Map::SectionLayout::UnitUnused::Print4Column(std::ostream& stream) const
-{
-  // "  UNUSED   %06x ........ ........    %s %s %s\r\n"
-  Common::Print(stream, "  UNUSED   {:06x} ........ ........    {:s} {:s} {:s}\r\n", size, name,
-                module, file);
-}
-void Map::SectionLayout::UnitEntry::Print3Column(std::ostream& stream) const
-{
-  // "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
-  Common::Print(stream, "  {:08x} {:06x} {:08x} {:s} (entry of {:s}) \t{:s} {:s}\r\n",
-                starting_address, size, virtual_address, name, entry_of_name, module, file);
-}
-void Map::SectionLayout::UnitEntry::Print4Column(std::ostream& stream) const
-{
-  // "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
-  Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x}    {:s} (entry of {:s}) \t{:s} {:s}\r\n",
-                starting_address, size, virtual_address, file_offset, name, entry_of_name, module,
-                file);
-}
-void Map::SectionLayout::UnitSpecial::Print4Column(std::ostream& stream) const
-{
-  // "  %08x %06x %08x %08x %2i %s\r\n"
-  Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s}\r\n", starting_address, size,
-                virtual_address, file_offset, alignment, name);
-}
+
+// void Map::SectionLayout::Export(Common::IntermediateDB& db) const
+// {
+//   for (const auto& unit : this->units)
+//     unit->Export(db, this->name);
+// }
+// void Map::SectionLayout::UnitReal::Export(Common::IntermediateDB& db,
+//                                           const std::string& section_name) const
+// {
+//   auto& db_module =
+//       file.empty() ? db.modules[this->module] : db.modules[this->module + " " + this->file];
+//   auto& db_symbol = db_module.symbols[this->name];
+//   db_symbol.name = this->name;
+//   db_symbol.value = this->virtual_address;
+//   db_symbol.size = this->size;
+//   if (this->name == section_name)
+//   {
+//     db_symbol.type = Common::IntermediateDB::Symbol::Type::Section;
+//     db_symbol.bind = Common::IntermediateDB::Symbol::Bind::Local;
+//   }
+// }
+// void Map::SectionLayout::UnitSpecial::Export(Common::IntermediateDB& db,
+//                                              const std::string& section_name) const
+// {
+// }
 
 // clang-format off
 static const std::regex re_memory_map_unit_normal_simple_old{
@@ -2185,3 +2252,7 @@ void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream) const
   Common::Print(stream, "{:25s} {:08x}\r\n", name, value);
 }
 }  // namespace MWLinker
+
+namespace Common
+{
+};  // namespace Common

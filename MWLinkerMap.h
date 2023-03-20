@@ -1,7 +1,10 @@
+#pragma once
+
 #include <algorithm>
 #include <cstddef>
 #include <istream>
 #include <list>
+#include <map>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -9,6 +12,13 @@
 #include <string>
 #include <string_view>
 #include <utility>
+
+using u32 = std::uint32_t;
+
+namespace Common
+{
+struct IntermediateDB;
+}
 
 namespace MWLinker
 {
@@ -72,6 +82,7 @@ struct Map
     EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch,
 
     SectionLayoutBadPrologue,
+    SectionLayoutOrphanedEntry,
     SectionLayoutSpecialNotFill,
 
     MemoryMapBadPrologue,
@@ -165,7 +176,7 @@ struct Map
             file(std::move(file_)){};
       virtual ~NodeNormal() = default;
 
-      virtual void Print(std::ostream&, int) const;
+      virtual void Print(std::ostream&, int) const override;
 
       Type type;
       Bind bind;
@@ -179,7 +190,7 @@ struct Map
       NodeLinkerGenerated(std::string name_) : NodeBase(std::move(name_)){};
       virtual ~NodeLinkerGenerated() = default;
 
-      virtual void Print(std::ostream&, int) const;
+      virtual void Print(std::ostream&, int) const override;
     };
 
     SymbolClosure() = default;
@@ -201,7 +212,7 @@ struct Map
   {
     struct MergingUnit
     {
-      MergingUnit(std::string first_name_, std::string second_name_, std::uint32_t size_,
+      MergingUnit(std::string first_name_, std::string second_name_, u32 size_,
                   bool will_be_replaced_, bool was_interchanged_)
           : first_name(std::move(first_name_)), second_name(std::move(second_name_)), size(size_),
             will_be_replaced(will_be_replaced_), was_interchanged(was_interchanged_){};
@@ -211,7 +222,7 @@ struct Map
 
       std::string first_name;
       std::string second_name;
-      std::uint32_t size;
+      u32 size;
       // If the conditions are right (e.g. the function is more than just a BLR instruction), then
       // one function is replaced with a branch to the other function, saving space at the cost of a
       // tiny amount of overhead. This is by far the more common code merging technique.
@@ -226,7 +237,7 @@ struct Map
     {
       struct Unit
       {
-        Unit(std::string first_name_, std::string second_name_, std::uint32_t size_,
+        Unit(std::string first_name_, std::string second_name_, u32 size_,
              bool new_branch_function_)
             : first_name(first_name_), second_name(std::move(second_name_)), size(size_),
               new_branch_function(new_branch_function_){};
@@ -236,7 +247,7 @@ struct Map
 
         std::string first_name;
         std::string second_name;
-        std::uint32_t size;
+        u32 size;
         bool new_branch_function;
       };
 
@@ -413,103 +424,65 @@ struct Map
   //  - Changed to four column info, added *fill* symbols.
   struct SectionLayout final : PortionBase
   {
-    struct UnitBase
+    struct Unit
     {
-      UnitBase(std::uint32_t size_, std::string name_) : size(size_), name(std::move(name_)){};
-      virtual ~UnitBase() = default;
+      enum class Kind
+      {
+        Unused,
+        Normal,
+        Entry,
+        Special,
+      };
 
-      virtual void Print3Column(std::ostream&) const = 0;
-      virtual void Print4Column(std::ostream&) const = 0;
-
-      std::uint32_t size;
-      std::string name;
-    };
-
-    struct UnitNormal final : UnitBase
-    {
-      UnitNormal(std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t virtual_address_, std::uint32_t alignment_, std::string name_,
-                 std::string module_, std::string file_)
-          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
-            virtual_address(virtual_address_), alignment(alignment_), module(std::move(module_)),
-            file(std::move(file_)){};
-      UnitNormal(std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t virtual_address_, std::uint32_t file_offset_,
-                 std::uint32_t alignment_, std::string name_, std::string module_,
-                 std::string file_)
-          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
+      // UNUSED symbols
+      Unit(u32 size_, std::string name_, std::string module_, std::string file_)
+          : unit_kind(Kind::Unused), size(size_), name(std::move(name_)),
+            module(std::move(module_)), file(std::move(file_)){};
+      // 3-column normal symbols
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, int alignment_,
+           std::string name_, std::string module_, std::string file_)
+          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), alignment(alignment_), name(std::move(name_)),
+            module(std::move(module_)), file(std::move(file_)){};
+      // 4-column normal symbols
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
+           std::string name_, std::string module_, std::string file_)
+          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
+            name(std::move(name_)), module(std::move(module_)), file(std::move(file_)){};
+      // 3-column entry symbols
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, std::string name_,
+           const Unit* entry_parent_, std::string module_, std::string file_)
+          : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), name(std::move(name_)), entry_parent(entry_parent_),
             module(std::move(module_)), file(std::move(file_)){};
-      virtual ~UnitNormal() = default;
+      // 4-column entry symbols
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_,
+           std::string name_, const Unit* entry_parent_, std::string module_, std::string file_)
+          : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), file_offset(file_offset_), name(std::move(name_)),
+            entry_parent(entry_parent_), module(std::move(module_)), file(std::move(file_)){};
+      // 4-column special symbols
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
+           std::string name_)
+          : unit_kind(Kind::Special), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
+            name(std::move(name_)){};
 
-      virtual void Print3Column(std::ostream&) const override;
-      virtual void Print4Column(std::ostream&) const override;
+      void Print3Column(std::ostream&) const;
+      void Print4Column(std::ostream&) const;
 
-      std::uint32_t starting_address;
-      std::uint32_t virtual_address;
-      std::uint32_t file_offset;
-      std::uint32_t alignment;
-      std::string module;  // ELF object or static library name
-      std::string file;    // Static library STT_FILE symbol name (optional)
-    };
-
-    struct UnitUnused final : UnitBase
-    {
-      UnitUnused(std::uint32_t size_, std::string name_, std::string module_, std::string file_)
-          : UnitBase(size_, std::move(name_)), module(std::move(module_)), file(std::move(file_)){};
-      virtual ~UnitUnused() = default;
-
-      virtual void Print3Column(std::ostream&) const override;
-      virtual void Print4Column(std::ostream&) const override;
-
-      std::string module;  // ELF object or static library name
-      std::string file;    // Static library STT_FILE symbol name (optional)
-    };
-
-    struct UnitEntry final : UnitBase
-    {
-      UnitEntry(std::uint32_t starting_address_, std::uint32_t size_,
-                std::uint32_t virtual_address_, std::string name_, std::string entry_of_name_,
-                std::string module_, std::string file_)
-          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
-            virtual_address(virtual_address_), entry_of_name(std::move(entry_of_name_)),
-            module(std::move(module_)), file(std::move(file_)){};
-      UnitEntry(std::uint32_t starting_address_, std::uint32_t size_,
-                std::uint32_t virtual_address_, std::uint32_t file_offset_, std::string name_,
-                std::string entry_of_name_, std::string module_, std::string file_)
-          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
-            virtual_address(virtual_address_), file_offset(file_offset_),
-            entry_of_name(std::move(entry_of_name_)), module(std::move(module_)),
-            file(std::move(file_)){};
-      virtual ~UnitEntry() = default;
-
-      virtual void Print3Column(std::ostream&) const override;
-      virtual void Print4Column(std::ostream&) const override;
-
-      std::uint32_t starting_address;
-      std::uint32_t virtual_address;
-      std::uint32_t file_offset;
-      std::string entry_of_name;  // (entry of _____)
-      std::string module;         // ELF object or static library name
-      std::string file;           // Static library STT_FILE symbol name (optional)
-    };
-
-    struct UnitSpecial final : UnitBase  // e.g. "*fill*" or "**fill**"
-    {
-      UnitSpecial(std::uint32_t starting_address_, std::uint32_t size_,
-                  std::uint32_t virtual_address_, std::uint32_t file_offset_,
-                  std::uint32_t alignment_, std::string name_)
-          : UnitBase(size_, std::move(name_)), starting_address(starting_address_),
-            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_){};
-      virtual ~UnitSpecial() = default;
-
-      virtual void Print3Column(std::ostream&) const override{/* std::unreachable(); */};
-      virtual void Print4Column(std::ostream&) const override;
-
-      std::uint32_t starting_address;
-      std::uint32_t virtual_address;
-      std::uint32_t file_offset;
-      std::uint32_t alignment;
+      const Kind unit_kind;
+      u32 starting_address;
+      u32 size;
+      u32 virtual_address;
+      u32 file_offset;
+      int alignment;
+      std::string name;
+      const Unit* entry_parent;
+      std::list<const Unit*> entry_children;
+      std::string module;
+      std::string file;
     };
 
     SectionLayout(std::string name_) : name(std::move(name_)){};
@@ -522,7 +495,7 @@ struct Map
     virtual bool Empty() const noexcept override { return units.empty(); }
 
     std::string name;
-    std::list<std::unique_ptr<UnitBase>> units;
+    std::list<Unit> units;
   };
 
   // CodeWarrior for GCN 2.7
@@ -533,52 +506,45 @@ struct Map
   {
     struct UnitNormal
     {
-      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t file_offset_)
-          : name(std::move(name_)), file_offset(file_offset_), size(size_),
-            starting_address(starting_address_){};
-      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t file_offset_, int s_record_line_)
-          : name(std::move(name_)), file_offset(file_offset_), size(size_),
-            starting_address(starting_address_), s_record_line(s_record_line_){};
-      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t file_offset_, std::uint32_t rom_address_,
-                 std::uint32_t ram_buffer_address_)
-          : name(std::move(name_)), file_offset(file_offset_), size(size_),
-            starting_address(starting_address_), rom_address(rom_address_),
+      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_)
+          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+            file_offset(file_offset_){};
+      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+                 int s_record_line_)
+          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+            file_offset(file_offset_), s_record_line(s_record_line_){};
+      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+                 u32 rom_address_, u32 ram_buffer_address_)
+          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+            file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_){};
-      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t file_offset_, std::uint32_t rom_address_,
-                 std::uint32_t ram_buffer_address_, int s_record_line_)
-          : name(std::move(name_)), file_offset(file_offset_), size(size_),
-            starting_address(starting_address_), rom_address(rom_address_),
+      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+                 u32 rom_address_, u32 ram_buffer_address_, int s_record_line_)
+          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+            file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_){};
-      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t file_offset_, std::uint32_t bin_file_offset_,
-                 std::string bin_file_name_)
-          : name(std::move(name_)), file_offset(file_offset_), size(size_),
-            starting_address(starting_address_), bin_file_offset(bin_file_offset_),
+      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+                 u32 bin_file_offset_, std::string bin_file_name_)
+          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+            file_offset(file_offset_), bin_file_offset(bin_file_offset_),
             bin_file_name(std::move(bin_file_name_)){};
-      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t file_offset_, int s_record_line_, std::uint32_t bin_file_offset_,
-                 std::string bin_file_name_)
-          : name(std::move(name_)), file_offset(file_offset_), size(size_),
-            starting_address(starting_address_), s_record_line(s_record_line_),
+      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+                 int s_record_line_, u32 bin_file_offset_, std::string bin_file_name_)
+          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+            file_offset(file_offset_), s_record_line(s_record_line_),
             bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_)){};
-      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t file_offset_, std::uint32_t rom_address_,
-                 std::uint32_t ram_buffer_address_, std::uint32_t bin_file_offset_,
+      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+                 u32 rom_address_, u32 ram_buffer_address_, u32 bin_file_offset_,
                  std::string bin_file_name_)
-          : name(std::move(name_)), file_offset(file_offset_), size(size_),
-            starting_address(starting_address_), rom_address(rom_address_),
+          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+            file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), bin_file_offset(bin_file_offset_),
             bin_file_name(std::move(bin_file_name_)){};
-      UnitNormal(std::string name_, std::uint32_t starting_address_, std::uint32_t size_,
-                 std::uint32_t file_offset_, std::uint32_t rom_address_,
-                 std::uint32_t ram_buffer_address_, int s_record_line_,
-                 std::uint32_t bin_file_offset_, std::string bin_file_name_)
-          : name(std::move(name_)), file_offset(file_offset_), size(size_),
-            starting_address(starting_address_), rom_address(rom_address_),
+      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+                 u32 rom_address_, u32 ram_buffer_address_, int s_record_line_,
+                 u32 bin_file_offset_, std::string bin_file_name_)
+          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+            file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_),
             bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_)){};
 
@@ -594,13 +560,13 @@ struct Map
       void PrintRomRamSRecordBinFile(std::ostream&) const;
 
       std::string name;
-      std::uint32_t starting_address;
-      std::uint32_t size;
-      std::uint32_t file_offset;
-      std::uint32_t rom_address;
-      std::uint32_t ram_buffer_address;
+      u32 starting_address;
+      u32 size;
+      u32 file_offset;
+      u32 rom_address;
+      u32 ram_buffer_address;
       int s_record_line;
-      std::uint32_t bin_file_offset;
+      u32 bin_file_offset;
       std::string bin_file_name;
     };
 
@@ -608,7 +574,7 @@ struct Map
     // names, but I couldn't be bothered to look into it.
     struct UnitDebug
     {
-      UnitDebug(std::string name_, std::uint32_t size_, std::uint32_t file_offset_)
+      UnitDebug(std::string name_, u32 size_, u32 file_offset_)
           : name(std::move(name_)), size(size_), file_offset(file_offset_){};
 
       void Print_older(std::ostream&) const;
@@ -616,8 +582,8 @@ struct Map
       void Print(std::ostream&) const;
 
       std::string name;
-      std::uint32_t size;
-      std::uint32_t file_offset;
+      u32 size;
+      u32 file_offset;
     };
 
     MemoryMap(bool has_rom_ram_)  // ctor for old memory map
@@ -671,12 +637,12 @@ struct Map
     struct Unit
     {
       Unit() = default;
-      Unit(std::string name_, std::uint32_t value_) : name(std::move(name_)), value(value_){};
+      Unit(std::string name_, u32 value_) : name(std::move(name_)), value(value_){};
 
       void Print(std::ostream&) const;
 
       std::string name;
-      std::uint32_t value;
+      u32 value;
     };
 
     LinkerGeneratedSymbols() = default;
@@ -727,3 +693,41 @@ struct Map
   std::unique_ptr<LinkerGeneratedSymbols> linker_generated_symbols;
 };
 }  // namespace MWLinker
+
+namespace Common
+{
+struct IntermediateDB
+{
+  struct Symbol
+  {
+    enum class Type : unsigned char
+    {
+      NoType = 0,
+      Object = 1,
+      Func = 2,
+      Section = 3,
+      File = 4,
+    };
+    enum class Bind : unsigned char
+    {
+      Local = 0,
+      Global = 1,
+      Weak = 2,
+    };
+
+    std::string name;
+    u32 value = 0;
+    u32 size = 0;
+    Type type = Type::NoType;
+    Bind bind = Bind::Global;
+  };
+  struct ModuleDB
+  {
+    std::map<std::string, Symbol> symbols;
+  };
+
+  void Import(MWLinker::Map&);
+
+  std::map<std::string, ModuleDB> modules;
+};
+}  // namespace Common
