@@ -871,12 +871,11 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
       // "    3] .text (section,local) found in xyz.cpp lib.a"
       if (const bool is_weird = (next_node->name == "_dtors$99" &&  // Redundancy out of paranoia
                                  next_node->module == "Linker Generated Symbol File");
-          curr_node->children.push_back((curr_node = next_node.get(), std::move(next_node))),
-          is_weird)  // Yo dawg, I herd you like operator comma.
+          curr_node = curr_node->children.emplace_back(next_node.release()).get(), is_weird)
       {
         auto dummy_node = std::make_unique<NodeBase>();
         dummy_node->parent = curr_node;
-        curr_node->children.push_back((curr_node = dummy_node.get(), std::move(dummy_node)));
+        curr_node = curr_node->children.emplace_back(dummy_node.release()).get();
         ++curr_hierarchy_level;
         this->SetMinVersion(Version::version_3_0_4);
       }
@@ -899,7 +898,7 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
       curr_hierarchy_level = next_hierarchy_level;
 
       next_node->parent = curr_node;
-      curr_node->children.push_back((curr_node = next_node.get(), std::move(next_node)));
+      curr_node = curr_node->children.emplace_back(next_node.release()).get();
       continue;
     }
     // Up until CodeWarrior for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the
@@ -1475,15 +1474,16 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       std::string entry_parent_name = match.str(5), module = match.str(6), file = match.str(7);
-      for (auto& unit : std::ranges::reverse_view{this->units})
+      for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
-        if (file != unit.file || module != unit.module)
+        if (file != parent_unit.file || module != parent_unit.module)
           return Error::SectionLayoutOrphanedEntry;
-        if (entry_parent_name != unit.name)
+        if (entry_parent_name != parent_unit.name)
           continue;
         line_number += 1, head += match.length();
-        this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-                                 match.str(4), &unit, std::move(module), std::move(file));
+        parent_unit.entry_children.push_back(&this->units.emplace_back(
+            xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
+            &parent_unit, std::move(module), std::move(file)));
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1537,16 +1537,16 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       std::string entry_parent_name = match.str(6), module = match.str(7), file = match.str(8);
-      for (auto& unit : std::ranges::reverse_view{this->units})
+      for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
-        if (file != unit.file || module != unit.module)
+        if (file != parent_unit.file || module != parent_unit.module)
           return Error::SectionLayoutOrphanedEntry;
-        if (entry_parent_name != unit.name)
+        if (entry_parent_name != parent_unit.name)
           continue;
         line_number += 1, head += match.length();
-        this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-                                 xstoul(match.str(4)), match.str(5), &unit, std::move(module),
-                                 std::move(file));
+        parent_unit.entry_children.push_back(&this->units.emplace_back(
+            xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
+            match.str(5), &parent_unit, std::move(module), std::move(file)));
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1596,15 +1596,16 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                           std::regex_constants::match_continuous))
     {
       std::string entry_parent_name = match.str(5), module = match.str(6), file = match.str(7);
-      for (auto& unit : std::ranges::reverse_view{this->units})
+      for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
-        if (file != unit.file || module != unit.module)
+        if (file != parent_unit.file || module != parent_unit.module)
           return Error::SectionLayoutOrphanedEntry;
-        if (entry_parent_name != unit.name)
+        if (entry_parent_name != parent_unit.name)
           continue;
         line_number += 1, head += match.length();
-        this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-                                 0, match.str(4), &unit, std::move(module), std::move(file));
+        parent_unit.entry_children.push_back(&this->units.emplace_back(
+            xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
+            &parent_unit, std::move(module), std::move(file)));
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
