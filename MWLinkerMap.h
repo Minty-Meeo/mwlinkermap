@@ -452,13 +452,13 @@ struct Map
             name(std::move(name_)), module(std::move(module_)), file(std::move(file_)){};
       // 3-column entry symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, std::string name_,
-           const Unit* entry_parent_, std::string module_, std::string file_)
+           Unit* entry_parent_, std::string module_, std::string file_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), name(std::move(name_)), entry_parent(entry_parent_),
             module(std::move(module_)), file(std::move(file_)){};
       // 4-column entry symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_,
-           std::string name_, const Unit* entry_parent_, std::string module_, std::string file_)
+           std::string name_, Unit* entry_parent_, std::string module_, std::string file_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), name(std::move(name_)),
             entry_parent(entry_parent_), module(std::move(module_)), file(std::move(file_)){};
@@ -479,8 +479,8 @@ struct Map
       u32 file_offset;
       int alignment;
       std::string name;
-      const Unit* entry_parent;
-      std::list<const Unit*> entry_children;
+      Unit* entry_parent;
+      std::list<Unit*> entry_children;
       std::string module;
       std::string file;
     };
