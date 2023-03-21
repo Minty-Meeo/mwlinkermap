@@ -145,7 +145,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 2;
     head += match.length();
     const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
@@ -222,7 +222,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 2;
     head += match.length();
     auto portion = std::make_unique<MixedModeIslands>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -233,7 +233,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_branch_islands_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 2;
     head += match.length();
     auto portion = std::make_unique<BranchIslands>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -244,7 +244,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_linktime_size_decreasing_optimizations_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 2;
     head += match.length();
     auto portion = std::make_unique<LinktimeSizeDecreasingOptimizations>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -255,7 +255,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_linktime_size_increasing_optimizations_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 2;
     head += match.length();
     auto portion = std::make_unique<LinktimeSizeIncreasingOptimizations>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -267,7 +267,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   while (std::regex_search(head, tail, match, re_section_layout_header,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 3;
     head += match.length();
     const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
@@ -276,7 +276,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   if (std::regex_search(head, tail, match, re_memory_map_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 3;
     head += match.length();
     const auto error = this->ScanPrologue_MemoryMap(head, tail, line_number);
     if (error != Error::None)
@@ -285,7 +285,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   if (std::regex_search(head, tail, match, re_linker_generated_symbols_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 3;
     head += match.length();
     auto portion = std::make_unique<LinkerGeneratedSymbols>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -338,7 +338,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
                          std::regex_constants::match_continuous))
     return Error::SMGalaxyYouHadOneJob;
   {
-    line_number += 1;
+    line_number += 2;
     head += match.length();
     auto portion = std::make_unique<SectionLayout>(match.str(1));
     portion->SetMinVersion(Version::version_3_0_4);
@@ -1101,7 +1101,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 2;
       head += match.length();
       std::string first_name = match.str(1);
       std::string second_name = match.str(2);
@@ -1113,7 +1113,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
         if (match.str(2) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
-        line_number += 1;
+        line_number += 3;
         head += match.length();
         will_be_replaced = true;
       }
@@ -1138,7 +1138,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
         if (match.str(2) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
-        line_number += 1;
+        line_number += 3;
         head += match.length();
         will_be_replaced = true;
       }
@@ -1151,7 +1151,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
         if (std::stoul(match.str(3)) != size)
           return Error::EPPC_PatternMatchingMergingSizeMismatch;
-        line_number += 1;
+        line_number += 2;
         head += match.length();
       }
       else
@@ -1169,14 +1169,14 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
                            std::regex_constants::match_continuous))
   {
     auto folding_unit = FoldingUnit(match.str(1));
-    line_number += 1;
+    line_number += 4;
     head += match.length();
     while (true)
     {
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
                             std::regex_constants::match_continuous))
       {
-        line_number += 1;
+        line_number += 2;
         head += match.length();
         folding_unit.units.emplace_back(match.str(1), match.str(2), std::stoul(match.str(3)),
                                         false);
@@ -1187,7 +1187,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       {
         if (match.str(1) != match.str(4))  // It is my assumption that they will always match.
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
-        line_number += 1;
+        line_number += 2;
         head += match.length();
         folding_unit.units.emplace_back(match.str(1), match.str(2), std::stoul(match.str(3)), true);
         continue;
