@@ -11,9 +11,19 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
+// #define DOLPHIN
+
+#ifdef DOLPHIN  // Dolphin Emulator
+#include <fmt/format.h>
+
+#include "Common/CommonTypes.h"
+#else  // mwlinkermap-temp
+#include <format>
 using u32 = std::uint32_t;
+#endif
 
 namespace Common
 {
@@ -55,6 +65,38 @@ enum class Version
   version_4_3_build_213,
 };
 
+enum class Type
+{
+  // STT_NOTYPE
+  notype = 0,
+  // STT_OBJECT
+  object = 1,
+  // STT_FUNC
+  func = 2,
+  // STT_SECTION
+  section = 3,
+  // STT_FILE
+  file = 4,
+  // Default for an unknown ST_TYPE
+  unknown = -1,
+};
+
+enum class Bind
+{
+  // STB_LOCAL
+  local = 0,
+  // STB_GLOBAL
+  global = 1,
+  // STB_WEAK
+  weak = 2,
+  // Proprietary binding
+  multidef = 13,
+  // Proprietary binding
+  overload = 14,
+  // Default for an unknown ST_BIND
+  unknown = -1,
+};
+
 struct Map
 {
   enum class Error
@@ -88,6 +130,17 @@ struct Map
     MemoryMapBadPrologue,
   };
 
+  struct DebuggingInfo
+  {
+    std::string name;
+    u32 st_value;
+    u32 st_size;
+    Type st_type;
+    Bind st_bind;
+  };
+
+  using Report = std::unordered_map<std::string, std::map<std::string, DebuggingInfo>>;
+
   struct PortionBase
   {
     virtual ~PortionBase() = default;
@@ -109,38 +162,6 @@ struct Map
   //  - Added _ctors$99 and _dtors$99, among other things.
   struct SymbolClosure final : PortionBase
   {
-    enum class Type
-    {
-      // STT_NOTYPE
-      notype = 0,
-      // STT_OBJECT
-      object = 1,
-      // STT_FUNC
-      func = 2,
-      // STT_SECTION
-      section = 3,
-      // STT_FILE
-      file = 4,
-      // Default for an unknown ST_TYPE
-      unknown = -1,
-    };
-
-    enum class Bind
-    {
-      // STB_LOCAL
-      local = 0,
-      // STB_GLOBAL
-      global = 1,
-      // STB_WEAK
-      weak = 2,
-      // Proprietary binding
-      multidef = 13,
-      // Proprietary binding
-      overload = 14,
-      // Default for an unknown ST_BIND
-      unknown = -1,
-    };
-
     struct NodeBase
     {
       NodeBase() = default;  // Necessary for root node
@@ -148,6 +169,7 @@ struct Map
       virtual ~NodeBase() = default;
 
       virtual void Print(std::ostream&, int) const;  // Necessary for root node
+      virtual void Export(Report&) const noexcept;
 
       NodeBase* parent = nullptr;
       std::list<std::unique_ptr<NodeBase>> children;
@@ -180,6 +202,7 @@ struct Map
       virtual ~NodeNormal() override = default;
 
       virtual void Print(std::ostream&, int) const override;
+      virtual void Export(Report&) const noexcept override;
 
       Type type;
       Bind bind;
@@ -194,6 +217,7 @@ struct Map
       virtual ~NodeLinkerGenerated() override = default;
 
       virtual void Print(std::ostream&, int) const override;
+      virtual void Export(Report&) const noexcept override;
     };
 
     SymbolClosure() = default;
@@ -204,6 +228,7 @@ struct Map
     static void PrintPrefix(std::ostream&, int);
     static const char* GetName(Type) noexcept;
     static const char* GetName(Bind) noexcept;
+    void Export(Report&) const noexcept;
     virtual bool Empty() const noexcept override { return root.children.empty(); }
 
     NodeBase root;
@@ -462,6 +487,7 @@ struct Map
 
       void Print3Column(std::ostream&) const;
       void Print4Column(std::ostream&) const;
+      void Export(Report&) const noexcept;
 
       const Kind unit_kind;
       u32 starting_address;
@@ -483,6 +509,7 @@ struct Map
     Error Scan4Column(const char*&, const char*, std::size_t&);
     Error ScanTLOZTP(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    void Export(Report&) const noexcept;
     virtual bool Empty() const noexcept override { return units.empty(); }
 
     std::string name;
@@ -665,16 +692,22 @@ struct Map
     std::list<Unit> units;
   };
 
+#ifndef DOLPHIN
   Error Scan(std::istream&, std::size_t&);
   Error Scan(const std::stringstream&, std::size_t&);
+#endif
   Error Scan(std::string_view, std::size_t&);
   Error Scan(const char*, const char*, std::size_t&);
+#ifndef DOLPHIN
   Error ScanTLOZTP(std::istream&, std::size_t&);
   Error ScanTLOZTP(const std::stringstream&, std::size_t&);
+#endif
   Error ScanTLOZTP(std::string_view, std::size_t&);
   Error ScanTLOZTP(const char*, const char*, std::size_t&);
+#ifndef DOLPHIN
   Error ScanSMGalaxy(std::istream&, std::size_t&);
   Error ScanSMGalaxy(const std::stringstream&, std::size_t&);
+#endif
   Error ScanSMGalaxy(std::string_view, std::size_t&);
   Error ScanSMGalaxy(const char*, const char*, std::size_t&);
 
@@ -683,6 +716,7 @@ struct Map
   Error ScanForGarbage(const char*, const char*);
 
   void Print(std::ostream&) const;
+  void Export(Report&) const noexcept;
   Version GetMinVersion() const noexcept;
 
   std::string entry_point_name;
@@ -700,41 +734,3 @@ struct Map
   std::unique_ptr<LinkerGeneratedSymbols> linker_generated_symbols;
 };
 }  // namespace MWLinker
-
-namespace Common
-{
-struct IntermediateDB
-{
-  struct Symbol
-  {
-    enum class Type : unsigned char
-    {
-      NoType = 0,
-      Object = 1,
-      Func = 2,
-      Section = 3,
-      File = 4,
-    };
-    enum class Bind : unsigned char
-    {
-      Local = 0,
-      Global = 1,
-      Weak = 2,
-    };
-
-    std::string name;
-    u32 value = 0;
-    u32 size = 0;
-    Type type = Type::NoType;
-    Bind bind = Bind::Global;
-  };
-  struct ModuleDB
-  {
-    std::map<std::string, Symbol> symbols;
-  };
-
-  void Import(MWLinker::Map&);
-
-  std::map<std::string, ModuleDB> modules;
-};
-}  // namespace Common

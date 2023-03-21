@@ -1,6 +1,5 @@
 #include "MWLinkerMap.h"
 
-#include <cassert>
 #include <cstddef>
 #include <istream>
 #include <ostream>
@@ -13,19 +12,37 @@
 #include <unordered_map>
 #include <utility>
 
+#ifdef DOLPHIN  // Dolphin Emulator
+#include <fmt/format.h>
+
+#include "Common/Assert.h"
+#include "Common/CommonTypes.h"
+#else  // mwlinkermap-temp
+#include <cassert>
 #include <format>
-#include <iostream>
+using u32 = std::uint32_t;
+#define ASSERT assert
+#endif
 
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
 
 namespace Common
 {
+#ifdef DOLPHIN  // Dolphin Emulator
+template <class... Args>
+void Print(std::ostream& os, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  const std::string s = fmt::format(std::move(fmt), args...);
+  os.write(s.data(), std::ssize(s));
+}
+#else  // mwlinkermap-temp
 template <class... Args>
 void Print(std::ostream& os, std::format_string<Args...> fmt, Args&&... args)
 {
   const std::string s = std::format(std::move(fmt), args...);
-  os.write(s.c_str(), std::ssize(s));
+  os.write(s.data(), std::ssize(s));
 }
+#endif
 }  // namespace Common
 
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
@@ -33,6 +50,8 @@ void Print(std::ostream& os, std::format_string<Args...> fmt, Args&&... args)
 
 namespace MWLinker
 {
+#ifdef DOLPHIN  // Dolphin Emulator
+#else           // mwlinkermap-temp
 Map::Error Map::Scan(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
@@ -44,11 +63,14 @@ Map::Error Map::Scan(const std::stringstream& sstream, std::size_t& line_number)
   // TODO: donkey dick
   return this->Scan(std::move(sstream).str(), line_number);
 }
+#endif
 Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->Scan(string_view.data(), string_view.data() + string_view.length(), line_number);
+  return this->Scan(string_view.data(), string_view.data() + string_view.size(), line_number);
 }
 
+#ifdef DOLPHIN  // Dolphin Emulator
+#else           // mwlinkermap-temp
 Map::Error Map::ScanTLOZTP(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
@@ -60,12 +82,14 @@ Map::Error Map::ScanTLOZTP(const std::stringstream& sstream, std::size_t& line_n
   // TODO: donkey dick
   return this->ScanTLOZTP(std::move(sstream).str(), line_number);
 }
+#endif
 Map::Error Map::ScanTLOZTP(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->ScanTLOZTP(string_view.data(), string_view.data() + string_view.length(),
-                          line_number);
+  return this->ScanTLOZTP(string_view.data(), string_view.data() + string_view.size(), line_number);
 }
 
+#ifdef DOLPHIN  // Dolphin Emulator
+#else           // mwlinkermap-temp
 Map::Error Map::ScanSMGalaxy(std::istream& stream, std::size_t& line_number)
 {
   std::stringstream sstream;
@@ -77,9 +101,10 @@ Map::Error Map::ScanSMGalaxy(const std::stringstream& sstream, std::size_t& line
   // TODO: donkey dick
   return this->ScanSMGalaxy(std::move(sstream).str(), line_number);
 }
+#endif
 Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->ScanSMGalaxy(string_view.data(), string_view.data() + string_view.length(),
+  return this->ScanSMGalaxy(string_view.data(), string_view.data() + string_view.size(),
                             line_number);
 }
 
@@ -389,6 +414,16 @@ void Map::Print(std::ostream& stream) const
     memory_map->Print(stream);
   if (linker_generated_symbols)
     linker_generated_symbols->Print(stream);
+}
+
+void Map::Export(Report& db) const noexcept
+{
+  for (const auto& section_layout : section_layouts)
+    section_layout->Export(db);
+  if (normal_symbol_closure)
+    normal_symbol_closure->Export(db);
+  if (dwarf_symbol_closure)
+    dwarf_symbol_closure->Export(db);
 }
 
 Version Map::GetMinVersion() const noexcept
@@ -822,28 +857,21 @@ static const std::regex re_symbol_closure_node_linker_generated{
     "   *(\\d+)\\] (.*) found as linker generated symbol\r?\n"};
 // clang-format on
 
-static const std::unordered_map<std::string, const Map::SymbolClosure::Type>
-    map_symbol_closure_st_type{
-        {"notype", Map::SymbolClosure::Type::notype},
-        {"object", Map::SymbolClosure::Type::object},
-        {"func", Map::SymbolClosure::Type::func},
-        {"section", Map::SymbolClosure::Type::section},
-        {"file", Map::SymbolClosure::Type::file},
-        {"unknown", Map::SymbolClosure::Type::unknown},
-    };
-static const std::unordered_map<std::string, const Map::SymbolClosure::Bind>
-    map_symbol_closure_st_bind{
-        {"local", Map::SymbolClosure::Bind::local},
-        {"global", Map::SymbolClosure::Bind::global},
-        {"weak", Map::SymbolClosure::Bind::weak},
-        {"multidef", Map::SymbolClosure::Bind::multidef},
-        {"overload", Map::SymbolClosure::Bind::overload},
-        {"unknown", Map::SymbolClosure::Bind::unknown},
-    };
+static const std::unordered_map<std::string, Type> map_symbol_closure_st_type{
+    {"notype", Type::notype},   {"object", Type::object}, {"func", Type::func},
+    {"section", Type::section}, {"file", Type::file},     {"unknown", Type::unknown},
+};
+static const std::unordered_map<std::string, Bind> map_symbol_closure_st_bind{
+    {"local", Bind::local},       {"global", Bind::global},     {"weak", Bind::weak},
+    {"multidef", Bind::multidef}, {"overload", Bind::overload}, {"unknown", Bind::unknown},
+};
 
 Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
                                     std::size_t& line_number,
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
                                     std::list<std::string>& unresolved_symbols)
+#pragma GCC diagnostic pop
 {
   std::cmatch match;
 
@@ -977,7 +1005,7 @@ void Map::SymbolClosure::PrintPrefix(std::ostream& stream, const int hierarchy_l
       stream.put(' ');
   Common::Print(stream, "{:d}] ", hierarchy_level);  // "%i] "
 }
-const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Type st_type) noexcept
+const char* Map::SymbolClosure::GetName(const Type st_type) noexcept
 {
   switch (st_type)
   {
@@ -995,7 +1023,7 @@ const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Type st_type) 
     return "unknown";
   }
 }
-const char* Map::SymbolClosure::GetName(const Map::SymbolClosure::Bind st_bind) noexcept
+const char* Map::SymbolClosure::GetName(const Bind st_bind) noexcept
 {
   switch (st_bind)
   {
@@ -1064,6 +1092,36 @@ void Map::SymbolClosure::NodeLinkerGenerated::Print(std::ostream& stream,
     node->Print(stream, hierarchy_level + 1);  // no children but we'll check anyway.
 }
 
+void Map::SymbolClosure::Export(Report& db) const noexcept
+{
+  this->root.Export(db);
+}
+
+void Map::SymbolClosure::NodeBase::Export(Report& db) const noexcept
+{
+  for (const auto& node : this->children)
+    node->Export(db);
+}
+
+void Map::SymbolClosure::NodeNormal::Export(Report& db) const noexcept
+{
+  for (const auto& node : this->children)
+    node->Export(db);
+  auto& module_db = db[file.empty() ? module : std::format("{:s} {:s}", module, file)];
+  if (!module_db.contains(name))
+    return;
+  auto& symbol = module_db.at(name);
+  symbol.st_type = this->type;
+  symbol.st_bind = this->bind;
+}
+
+void Map::SymbolClosure::NodeLinkerGenerated::Export(Report& db) const noexcept
+{
+  for (const auto& node : this->children)
+    node->Export(db);
+  // These symbols are always notype globals, but they aren't important to Dolphin atm.
+}
+
 // clang-format off
 static const std::regex re_code_merging_is_duplicated{
 //  "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
@@ -1105,7 +1163,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       head += match.length();
       std::string first_name = match.str(1);
       std::string second_name = match.str(2);
-      const std::uint32_t size = std::stoul(match.str(3));
+      const u32 size = static_cast<u32>(std::stoul(match.str(3)));
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
@@ -1126,7 +1184,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     {
       std::string first_name = match.str(1);
       std::string second_name = match.str(2);
-      const std::uint32_t size = std::stoul(match.str(3));
+      const u32 size = static_cast<u32>(std::stoul(match.str(3)));
       was_interchanged = true;
 
       line_number += 1;
@@ -1736,7 +1794,7 @@ void Map::SectionLayout::Unit::Print3Column(std::ostream& stream) const
                   starting_address, size, virtual_address, name, entry_parent->name, module, file);
     return;
   case Kind::Special:
-    assert(false);
+    ASSERT(false);
     return;
   }
 }
@@ -1770,30 +1828,21 @@ void Map::SectionLayout::Unit::Print4Column(std::ostream& stream) const
   }
 }
 
-// void Map::SectionLayout::Export(Common::IntermediateDB& db) const
-// {
-//   for (const auto& unit : this->units)
-//     unit->Export(db, this->name);
-// }
-// void Map::SectionLayout::UnitReal::Export(Common::IntermediateDB& db,
-//                                           const std::string& section_name) const
-// {
-//   auto& db_module =
-//       file.empty() ? db.modules[this->module] : db.modules[this->module + " " + this->file];
-//   auto& db_symbol = db_module.symbols[this->name];
-//   db_symbol.name = this->name;
-//   db_symbol.value = this->virtual_address;
-//   db_symbol.size = this->size;
-//   if (this->name == section_name)
-//   {
-//     db_symbol.type = Common::IntermediateDB::Symbol::Type::Section;
-//     db_symbol.bind = Common::IntermediateDB::Symbol::Bind::Local;
-//   }
-// }
-// void Map::SectionLayout::UnitSpecial::Export(Common::IntermediateDB& db,
-//                                              const std::string& section_name) const
-// {
-// }
+void Map::SectionLayout::Export(Report& db) const noexcept
+{
+  for (const auto& unit : this->units)
+    unit.Export(db);
+}
+
+void Map::SectionLayout::Unit::Export(Report& db) const noexcept
+{
+  if (unit_kind != Unit::Kind::Normal)
+    return;
+  auto& symbol = db[file.empty() ? module : std::format("{:s} {:s}", module, file)][name];
+  symbol.name = name;
+  symbol.st_value = virtual_address;
+  symbol.st_size = size;
+}
 
 // clang-format off
 static const std::regex re_memory_map_unit_normal_simple_old{
