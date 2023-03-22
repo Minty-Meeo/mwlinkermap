@@ -41,6 +41,9 @@ static void tempfunc(const char* name, int choice)
     return;
   }
 
+  MWLinker::Map::Report report;
+  linker_map.Export(report);
+
   while (temp.back() == '\0')
     temp.pop_back();
   std::stringstream outfile;

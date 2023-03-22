@@ -11,7 +11,6 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -132,7 +131,7 @@ struct Map
   };
 
   struct DebugInfo;
-  using Report = std::unordered_map<std::string, std::map<std::string, DebugInfo>>;
+  using Report = std::map<std::string, std::map<std::string, DebugInfo>>;
 
   struct PortionBase
   {
@@ -168,7 +167,7 @@ struct Map
       std::list<std::unique_ptr<NodeBase>> children;
     };
 
-    struct NodeNormal final : NodeBase
+    struct NodeReal final : NodeBase
     {
       enum class Kind
       {
@@ -193,18 +192,18 @@ struct Map
         std::string source_name;
       };
 
-      NodeNormal(std::string name_, Type type_, Bind bind_, std::string module_name_,
-                 std::string source_name_)
+      NodeReal(std::string name_, Type type_, Bind bind_, std::string module_name_,
+               std::string source_name_)
           : unit_kind(Kind::Normal), name(std::move(name_)), type(type_), bind(bind_),
             module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
-      NodeNormal(std::string name_)
+      NodeReal(std::string name_)
           : unit_kind(Kind::LinkerGenerated), name(std::move(name_)), type(Type::notype),
             bind(Bind::global)
       {
       }
-      virtual ~NodeNormal() override = default;
+      virtual ~NodeReal() override = default;
 
       virtual void Print(std::ostream&, int) const override;
       virtual void Export(Report&) const noexcept override;
@@ -296,6 +295,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    void Export(Report&) const noexcept;
     virtual bool Empty() const noexcept override
     {
       return merging_units.empty() || folding_units.empty();
@@ -443,52 +443,59 @@ struct Map
       };
 
       // UNUSED symbols
-      Unit(u32 size_, std::string name_, std::string module_name_, std::string source_name_)
+      Unit(const SectionLayout* section_parent_, u32 size_, std::string name_,
+           std::string module_name_, std::string source_name_)
           : unit_kind(Kind::Unused), size(size_), name(std::move(name_)),
-            module_name(std::move(module_name_)), source_name(std::move(source_name_))
-      {
-      }
-      // 3-column normal symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, int alignment_,
-           std::string name_, std::string module_name_, std::string source_name_)
-          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), alignment(alignment_), name(std::move(name_)),
-            module_name(std::move(module_name_)), source_name(std::move(source_name_))
-      {
-      }
-      // 4-column normal symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
-           std::string name_, std::string module_name_, std::string source_name_)
-          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            name(std::move(name_)), module_name(std::move(module_name_)),
+            section_parent(section_parent_), module_name(std::move(module_name_)),
             source_name(std::move(source_name_))
       {
       }
+      // 3-column normal symbols
+      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
+           u32 virtual_address_, int alignment_, std::string name_, std::string module_name_,
+           std::string source_name_)
+          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), alignment(alignment_), name(std::move(name_)),
+            section_parent(section_parent_), module_name(std::move(module_name_)),
+            source_name(std::move(source_name_))
+      {
+      }
+      // 4-column normal symbols
+      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
+           u32 virtual_address_, u32 file_offset_, int alignment_, std::string name_,
+           std::string module_name_, std::string source_name_)
+          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
+            name(std::move(name_)), section_parent(section_parent_),
+            module_name(std::move(module_name_)), source_name(std::move(source_name_))
+      {
+      }
       // 3-column entry symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, std::string name_,
-           Unit* entry_parent_, std::string module_name_, std::string source_name_)
+      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
+           u32 virtual_address_, std::string name_, const Unit* entry_parent_,
+           std::string module_name_, std::string source_name_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), name(std::move(name_)), entry_parent(entry_parent_),
+            virtual_address(virtual_address_), name(std::move(name_)),
+            section_parent(section_parent_), entry_parent(entry_parent_),
             module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
       // 4-column entry symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_,
-           std::string name_, Unit* entry_parent_, std::string module_name_,
-           std::string source_name_)
+      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
+           u32 virtual_address_, u32 file_offset_, std::string name_, const Unit* entry_parent_,
+           std::string module_name_, std::string source_name_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), name(std::move(name_)),
-            entry_parent(entry_parent_), module_name(std::move(module_name_)),
-            source_name(std::move(source_name_))
+            section_parent(section_parent_), entry_parent(entry_parent_),
+            module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
       // 4-column special symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
-           std::string name_)
+      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
+           u32 virtual_address_, u32 file_offset_, int alignment_, std::string name_)
           : unit_kind(Kind::Special), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            name(std::move(name_))
+            name(std::move(name_)), section_parent(section_parent_)
       {
       }
 
@@ -503,8 +510,12 @@ struct Map
       u32 file_offset;
       int alignment;
       std::string name;
-      Unit* entry_parent;
-      std::list<Unit*> entry_children;
+      // This is useful to confirm STT_SECTION symbols which lack a symbol closure unit.
+      const SectionLayout* section_parent;
+      // Doubly-linked relationship between entry symbols and their host.
+      const Unit* entry_parent;
+      // Doubly-linked relationship between entry symbols and their host.
+      std::vector<const Unit*> entry_children;
       // Static library or object name
       std::string module_name;
       // When linking a static library, this is either:
@@ -698,6 +709,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
+    void Export(Report&) const noexcept;
     virtual bool Empty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
@@ -705,9 +717,12 @@ struct Map
 
   struct DebugInfo
   {
-    const SymbolClosure::NodeNormal* symbol_closure_unit;
-    const SectionLayout::Unit* section_layout_unit;
-    const LinkerGeneratedSymbols::Unit* linker_generated_symbol_unit;
+    const SymbolClosure::NodeReal* symbol_closure_unit = nullptr;
+    const EPPC_PatternMatching::MergingUnit* eppc_pattern_matching_merging_unit = nullptr;
+    const EPPC_PatternMatching::FoldingUnit::Unit* eppc_pattern_matching_folding_unit_unit =
+        nullptr;
+    const SectionLayout::Unit* section_layout_unit = nullptr;
+    const LinkerGeneratedSymbols::Unit* linker_generated_symbol_unit = nullptr;
   };
 
 #ifndef DOLPHIN

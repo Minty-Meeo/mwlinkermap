@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <istream>
+#include <map>
 #include <ostream>
 #include <ranges>
 #include <regex>
@@ -9,7 +10,6 @@
 #include <string>
 #include <string_view>
 #include <typeinfo>
-#include <unordered_map>
 #include <utility>
 
 #ifdef DOLPHIN  // Dolphin Emulator
@@ -416,14 +416,18 @@ void Map::Print(std::ostream& stream) const
     linker_generated_symbols->Print(stream);
 }
 
-void Map::Export(Report& db) const noexcept
+void Map::Export(Report& report) const noexcept
 {
-  for (const auto& section_layout : section_layouts)
-    section_layout->Export(db);
   if (normal_symbol_closure)
-    normal_symbol_closure->Export(db);
+    normal_symbol_closure->Export(report);
   if (dwarf_symbol_closure)
-    dwarf_symbol_closure->Export(db);
+    dwarf_symbol_closure->Export(report);
+  if (eppc_pattern_matching)
+    eppc_pattern_matching->Export(report);
+  for (const auto& section_layout : section_layouts)
+    section_layout->Export(report);
+  if (linker_generated_symbols)
+    linker_generated_symbols->Export(report);
 }
 
 Version Map::GetMinVersion() const noexcept
@@ -857,11 +861,11 @@ static const std::regex re_symbol_closure_node_linker_generated{
     "   *(\\d+)\\] (.*) found as linker generated symbol\r?\n"};
 // clang-format on
 
-static const std::unordered_map<std::string, Type> map_symbol_closure_st_type{
+static const std::map<std::string, Type> map_symbol_closure_st_type{
     {"notype", Type::notype},   {"object", Type::object}, {"func", Type::func},
     {"section", Type::section}, {"file", Type::file},     {"unknown", Type::unknown},
 };
-static const std::unordered_map<std::string, Bind> map_symbol_closure_st_bind{
+static const std::map<std::string, Bind> map_symbol_closure_st_bind{
     {"local", Bind::local},       {"global", Bind::global},     {"weak", Bind::weak},
     {"multidef", Bind::multidef}, {"overload", Bind::overload}, {"unknown", Bind::unknown},
 };
@@ -896,9 +900,9 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
       line_number += 1;
       head += match.length();
 
-      auto next_node = std::make_unique<NodeNormal>(
-          match.str(2), map_symbol_closure_st_type.at(type), map_symbol_closure_st_bind.at(bind),
-          match.str(5), match.str(6));
+      auto next_node = std::make_unique<NodeReal>(match.str(2), map_symbol_closure_st_type.at(type),
+                                                  map_symbol_closure_st_bind.at(bind), match.str(5),
+                                                  match.str(6));
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
@@ -961,7 +965,7 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
       line_number += 1;
       head += match.length();
 
-      auto next_node = std::make_unique<NodeNormal>(match.str(2));
+      auto next_node = std::make_unique<NodeReal>(match.str(2));
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
@@ -1053,7 +1057,7 @@ void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarc
     node->Print(stream, hierarchy_level + 1);
 }
 
-void Map::SymbolClosure::NodeNormal::Print(std::ostream& stream, const int hierarchy_level) const
+void Map::SymbolClosure::NodeReal::Print(std::ostream& stream, const int hierarchy_level) const
 {
   PrintPrefix(stream, hierarchy_level);
   if (unit_kind == Kind::Normal)
@@ -1083,8 +1087,8 @@ void Map::SymbolClosure::NodeNormal::Print(std::ostream& stream, const int hiera
     node->Print(stream, hierarchy_level + 1);
 }
 
-void Map::SymbolClosure::NodeNormal::UnreferencedDuplicate::Print(std::ostream& stream,
-                                                                  const int hierarchy_level) const
+void Map::SymbolClosure::NodeReal::UnreferencedDuplicate::Print(std::ostream& stream,
+                                                                const int hierarchy_level) const
 {
   PrintPrefix(stream, hierarchy_level);
   const char *type_s = GetName(type), *bind_s = GetName(bind);
@@ -1093,24 +1097,24 @@ void Map::SymbolClosure::NodeNormal::UnreferencedDuplicate::Print(std::ostream& 
                 source_name);
 }
 
-void Map::SymbolClosure::Export(Report& db) const noexcept
+void Map::SymbolClosure::Export(Report& report) const noexcept
 {
-  this->root.Export(db);
+  this->root.Export(report);
 }
 
-void Map::SymbolClosure::NodeBase::Export(Report& db) const noexcept
+void Map::SymbolClosure::NodeBase::Export(Report& report) const noexcept
 {
   for (const auto& node : this->children)
-    node->Export(db);
+    node->Export(report);
 }
 
-void Map::SymbolClosure::NodeNormal::Export(Report& db) const noexcept
+void Map::SymbolClosure::NodeReal::Export(Report& report) const noexcept
 {
-  auto& debug_info = db[source_name.empty() ? module_name : source_name][name];
+  auto& debug_info = report[source_name.empty() ? module_name : source_name][name];
   debug_info.symbol_closure_unit = this;
 
   for (const auto& node : this->children)
-    node->Export(db);
+    node->Export(report);
 }
 
 // clang-format off
@@ -1310,6 +1314,44 @@ void Map::EPPC_PatternMatching::FoldingUnit::Unit::Print(std::ostream& stream) c
     // "--> %s is duplicated by %s, size = %d \r\n\r\n"
     Common::Print(stream, "--> {:s} is duplicated by {:s}, size = {:d} \r\n\r\n", first_name,
                   second_name, size);
+}
+
+static void fake() noexcept
+{
+}
+
+void Map::EPPC_PatternMatching::Export(Report& report) const noexcept
+{
+  auto GenerateLookup = [this]() {
+    std::map<std::string, const MergingUnit&> lookup;
+    for (const auto& merging_unit : merging_units)
+      // TODO: make sure there are no repeats while in the Scan method.
+      lookup.insert({merging_unit.first_name, merging_unit});
+    return lookup;
+  };
+  auto ObjName = [&report](std::string s) -> std::string {
+    std::size_t dir_sep_off = s.rfind('\\');
+    if (dir_sep_off != std::string::npos && ++dir_sep_off < s.length())
+    {
+      std::string s2 = s.substr(dir_sep_off);
+      if (report.contains(s2))
+        return s2;
+    }
+    return s;
+  };
+  const auto lookup = GenerateLookup();  // O(n) becomes O(log n)
+
+  for (const auto& folding_unit : folding_units)
+  {
+    auto& subreport = report[ObjName(folding_unit.object_name)];
+    for (const auto& unit : folding_unit.units)
+    {
+      auto& debug_info = subreport[unit.first_name];
+      // TODO: You had better hope this doesn't throw
+      debug_info.eppc_pattern_matching_merging_unit = &lookup.at(unit.first_name);
+      debug_info.eppc_pattern_matching_folding_unit_unit = &unit;
+    }
+  }
 }
 
 // clang-format off
@@ -1565,8 +1607,9 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     {
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-                               std::stoi(match.str(4)), match.str(5), match.str(6), match.str(7));
+      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
+                               xstoul(match.str(3)), std::stoi(match.str(4)), match.str(5),
+                               match.str(6), match.str(7));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
@@ -1574,7 +1617,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     {
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(xstoul(match.str(1)), match.str(2), match.str(3), match.str(4));
+      this->units.emplace_back(this, xstoul(match.str(1)), match.str(2), match.str(3),
+                               match.str(4));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
@@ -1591,7 +1635,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         line_number += 1;
         head += match.length();
         parent_unit.entry_children.push_back(&this->units.emplace_back(
-            xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
+            this, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
             &parent_unit, std::move(module_name), std::move(source_name)));
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
@@ -1631,9 +1675,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     {
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-                               xstoul(match.str(4)), std::stoi(match.str(5)), match.str(6),
-                               match.str(7), match.str(8));
+      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
+                               xstoul(match.str(3)), xstoul(match.str(4)), std::stoi(match.str(5)),
+                               match.str(6), match.str(7), match.str(8));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
@@ -1641,7 +1685,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     {
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(xstoul(match.str(1)), match.str(2), match.str(3), match.str(4));
+      this->units.emplace_back(this, xstoul(match.str(1)), match.str(2), match.str(3),
+                               match.str(4));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
@@ -1658,8 +1703,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         line_number += 1;
         head += match.length();
         parent_unit.entry_children.push_back(&this->units.emplace_back(
-            xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-            match.str(5), &parent_unit, std::move(module_name), std::move(source_name)));
+            this, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+            xstoul(match.str(4)), match.str(5), &parent_unit, std::move(module_name),
+            std::move(source_name)));
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1674,8 +1720,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         return Error::SectionLayoutSpecialNotFill;
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-                               xstoul(match.str(4)), std::stoi(match.str(5)),
+      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
+                               xstoul(match.str(3)), xstoul(match.str(4)), std::stoi(match.str(5)),
                                std::move(special_name));
       continue;
     }
@@ -1703,8 +1749,9 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
     {
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
-                               std::stoi(match.str(4)), match.str(5), match.str(6), match.str(7));
+      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
+                               xstoul(match.str(3)), 0, std::stoi(match.str(4)), match.str(5),
+                               match.str(6), match.str(7));
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
@@ -1721,7 +1768,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         line_number += 1;
         head += match.length();
         parent_unit.entry_children.push_back(&this->units.emplace_back(
-            xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
+            this, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
             &parent_unit, std::move(module_name), std::move(source_name)));
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
@@ -1737,8 +1784,9 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         return Error::SectionLayoutSpecialNotFill;
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
-                               std::stoi(match.str(4)), std::move(special_name));
+      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
+                               xstoul(match.str(3)), 0, std::stoi(match.str(4)),
+                               std::move(special_name));
       continue;
     }
     break;
@@ -1823,15 +1871,15 @@ void Map::SectionLayout::Unit::Print4Column(std::ostream& stream) const
   }
 }
 
-void Map::SectionLayout::Export(Report& db) const noexcept
+void Map::SectionLayout::Export(Report& report) const noexcept
 {
   for (const auto& unit : this->units)
-    unit.Export(db);
+    unit.Export(report);
 }
 
-void Map::SectionLayout::Unit::Export(Report& db) const noexcept
+void Map::SectionLayout::Unit::Export(Report& report) const noexcept
 {
-  auto& debug_info = db[source_name.empty() ? module_name : source_name][name];
+  auto& debug_info = report[source_name.empty() ? module_name : source_name][name];
   debug_info.section_layout_unit = this;
 }
 
@@ -2370,6 +2418,13 @@ void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream) const
 {
   // "%25s %08x\r\n"
   Common::Print(stream, "{:25s} {:08x}\r\n", name, value);
+}
+
+void Map::LinkerGeneratedSymbols::Export(Report& report) const noexcept
+{
+  auto& subreport = report[""];
+  for (const auto& unit : units)
+    subreport[unit.name].linker_generated_symbol_unit = &unit;
 }
 }  // namespace MWLinker
 
