@@ -13,6 +13,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 // #define DOLPHIN
 
@@ -130,16 +131,8 @@ struct Map
     MemoryMapBadPrologue,
   };
 
-  struct DebuggingInfo
-  {
-    std::string name;
-    u32 st_value;
-    u32 st_size;
-    Type st_type;
-    Bind st_bind;
-  };
-
-  using Report = std::unordered_map<std::string, std::map<std::string, DebuggingInfo>>;
+  struct DebugInfo;
+  using Report = std::unordered_map<std::string, std::map<std::string, DebugInfo>>;
 
   struct PortionBase
   {
@@ -159,30 +152,36 @@ struct Map
   //  - Added UNREFERENCED DUPLICATE info.
   // CodeWarrior for GCN 2.7
   //  - Symbol closure became optional with '-[no]listclosure', off by default.
+  //  - Changed behavior of the source name when linking static libs
   //  - Added _ctors$99 and _dtors$99, among other things.
   struct SymbolClosure final : PortionBase
   {
     struct NodeBase
     {
-      NodeBase() = default;  // Necessary for root node
-      NodeBase(std::string name_) : name(std::move(name_)) {}
+      NodeBase() = default;  // Necessary for root and fake _dtor$99 node
       virtual ~NodeBase() = default;
 
-      virtual void Print(std::ostream&, int) const;  // Necessary for root node
+      virtual void Print(std::ostream&, int) const;  // Necessary for root and fake _dtor$99 node
       virtual void Export(Report&) const noexcept;
 
       NodeBase* parent = nullptr;
       std::list<std::unique_ptr<NodeBase>> children;
-
-      std::string name;
     };
 
     struct NodeNormal final : NodeBase
     {
+      enum class Kind
+      {
+        Normal,
+        LinkerGenerated,
+      };
+
       struct UnreferencedDuplicate
       {
-        UnreferencedDuplicate(Type type_, Bind bind_, std::string module_, std::string file_)
-            : type(type_), bind(bind_), module(std::move(module_)), file(std::move(file_))
+        UnreferencedDuplicate(Type type_, Bind bind_, std::string module_name_,
+                              std::string source_name_)
+            : type(type_), bind(bind_), module_name(std::move(module_name_)),
+              source_name(std::move(source_name_))
         {
         }
 
@@ -190,13 +189,19 @@ struct Map
 
         Type type;
         Bind bind;
-        std::string module;
-        std::string file;
+        std::string module_name;
+        std::string source_name;
       };
 
-      NodeNormal(std::string name_, Type type_, Bind bind_, std::string module_, std::string file_)
-          : NodeBase(std::move(name_)), type(type_), bind(bind_), module(std::move(module_)),
-            file(std::move(file_))
+      NodeNormal(std::string name_, Type type_, Bind bind_, std::string module_name_,
+                 std::string source_name_)
+          : unit_kind(Kind::Normal), name(std::move(name_)), type(type_), bind(bind_),
+            module_name(std::move(module_name_)), source_name(std::move(source_name_))
+      {
+      }
+      NodeNormal(std::string name_)
+          : unit_kind(Kind::LinkerGenerated), name(std::move(name_)), type(Type::notype),
+            bind(Bind::global)
       {
       }
       virtual ~NodeNormal() override = default;
@@ -204,20 +209,17 @@ struct Map
       virtual void Print(std::ostream&, int) const override;
       virtual void Export(Report&) const noexcept override;
 
+      const Kind unit_kind;
+      std::string name;
       Type type;
       Bind bind;
-      std::string module;
-      std::string file;
+      // Static library or object name
+      std::string module_name;
+      // When linking a static library, this is either:
+      // A) The name of the STT_FILE symbol from the relevant object in the static library.
+      // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
+      std::string source_name;
       std::list<UnreferencedDuplicate> unref_dups;
-    };
-
-    struct NodeLinkerGenerated final : NodeBase
-    {
-      NodeLinkerGenerated(std::string name_) : NodeBase(std::move(name_)) {}
-      virtual ~NodeLinkerGenerated() override = default;
-
-      virtual void Print(std::ostream&, int) const override;
-      virtual void Export(Report&) const noexcept override;
     };
 
     SymbolClosure() = default;
@@ -281,11 +283,11 @@ struct Map
         bool new_branch_function;
       };
 
-      FoldingUnit(std::string name_) : name(std::move(name_)) {}
+      FoldingUnit(std::string object_name_) : object_name(std::move(object_name_)) {}
 
       void Print(std::ostream&) const;
 
-      std::string name;
+      std::string object_name;
       std::list<Unit> units;
     };
 
@@ -317,13 +319,14 @@ struct Map
         DisassembleError,
       };
 
-      Unit(std::string module_, std::string name_)
-          : unit_kind(Kind::DisassembleError), module(std::move(module_)), name(std::move(name_))
+      Unit(std::string module_name_, std::string name_)
+          : unit_kind(Kind::DisassembleError), module_name(std::move(module_name_)),
+            name(std::move(name_))
       {
       }
-      Unit(const Kind unit_kind_, std::string module_, std::string name_,
+      Unit(const Kind unit_kind_, std::string module_name_, std::string name_,
            std::string reference_name_)
-          : unit_kind(unit_kind_), module(std::move(module_)), name(std::move(name_)),
+          : unit_kind(unit_kind_), module_name(std::move(module_name_)), name(std::move(name_)),
             reference_name(std::move(reference_name_))
       {
       }
@@ -331,7 +334,7 @@ struct Map
       void Print(std::ostream&) const;
 
       const Kind unit_kind;
-      std::string module;
+      std::string module_name;
       std::string name;
       std::string reference_name;
     };
@@ -426,6 +429,7 @@ struct Map
 
   // CodeWarrior for GCN 2.7
   //  - Changed to four column info, added *fill* symbols.
+  //  - Changed the behavior of the source name when linking static libs
   struct SectionLayout final : PortionBase
   {
     struct Unit
@@ -439,41 +443,44 @@ struct Map
       };
 
       // UNUSED symbols
-      Unit(u32 size_, std::string name_, std::string module_, std::string file_)
+      Unit(u32 size_, std::string name_, std::string module_name_, std::string source_name_)
           : unit_kind(Kind::Unused), size(size_), name(std::move(name_)),
-            module(std::move(module_)), file(std::move(file_))
+            module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
       // 3-column normal symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, int alignment_,
-           std::string name_, std::string module_, std::string file_)
+           std::string name_, std::string module_name_, std::string source_name_)
           : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), alignment(alignment_), name(std::move(name_)),
-            module(std::move(module_)), file(std::move(file_))
+            module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
       // 4-column normal symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
-           std::string name_, std::string module_, std::string file_)
+           std::string name_, std::string module_name_, std::string source_name_)
           : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            name(std::move(name_)), module(std::move(module_)), file(std::move(file_))
+            name(std::move(name_)), module_name(std::move(module_name_)),
+            source_name(std::move(source_name_))
       {
       }
       // 3-column entry symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, std::string name_,
-           Unit* entry_parent_, std::string module_, std::string file_)
+           Unit* entry_parent_, std::string module_name_, std::string source_name_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), name(std::move(name_)), entry_parent(entry_parent_),
-            module(std::move(module_)), file(std::move(file_))
+            module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
       // 4-column entry symbols
       Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_,
-           std::string name_, Unit* entry_parent_, std::string module_, std::string file_)
+           std::string name_, Unit* entry_parent_, std::string module_name_,
+           std::string source_name_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), name(std::move(name_)),
-            entry_parent(entry_parent_), module(std::move(module_)), file(std::move(file_))
+            entry_parent(entry_parent_), module_name(std::move(module_name_)),
+            source_name(std::move(source_name_))
       {
       }
       // 4-column special symbols
@@ -498,8 +505,12 @@ struct Map
       std::string name;
       Unit* entry_parent;
       std::list<Unit*> entry_children;
-      std::string module;
-      std::string file;
+      // Static library or object name
+      std::string module_name;
+      // When linking a static library, this is either:
+      // A) The name of the STT_FILE symbol from the relevant object in the static library.
+      // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
+      std::string source_name;
     };
 
     SectionLayout(std::string name_) : name(std::move(name_)) {}
@@ -690,6 +701,13 @@ struct Map
     virtual bool Empty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
+  };
+
+  struct DebugInfo
+  {
+    const SymbolClosure::NodeNormal* symbol_closure_unit;
+    const SectionLayout::Unit* section_layout_unit;
+    const LinkerGeneratedSymbols::Unit* linker_generated_symbol_unit;
   };
 
 #ifndef DOLPHIN

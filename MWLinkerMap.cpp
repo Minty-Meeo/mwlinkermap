@@ -939,7 +939,7 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
       // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
       // "    3] .text (section,local) found in xyz.cpp lib.a"
       if (const bool is_weird = (next_node->name == "_dtors$99" &&  // Redundancy out of paranoia
-                                 next_node->module == "Linker Generated Symbol File");
+                                 next_node->module_name == "Linker Generated Symbol File");
           void(curr_node = curr_node->children.emplace_back(next_node.release()).get()), is_weird)
       {
         auto dummy_node = std::make_unique<NodeBase>();
@@ -961,7 +961,7 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
       line_number += 1;
       head += match.length();
 
-      auto next_node = std::make_unique<NodeLinkerGenerated>(match.str(2));
+      auto next_node = std::make_unique<NodeNormal>(match.str(2));
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
@@ -1056,18 +1056,28 @@ void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarc
 void Map::SymbolClosure::NodeNormal::Print(std::ostream& stream, const int hierarchy_level) const
 {
   PrintPrefix(stream, hierarchy_level);
-  // libc++ std::format requires lvalue references for the args.
-  const char *type_s = GetName(type), *bind_s = GetName(bind);
-  // "%s (%s,%s) found in %s %s\r\n"
-  Common::Print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", name, type_s, bind_s, module,
-                file);
-  if (!this->unref_dups.empty())
+  if (unit_kind == Kind::Normal)
   {
-    PrintPrefix(stream, hierarchy_level);
-    // ">>> UNREFERENCED DUPLICATE %s\r\n"
-    Common::Print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", name);
-    for (const auto& unref_dup : unref_dups)
-      unref_dup.Print(stream, hierarchy_level);
+    // libc++ std::format requires lvalue references for the args.
+    const char *type_s = GetName(type), *bind_s = GetName(bind);
+    // "%s (%s,%s) found in %s %s\r\n"
+    Common::Print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", name, type_s, bind_s,
+                  module_name, source_name);
+    if (!this->unref_dups.empty())
+    {
+      PrintPrefix(stream, hierarchy_level);
+      // ">>> UNREFERENCED DUPLICATE %s\r\n"
+      Common::Print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", name);
+      for (const auto& unref_dup : unref_dups)
+        unref_dup.Print(stream, hierarchy_level);
+    }
+  }
+  else
+  {
+    // "%s found as linker generated symbol\r\n"
+    Common::Print(stream, "{:s} found as linker generated symbol\r\n", name);
+    for (const auto& node : children)            // Linker generated symbols should have
+      node->Print(stream, hierarchy_level + 1);  // no children but we'll check anyway.
   }
   for (const auto& node : children)
     node->Print(stream, hierarchy_level + 1);
@@ -1079,17 +1089,8 @@ void Map::SymbolClosure::NodeNormal::UnreferencedDuplicate::Print(std::ostream& 
   PrintPrefix(stream, hierarchy_level);
   const char *type_s = GetName(type), *bind_s = GetName(bind);
   // ">>> (%s,%s) found in %s %s\r\n"
-  Common::Print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", type_s, bind_s, module, file);
-}
-
-void Map::SymbolClosure::NodeLinkerGenerated::Print(std::ostream& stream,
-                                                    const int hierarchy_level) const
-{
-  PrintPrefix(stream, hierarchy_level);
-  // "%s found as linker generated symbol\r\n"
-  Common::Print(stream, "{:s} found as linker generated symbol\r\n", name);
-  for (const auto& node : children)            // Linker generated symbols should have
-    node->Print(stream, hierarchy_level + 1);  // no children but we'll check anyway.
+  Common::Print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", type_s, bind_s, module_name,
+                source_name);
 }
 
 void Map::SymbolClosure::Export(Report& db) const noexcept
@@ -1105,21 +1106,11 @@ void Map::SymbolClosure::NodeBase::Export(Report& db) const noexcept
 
 void Map::SymbolClosure::NodeNormal::Export(Report& db) const noexcept
 {
-  for (const auto& node : this->children)
-    node->Export(db);
-  auto& module_db = db[file.empty() ? module : std::format("{:s} {:s}", module, file)];
-  if (!module_db.contains(name))
-    return;
-  auto& symbol = module_db.at(name);
-  symbol.st_type = this->type;
-  symbol.st_bind = this->bind;
-}
+  auto& debug_info = db[source_name.empty() ? module_name : source_name][name];
+  debug_info.symbol_closure_unit = this;
 
-void Map::SymbolClosure::NodeLinkerGenerated::Export(Report& db) const noexcept
-{
   for (const auto& node : this->children)
     node->Export(db);
-  // These symbols are always notype globals, but they aren't important to Dolphin atm.
 }
 
 // clang-format off
@@ -1303,7 +1294,7 @@ void Map::EPPC_PatternMatching::MergingUnit::Print(std::ostream& stream) const
 void Map::EPPC_PatternMatching::FoldingUnit::Print(std::ostream& stream) const
 {
   // "\r\n\r\n\r\nCode folded in file: %s \r\n"
-  Common::Print(stream, "\r\n\r\n\r\nCode folded in file: {:s} \r\n", name);
+  Common::Print(stream, "\r\n\r\n\r\nCode folded in file: {:s} \r\n", object_name);
   for (const auto& unit : units)
     unit.Print(stream);
 }
@@ -1395,21 +1386,21 @@ void Map::LinkerOpts::Unit::Print(std::ostream& stream) const
   case Kind::NotNear:
     // "  %s/ %s()/ %s - address not in near addressing range \r\n"
     Common::Print(stream, "  {:s}/ {:s}()/ {:s} - address not in near addressing range \r\n",
-                  module, name, reference_name);
+                  module_name, name, reference_name);
     return;
   case Kind::NotComputed:
     // "  %s/ %s()/ %s - final address not yet computed \r\n"
-    Common::Print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", module,
+    Common::Print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", module_name,
                   name, reference_name);
     return;
   case Kind::Optimized:
     // "! %s/ %s()/ %s - optimized addressing \r\n"
-    Common::Print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", module, name,
+    Common::Print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", module_name, name,
                   reference_name);
     return;
   case Kind::DisassembleError:
     // "  %s/ %s() - error disassembling function \r\n"
-    Common::Print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", module, name);
+    Common::Print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", module_name, name);
     return;
   }
 }
@@ -1589,10 +1580,11 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string entry_parent_name = match.str(5), module = match.str(6), file = match.str(7);
+      std::string entry_parent_name = match.str(5), module_name = match.str(6),
+                  source_name = match.str(7);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
-        if (file != parent_unit.file || module != parent_unit.module)
+        if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit.name)
           continue;
@@ -1600,7 +1592,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         head += match.length();
         parent_unit.entry_children.push_back(&this->units.emplace_back(
             xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
-            &parent_unit, std::move(module), std::move(file)));
+            &parent_unit, std::move(module_name), std::move(source_name)));
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1655,10 +1647,11 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string entry_parent_name = match.str(6), module = match.str(7), file = match.str(8);
+      std::string entry_parent_name = match.str(6), module_name = match.str(7),
+                  source_name = match.str(8);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
-        if (file != parent_unit.file || module != parent_unit.module)
+        if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit.name)
           continue;
@@ -1666,7 +1659,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         head += match.length();
         parent_unit.entry_children.push_back(&this->units.emplace_back(
             xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), xstoul(match.str(4)),
-            match.str(5), &parent_unit, std::move(module), std::move(file)));
+            match.str(5), &parent_unit, std::move(module_name), std::move(source_name)));
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1717,10 +1710,11 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string entry_parent_name = match.str(5), module = match.str(6), file = match.str(7);
+      std::string entry_parent_name = match.str(5), module_name = match.str(6),
+                  source_name = match.str(7);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
-        if (file != parent_unit.file || module != parent_unit.module)
+        if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit.name)
           continue;
@@ -1728,7 +1722,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         head += match.length();
         parent_unit.entry_children.push_back(&this->units.emplace_back(
             xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
-            &parent_unit, std::move(module), std::move(file)));
+            &parent_unit, std::move(module_name), std::move(source_name)));
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1781,17 +1775,18 @@ void Map::SectionLayout::Unit::Print3Column(std::ostream& stream) const
   case Kind::Normal:
     // "  %08x %06x %08x %2i %s \t%s %s\r\n"
     Common::Print(stream, "  {:08x} {:06x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n", starting_address,
-                  size, virtual_address, alignment, name, module, file);
+                  size, virtual_address, alignment, name, module_name, source_name);
     return;
   case Kind::Unused:
     // "  UNUSED   %06x ........ %s %s %s\r\n"
-    Common::Print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", size, name, module,
-                  file);
+    Common::Print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", size, name, module_name,
+                  source_name);
     return;
   case Kind::Entry:
     // "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
     Common::Print(stream, "  {:08x} {:06x} {:08x} {:s} (entry of {:s}) \t{:s} {:s}\r\n",
-                  starting_address, size, virtual_address, name, entry_parent->name, module, file);
+                  starting_address, size, virtual_address, name, entry_parent->name, module_name,
+                  source_name);
     return;
   case Kind::Special:
     ASSERT(false);
@@ -1806,19 +1801,19 @@ void Map::SectionLayout::Unit::Print4Column(std::ostream& stream) const
   case Kind::Normal:
     // "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
     Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n",
-                  starting_address, size, virtual_address, file_offset, alignment, name, module,
-                  file);
+                  starting_address, size, virtual_address, file_offset, alignment, name,
+                  module_name, source_name);
     return;
   case Kind::Unused:
     // "  UNUSED   %06x ........ ........    %s %s %s\r\n"
     Common::Print(stream, "  UNUSED   {:06x} ........ ........    {:s} {:s} {:s}\r\n", size, name,
-                  module, file);
+                  module_name, source_name);
     return;
   case Kind::Entry:
     // "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
     Common::Print(stream, "  {:08x} {:06x} {:08x} {:08x}    {:s} (entry of {:s}) \t{:s} {:s}\r\n",
                   starting_address, size, virtual_address, file_offset, name, entry_parent->name,
-                  module, file);
+                  module_name, source_name);
     return;
   case Kind::Special:
     // "  %08x %06x %08x %08x %2i %s\r\n"
@@ -1836,12 +1831,8 @@ void Map::SectionLayout::Export(Report& db) const noexcept
 
 void Map::SectionLayout::Unit::Export(Report& db) const noexcept
 {
-  if (unit_kind != Unit::Kind::Normal)
-    return;
-  auto& symbol = db[file.empty() ? module : std::format("{:s} {:s}", module, file)][name];
-  symbol.name = name;
-  symbol.st_value = virtual_address;
-  symbol.st_size = size;
+  auto& debug_info = db[source_name.empty() ? module_name : source_name][name];
+  debug_info.section_layout_unit = this;
 }
 
 // clang-format off
