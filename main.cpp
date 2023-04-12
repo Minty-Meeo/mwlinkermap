@@ -41,9 +41,6 @@ static void tempfunc(const char* name, int choice)
     return;
   }
 
-  MWLinker::Map::Report report;
-  linker_map.Export(report);
-
   while (temp.back() == '\0')
     temp.pop_back();
   std::stringstream outfile;
@@ -52,6 +49,22 @@ static void tempfunc(const char* name, int choice)
   std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(error)
             << "   matches: " << matches
             << "   min_version: " << static_cast<int>(linker_map.GetMinVersion()) << std::endl;
+
+  for (const auto& section_layout : linker_map.section_layouts)
+  {
+    for (const auto& module_lookup : section_layout->lookup)
+    {
+      int i = 0;
+      for (const auto& unit_lookups : module_lookup.second)
+      {
+        const std::string& compilation_unit_name = module_lookup.first;
+        std::cout << ++i << " | " << compilation_unit_name << std::endl;
+
+        for (const auto& unit_lookup : unit_lookups)
+          std::cout << unit_lookup.first << std::endl;
+      }
+    }
+  }
 }
 
 int main(const int argc, const char** argv)

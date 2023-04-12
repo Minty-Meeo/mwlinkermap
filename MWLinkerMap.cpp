@@ -18,8 +18,10 @@
 #include "Common/Assert.h"
 #include "Common/CommonTypes.h"
 #else  // mwlinkermap-temp
-#include <cassert>
+#ifdef __clang__
 #include <format>
+#endif
+#include <cassert>
 using u32 = std::uint32_t;
 #define ASSERT assert
 #endif
@@ -35,12 +37,17 @@ void Print(std::ostream& os, fmt::format_string<Args...> fmt, Args&&... args)
   const std::string s = fmt::format(std::move(fmt), args...);
   os.write(s.data(), std::ssize(s));
 }
-#else  // mwlinkermap-temp
+#elif defined(__clang__)  // mwlinkermap-temp
 template <class... Args>
 void Print(std::ostream& os, std::format_string<Args...> fmt, Args&&... args)
 {
   const std::string s = std::format(std::move(fmt), args...);
   os.write(s.data(), std::ssize(s));
+}
+#else
+template <class... Args>
+void Print(std::ostream&, std::string, Args&&...)
+{
 }
 #endif
 }  // namespace Common
@@ -210,7 +217,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number, this->unresolved_symbols);
     if (error != Error::None)
       return error;
-    if (!portion->Empty())
+    if (!portion->IsEmpty())
       this->normal_symbol_closure = std::move(portion);
   }
   {
@@ -218,7 +225,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    if (!portion->Empty())
+    if (!portion->IsEmpty())
       this->eppc_pattern_matching = std::move(portion);
   }
   // With '-listdwarf' and DWARF debugging information enabled, a second symbol closure
@@ -227,12 +234,14 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   // eyes of this scan function.
   {
     auto portion = std::make_unique<SymbolClosure>();
-    portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->Scan(head, tail, line_number, this->unresolved_symbols);
     if (error != Error::None)
       return error;
-    if (!portion->Empty())
+    if (!portion->IsEmpty())
+    {
+      portion->SetMinVersion(Version::version_3_0_4);
       this->dwarf_symbol_closure = std::move(portion);
+    }
   }
   // Unresolved symbol post-prints probably belong here (I have not confirmed if they preceed
   // LinkerOpts), but the Symbol Closure scanning code that just happened handles them well enough.
@@ -241,7 +250,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    if (!portion->Empty())
+    if (!portion->IsEmpty())
       this->linker_opts = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
@@ -379,7 +388,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     const auto error = portion->ScanSimple(head, tail, line_number);
     if (error != Error::None)
       return error;
-    if (!portion->Empty())
+    if (!portion->IsEmpty())
       this->memory_map = std::move(portion);
   }
   return this->ScanForGarbage(head, tail);
@@ -416,19 +425,19 @@ void Map::Print(std::ostream& stream) const
     linker_generated_symbols->Print(stream);
 }
 
-void Map::Export(Report& report) const noexcept
-{
-  if (normal_symbol_closure)
-    normal_symbol_closure->Export(report);
-  if (dwarf_symbol_closure)
-    dwarf_symbol_closure->Export(report);
-  if (eppc_pattern_matching)
-    eppc_pattern_matching->Export(report);
-  for (const auto& section_layout : section_layouts)
-    section_layout->Export(report);
-  if (linker_generated_symbols)
-    linker_generated_symbols->Export(report);
-}
+// void Map::Export(Report& report) const noexcept
+// {
+//   if (normal_symbol_closure)
+//     normal_symbol_closure->Export(report);
+//   if (dwarf_symbol_closure)
+//     dwarf_symbol_closure->Export(report);
+//   if (eppc_pattern_matching)
+//     eppc_pattern_matching->Export(report);
+//   for (const auto& section_layout : section_layouts)
+//     section_layout->Export(report);
+//   if (linker_generated_symbols)
+//     linker_generated_symbols->Export(report);
+// }
 
 Version Map::GetMinVersion() const noexcept
 {
@@ -872,10 +881,7 @@ static const std::map<std::string, Bind> map_symbol_closure_st_bind{
 
 Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
                                     std::size_t& line_number,
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
                                     std::list<std::string>& unresolved_symbols)
-#pragma GCC diagnostic pop
 {
   std::cmatch match;
 
@@ -1097,25 +1103,25 @@ void Map::SymbolClosure::NodeReal::UnreferencedDuplicate::Print(std::ostream& st
                 source_name);
 }
 
-void Map::SymbolClosure::Export(Report& report) const noexcept
-{
-  this->root.Export(report);
-}
+// void Map::SymbolClosure::Export(Report& report) const noexcept
+// {
+//   this->root.Export(report);
+// }
 
-void Map::SymbolClosure::NodeBase::Export(Report& report) const noexcept
-{
-  for (const auto& node : this->children)
-    node->Export(report);
-}
+// void Map::SymbolClosure::NodeBase::Export(Report& report) const noexcept
+// {
+//   for (const auto& node : this->children)
+//     node->Export(report);
+// }
 
-void Map::SymbolClosure::NodeReal::Export(Report& report) const noexcept
-{
-  auto& debug_info = report[source_name.empty() ? module_name : source_name][name];
-  debug_info.symbol_closure_unit = this;
+// void Map::SymbolClosure::NodeReal::Export(Report& report) const noexcept
+// {
+//   auto& debug_info = report[source_name.empty() ? module_name : source_name][name];
+//   debug_info.symbol_closure_unit = this;
 
-  for (const auto& node : this->children)
-    node->Export(report);
-}
+//   for (const auto& node : this->children)
+//     node->Export(report);
+// }
 
 // clang-format off
 static const std::regex re_code_merging_is_duplicated{
@@ -1316,43 +1322,39 @@ void Map::EPPC_PatternMatching::FoldingUnit::Unit::Print(std::ostream& stream) c
                   second_name, size);
 }
 
-static void fake() noexcept
-{
-}
+// void Map::EPPC_PatternMatching::Export(Report& report) const noexcept
+// {
+//   auto GenerateLookup = [this]() {
+//     std::map<std::string, const MergingUnit&> lookup;
+//     for (const auto& merging_unit : merging_units)
+//       // TODO: make sure there are no repeats while in the Scan method.
+//       lookup.insert({merging_unit.first_name, merging_unit});
+//     return lookup;
+//   };
+//   auto ObjName = [&report](std::string s) -> std::string {
+//     std::size_t dir_sep_off = s.rfind('\\');
+//     if (dir_sep_off != std::string::npos && ++dir_sep_off < s.length())
+//     {
+//       std::string s2 = s.substr(dir_sep_off);
+//       if (report.contains(s2))
+//         return s2;
+//     }
+//     return s;
+//   };
+//   const auto lookup = GenerateLookup();  // O(n) becomes O(log n)
 
-void Map::EPPC_PatternMatching::Export(Report& report) const noexcept
-{
-  auto GenerateLookup = [this]() {
-    std::map<std::string, const MergingUnit&> lookup;
-    for (const auto& merging_unit : merging_units)
-      // TODO: make sure there are no repeats while in the Scan method.
-      lookup.insert({merging_unit.first_name, merging_unit});
-    return lookup;
-  };
-  auto ObjName = [&report](std::string s) -> std::string {
-    std::size_t dir_sep_off = s.rfind('\\');
-    if (dir_sep_off != std::string::npos && ++dir_sep_off < s.length())
-    {
-      std::string s2 = s.substr(dir_sep_off);
-      if (report.contains(s2))
-        return s2;
-    }
-    return s;
-  };
-  const auto lookup = GenerateLookup();  // O(n) becomes O(log n)
-
-  for (const auto& folding_unit : folding_units)
-  {
-    auto& subreport = report[ObjName(folding_unit.object_name)];
-    for (const auto& unit : folding_unit.units)
-    {
-      auto& debug_info = subreport[unit.first_name];
-      // TODO: You had better hope this doesn't throw
-      debug_info.eppc_pattern_matching_merging_unit = &lookup.at(unit.first_name);
-      debug_info.eppc_pattern_matching_folding_unit_unit = &unit;
-    }
-  }
-}
+//   for (const auto& folding_unit : folding_units)
+//   {
+//     auto& subreport = report[ObjName(folding_unit.object_name)];
+//     for (const auto& unit : folding_unit.units)
+//     {
+//       auto& debug_info = subreport[unit.first_name];
+//       // TODO: You had better hope this doesn't throw
+//       debug_info.eppc_pattern_matching_merging_unit = &lookup.at(unit.first_name);
+//       debug_info.eppc_pattern_matching_folding_unit_unit = &unit;
+//     }
+//   }
+// }
 
 // clang-format off
 static const std::regex re_linker_opts_unit_not_near{
@@ -1583,6 +1585,24 @@ void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream) const
   Common::Print(stream, "\r\nLinktime size-increasing optimizations\r\n");
 }
 
+Map::Error Map::SectionLayout::UpdateCurrUnitLookup(
+    const std::string& symbol_name, const std::string& module_name, const std::string& source_name,
+    std::string& curr_module_name, std::string& curr_source_name,
+    Map::SectionLayout::UnitLookup*& curr_unit_lookup)
+{
+  if (curr_module_name != module_name || curr_source_name != source_name)
+  {
+    curr_module_name = module_name;
+    curr_source_name = source_name;
+    // TODO: Build lookup by static library
+    const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
+    curr_unit_lookup = &lookup[compilation_unit_name].emplace_back();
+  }
+  if (curr_unit_lookup->contains(symbol_name))
+    return Error::SectionLayoutOneDefinitionRuleViolated;
+  return Error::None;
+}
+
 // clang-format off
 static const std::regex re_section_layout_3column_unit_normal{
 //  "  %08x %06x %08x %2i %s \t%s %s\r\n"
@@ -1599,44 +1619,68 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                                            std::size_t& line_number)
 {
   std::cmatch match;
+  std::string curr_module_name, curr_source_name;
+  UnitLookup* curr_unit_lookup = nullptr;
 
   while (true)
   {
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
+      std::string symbol_name = match.str(5), module_name = match.str(6),
+                  source_name = match.str(7);
+      const bool is_stt_section = (symbol_name.find(this->name) != std::string::npos);
+      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
+                                              curr_module_name, curr_source_name, curr_unit_lookup);
+      if (error != Error::None)
+        return error;
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
-                               xstoul(match.str(3)), std::stoi(match.str(4)), match.str(5),
-                               match.str(6), match.str(7));
+      const Unit& unit = this->units.emplace_back(
+          is_stt_section, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+          std::stoi(match.str(4)), symbol_name, std::move(module_name), std::move(source_name));
+      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
                           std::regex_constants::match_continuous))
     {
+      std::string symbol_name = match.str(2), module_name = match.str(3),
+                  source_name = match.str(4);
+      // Should never be the STT_SECTION symbol.
+      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
+                                              curr_module_name, curr_source_name, curr_unit_lookup);
+      if (error != Error::None)
+        return error;
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(this, xstoul(match.str(1)), match.str(2), match.str(3),
-                               match.str(4));
+      const Unit& unit = this->units.emplace_back(false, xstoul(match.str(1)), symbol_name,
+                                                  std::move(module_name), std::move(source_name));
+      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string entry_parent_name = match.str(5), module_name = match.str(6),
-                  source_name = match.str(7);
+      std::string symbol_name = match.str(4), entry_parent_name = match.str(5),
+                  module_name = match.str(6), source_name = match.str(7);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
         if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit.name)
           continue;
+        // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
+        // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
+        if (curr_unit_lookup->contains(symbol_name))
+          return Error::SectionLayoutOneDefinitionRuleViolated;
         line_number += 1;
         head += match.length();
-        parent_unit.entry_children.push_back(&this->units.emplace_back(
-            this, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), match.str(4),
-            &parent_unit, std::move(module_name), std::move(source_name)));
+        const Unit& unit = this->units.emplace_back(
+            false, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), symbol_name,
+            &parent_unit, std::move(module_name), std::move(source_name));
+        curr_unit_lookup->emplace(std::move(symbol_name), unit);
+        parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1667,45 +1711,70 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                                            std::size_t& line_number)
 {
   std::cmatch match;
+  std::string curr_module_name, curr_source_name;
+  UnitLookup* curr_unit_lookup = nullptr;
 
   while (true)
   {
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_normal,
                           std::regex_constants::match_continuous))
     {
+      std::string symbol_name = match.str(6), module_name = match.str(7),
+                  source_name = match.str(8);
+      const bool is_stt_section = (symbol_name == this->name);
+      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
+                                              curr_module_name, curr_source_name, curr_unit_lookup);
+      if (error != Error::None)
+        return error;
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
-                               xstoul(match.str(3)), xstoul(match.str(4)), std::stoi(match.str(5)),
-                               match.str(6), match.str(7), match.str(8));
+      const Unit& unit = this->units.emplace_back(
+          is_stt_section, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+          xstoul(match.str(4)), std::stoi(match.str(5)), symbol_name, std::move(module_name),
+          std::move(source_name));
+      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
                           std::regex_constants::match_continuous))
     {
+      std::string symbol_name = match.str(2), module_name = match.str(3),
+                  source_name = match.str(4);
+      // Should never be the STT_SECTION symbol.
+      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
+                                              curr_module_name, curr_source_name, curr_unit_lookup);
+      if (error != Error::None)
+        return error;
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(this, xstoul(match.str(1)), match.str(2), match.str(3),
-                               match.str(4));
+      const Unit& unit = this->units.emplace_back(false, xstoul(match.str(1)), symbol_name,
+                                                  std::move(module_name), std::move(source_name));
+      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string entry_parent_name = match.str(6), module_name = match.str(7),
-                  source_name = match.str(8);
+      std::string symbol_name = match.str(5), entry_parent_name = match.str(6),
+                  module_name = match.str(7), source_name = match.str(8);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
         if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit.name)
           continue;
+        // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
+        // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
+        if (curr_unit_lookup->contains(symbol_name))
+          return Error::SectionLayoutOneDefinitionRuleViolated;
         line_number += 1;
         head += match.length();
-        parent_unit.entry_children.push_back(&this->units.emplace_back(
-            this, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-            xstoul(match.str(4)), match.str(5), &parent_unit, std::move(module_name),
-            std::move(source_name)));
+        const Unit& unit =
+            this->units.emplace_back(false, xstoul(match.str(1)), xstoul(match.str(2)),
+                                     xstoul(match.str(3)), xstoul(match.str(4)), symbol_name,
+                                     &parent_unit, std::move(module_name), std::move(source_name));
+        curr_unit_lookup->emplace(std::move(symbol_name), unit);
+        parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1720,9 +1789,10 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         return Error::SectionLayoutSpecialNotFill;
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
+      this->units.emplace_back(false, xstoul(match.str(1)), xstoul(match.str(2)),
                                xstoul(match.str(3)), xstoul(match.str(4)), std::stoi(match.str(5)),
                                std::move(special_name));
+      // Special symbols dom't belong to any compilation unit, so they don't go in any lookup.
       continue;
     }
     break;
@@ -1741,35 +1811,51 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                                           std::size_t& line_number)
 {
   std::cmatch match;
+  std::string curr_module_name, curr_source_name;
+  UnitLookup* curr_unit_lookup = nullptr;
 
   while (true)
   {
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
+      std::string symbol_name = match.str(5), module_name = match.str(6),
+                  source_name = match.str(7);
+      const bool is_stt_section = (symbol_name == this->name);
+      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
+                                              curr_module_name, curr_source_name, curr_unit_lookup);
+      if (error != Error::None)
+        return error;
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
-                               xstoul(match.str(3)), 0, std::stoi(match.str(4)), match.str(5),
-                               match.str(6), match.str(7));
+      const Unit& unit = this->units.emplace_back(
+          is_stt_section, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
+          std::stoi(match.str(4)), symbol_name, std::move(module_name), std::move(source_name));
+      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string entry_parent_name = match.str(5), module_name = match.str(6),
-                  source_name = match.str(7);
+      std::string symbol_name = match.str(4), entry_parent_name = match.str(5),
+                  module_name = match.str(6), source_name = match.str(7);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
         if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit.name)
           continue;
+        // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
+        // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
+        if (curr_unit_lookup->contains(symbol_name))
+          return Error::SectionLayoutOneDefinitionRuleViolated;
         line_number += 1;
         head += match.length();
-        parent_unit.entry_children.push_back(&this->units.emplace_back(
-            this, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, match.str(4),
-            &parent_unit, std::move(module_name), std::move(source_name)));
+        const Unit& unit = this->units.emplace_back(
+            false, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, symbol_name,
+            &parent_unit, std::move(module_name), std::move(source_name));
+        curr_unit_lookup->emplace(std::move(symbol_name), unit);
+        parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1784,9 +1870,10 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         return Error::SectionLayoutSpecialNotFill;
       line_number += 1;
       head += match.length();
-      this->units.emplace_back(this, xstoul(match.str(1)), xstoul(match.str(2)),
+      this->units.emplace_back(false, xstoul(match.str(1)), xstoul(match.str(2)),
                                xstoul(match.str(3)), 0, std::stoi(match.str(4)),
                                std::move(special_name));
+      // Special symbols dom't belong to any compilation unit, so they don't go in any lookup.
       continue;
     }
     break;
@@ -1871,17 +1958,17 @@ void Map::SectionLayout::Unit::Print4Column(std::ostream& stream) const
   }
 }
 
-void Map::SectionLayout::Export(Report& report) const noexcept
-{
-  for (const auto& unit : this->units)
-    unit.Export(report);
-}
+// void Map::SectionLayout::Export(Report& report) const noexcept
+// {
+//   for (const auto& unit : this->units)
+//     unit.Export(report);
+// }
 
-void Map::SectionLayout::Unit::Export(Report& report) const noexcept
-{
-  auto& debug_info = report[source_name.empty() ? module_name : source_name][name];
-  debug_info.section_layout_unit = this;
-}
+// void Map::SectionLayout::Unit::Export(Report& report) const noexcept
+// {
+//   auto& debug_info = report[source_name.empty() ? module_name : source_name][name];
+//   debug_info.section_layout_unit = this;
+// }
 
 // clang-format off
 static const std::regex re_memory_map_unit_normal_simple_old{
@@ -2420,12 +2507,12 @@ void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream) const
   Common::Print(stream, "{:25s} {:08x}\r\n", name, value);
 }
 
-void Map::LinkerGeneratedSymbols::Export(Report& report) const noexcept
-{
-  auto& subreport = report[""];
-  for (const auto& unit : units)
-    subreport[unit.name].linker_generated_symbol_unit = &unit;
-}
+// void Map::LinkerGeneratedSymbols::Export(Report& report) const noexcept
+// {
+//   auto& subreport = report[""];
+//   for (const auto& unit : units)
+//     subreport[unit.name].linker_generated_symbol_unit = &unit;
+// }
 }  // namespace MWLinker
 
 namespace Common

@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -21,7 +22,9 @@
 
 #include "Common/CommonTypes.h"
 #else  // mwlinkermap-temp
+#ifdef __clang__
 #include <format>
+#endif
 using u32 = std::uint32_t;
 #endif
 
@@ -105,6 +108,7 @@ struct Map
     Fail,
     Unimplemented,
     GarbageFound,
+    Warning,
 
     EntryPointNameMissing,
     SMGalaxyYouHadOneJob,
@@ -117,6 +121,10 @@ struct Map
     SymbolClosureUnrefDupsNameMismatch,
     SymbolClosureUnrefDupsEmpty,
 
+    // TODO: remove
+    SectionLayoutIndistinctObjectName,
+    EPPC_PatterMatchingIndistinctObjectName,
+
     EPPC_PatternMatchingMergingFirstNameMismatch,
     EPPC_PatternMatchingMergingSecondNameMismatch,
     EPPC_PatternMatchingMergingSizeMismatch,
@@ -124,14 +132,32 @@ struct Map
     EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch,
 
     SectionLayoutBadPrologue,
+    SectionLayoutOneDefinitionRuleViolated,
     SectionLayoutOrphanedEntry,
     SectionLayoutSpecialNotFill,
 
     MemoryMapBadPrologue,
   };
 
-  struct DebugInfo;
-  using Report = std::map<std::string, std::map<std::string, DebugInfo>>;
+  enum class Warning
+  {
+    // Either your linker map violates the One Definition Rule, or you have found multiple
+    // compilation units with identical names! Either way, the previous definition of this
+    // symbol in its section layout's lookup will be discarded.
+    // https://en.cppreference.com/w/cpp/language/definition#One_Definition_Rule
+    SectionLayoutOneDefinitionRuleViolated,
+    // A less critical variant of the ODR violation. Before CW for GCN 2.7, compiling with the '-sym
+    // on' flag
+    // TODO: finish explaining
+    // This is for symbols with the same name as the
+    // More than one symbol named things like ".text" or ".bss" has been found. This is like a
+    // finer-toothed version of the SectionLayoutOneDefinitionRuleViolated warning that can help to
+    // identify same-name compilation units.
+    SectionLayoutMultipleSectionTypeSymbols,
+  };
+
+  struct UnitDebugInfo;
+  using DebugInfo = std::map<std::string, std::map<std::string, UnitDebugInfo>>;
 
   struct PortionBase
   {
@@ -142,26 +168,27 @@ struct Map
       min_version = std::max(min_version, version);
     }
     virtual void Print(std::ostream&) const = 0;
-    virtual bool Empty() const noexcept = 0;
+    virtual bool IsEmpty() const noexcept = 0;
 
     Version min_version = Version::Unknown;
   };
 
-  // CodeWarrior for GCN 1.1
-  //  - Added UNREFERENCED DUPLICATE info.
-  // CodeWarrior for GCN 2.7
-  //  - Symbol closure became optional with '-[no]listclosure', off by default.
-  //  - Changed behavior of the source name when linking static libs
-  //  - Added _ctors$99 and _dtors$99, among other things.
   struct SymbolClosure final : PortionBase
   {
+    // CodeWarrior for GCN 1.1
+    //  - Added UNREFERENCED DUPLICATE info.
+    // CodeWarrior for GCN 2.7
+    //  - Symbol closure became optional with '-[no]listclosure', off by default.
+    //  - Changed behavior of the source name when linking static libs
+    //  - Added _ctors$99 and _dtors$99, among other things.
+
     struct NodeBase
     {
       NodeBase() = default;  // Necessary for root and fake _dtor$99 node
       virtual ~NodeBase() = default;
 
       virtual void Print(std::ostream&, int) const;  // Necessary for root and fake _dtor$99 node
-      virtual void Export(Report&) const noexcept;
+      // virtual void Export(DebugInfo&) const noexcept;
 
       NodeBase* parent = nullptr;
       std::list<std::unique_ptr<NodeBase>> children;
@@ -206,7 +233,7 @@ struct Map
       virtual ~NodeReal() override = default;
 
       virtual void Print(std::ostream&, int) const override;
-      virtual void Export(Report&) const noexcept override;
+      // virtual void Export(DebugInfo&) const noexcept override;
 
       const Kind unit_kind;
       std::string name;
@@ -229,16 +256,17 @@ struct Map
     static void PrintPrefix(std::ostream&, int);
     static const char* GetName(Type) noexcept;
     static const char* GetName(Bind) noexcept;
-    void Export(Report&) const noexcept;
-    virtual bool Empty() const noexcept override { return root.children.empty(); }
+    void Export(DebugInfo&) const noexcept;
+    virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
 
     NodeBase root;
   };
 
-  // CodeWarrior for Wii 1.0
-  //  - Added EPPC_PatternMatching
   struct EPPC_PatternMatching final : PortionBase
   {
+    // CodeWarrior for Wii 1.0
+    //  - Added EPPC_PatternMatching
+
     struct MergingUnit
     {
       MergingUnit(std::string first_name_, std::string second_name_, u32 size_,
@@ -295,8 +323,8 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    void Export(Report&) const noexcept;
-    virtual bool Empty() const noexcept override
+    void Export(DebugInfo&) const noexcept;
+    virtual bool IsEmpty() const noexcept override
     {
       return merging_units.empty() || folding_units.empty();
     }
@@ -305,10 +333,11 @@ struct Map
     std::list<FoldingUnit> folding_units;
   };
 
-  // CodeWarrior for Wii 1.0
-  //  - Added LinkerOpts
   struct LinkerOpts final : PortionBase
   {
+    // CodeWarrior for Wii 1.0
+    //  - Added LinkerOpts
+
     struct Unit
     {
       enum class Kind
@@ -344,15 +373,16 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool Empty() const noexcept override { return units.empty(); }
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
   };
 
-  // CodeWarror for GCN 3.0a3 (at the earliest)
-  //  - Added Branch Islands.
   struct BranchIslands final : PortionBase
   {
+    // CodeWarror for GCN 3.0a3 (at the earliest)
+    //  - Added Branch Islands.
+
     struct Unit
     {
       Unit(std::string first_name_, std::string second_name_, bool is_safe_)
@@ -373,15 +403,16 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool Empty() const noexcept override { return units.empty(); }
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
   };
 
-  // CodeWarror for GCN 3.0a3 (at the earliest)
-  //  - Added Mixed Mode Islands.
   struct MixedModeIslands final : PortionBase
   {
+    // CodeWarror for GCN 3.0a3 (at the earliest)
+    //  - Added Mixed Mode Islands.
+
     struct Unit
     {
       Unit(std::string first_name_, std::string second_name_, bool is_safe_)
@@ -402,7 +433,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool Empty() const noexcept override { return units.empty(); }
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
   };
@@ -414,7 +445,7 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool Empty() const noexcept override { return true; }
+    virtual bool IsEmpty() const noexcept override { return true; }
   };
 
   struct LinktimeSizeIncreasingOptimizations final : PortionBase
@@ -424,14 +455,15 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    virtual bool Empty() const noexcept override { return true; }
+    virtual bool IsEmpty() const noexcept override { return true; }
   };
 
-  // CodeWarrior for GCN 2.7
-  //  - Changed to four column info, added *fill* symbols.
-  //  - Changed the behavior of the source name when linking static libs
   struct SectionLayout final : PortionBase
   {
+    // CodeWarrior for GCN 2.7
+    //  - Changed to four column info, added *fill* symbols.
+    //  - Changed the behavior of the source name when linking static libs
+
     struct Unit
     {
       enum class Kind
@@ -443,79 +475,77 @@ struct Map
       };
 
       // UNUSED symbols
-      Unit(const SectionLayout* section_parent_, u32 size_, std::string name_,
-           std::string module_name_, std::string source_name_)
-          : unit_kind(Kind::Unused), size(size_), name(std::move(name_)),
-            section_parent(section_parent_), module_name(std::move(module_name_)),
+      Unit(bool is_stt_section_, u32 size_, std::string name_, std::string module_name_,
+           std::string source_name_)
+          : unit_kind(Kind::Unused), is_stt_section(is_stt_section_), size(size_),
+            name(std::move(name_)), module_name(std::move(module_name_)),
             source_name(std::move(source_name_))
       {
       }
       // 3-column normal symbols
-      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
-           u32 virtual_address_, int alignment_, std::string name_, std::string module_name_,
-           std::string source_name_)
-          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), alignment(alignment_), name(std::move(name_)),
-            section_parent(section_parent_), module_name(std::move(module_name_)),
+      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
+           int alignment_, std::string name_, std::string module_name_, std::string source_name_)
+          : unit_kind(Kind::Normal), is_stt_section(is_stt_section_),
+            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
+            alignment(alignment_), name(std::move(name_)), module_name(std::move(module_name_)),
             source_name(std::move(source_name_))
       {
       }
       // 4-column normal symbols
-      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
-           u32 virtual_address_, u32 file_offset_, int alignment_, std::string name_,
-           std::string module_name_, std::string source_name_)
-          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            name(std::move(name_)), section_parent(section_parent_),
+      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
+           u32 file_offset_, int alignment_, std::string name_, std::string module_name_,
+           std::string source_name_)
+          : unit_kind(Kind::Normal), is_stt_section(is_stt_section_),
+            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
+            file_offset(file_offset_), alignment(alignment_), name(std::move(name_)),
             module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
       // 3-column entry symbols
-      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
-           u32 virtual_address_, std::string name_, const Unit* entry_parent_,
-           std::string module_name_, std::string source_name_)
-          : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), name(std::move(name_)),
-            section_parent(section_parent_), entry_parent(entry_parent_),
+      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
+           std::string name_, const Unit* entry_parent_, std::string module_name_,
+           std::string source_name_)
+          : unit_kind(Kind::Entry), is_stt_section(is_stt_section_),
+            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
+            name(std::move(name_)), entry_parent(entry_parent_),
             module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
       // 4-column entry symbols
-      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
-           u32 virtual_address_, u32 file_offset_, std::string name_, const Unit* entry_parent_,
-           std::string module_name_, std::string source_name_)
-          : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset(file_offset_), name(std::move(name_)),
-            section_parent(section_parent_), entry_parent(entry_parent_),
+      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
+           u32 file_offset_, std::string name_, const Unit* entry_parent_, std::string module_name_,
+           std::string source_name_)
+          : unit_kind(Kind::Entry), is_stt_section(is_stt_section_),
+            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
+            file_offset(file_offset_), name(std::move(name_)), entry_parent(entry_parent_),
             module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
       // 4-column special symbols
-      Unit(const SectionLayout* section_parent_, u32 starting_address_, u32 size_,
-           u32 virtual_address_, u32 file_offset_, int alignment_, std::string name_)
-          : unit_kind(Kind::Special), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            name(std::move(name_)), section_parent(section_parent_)
+      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
+           u32 file_offset_, int alignment_, std::string name_)
+          : unit_kind(Kind::Special), is_stt_section(is_stt_section_),
+            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
+            file_offset(file_offset_), alignment(alignment_), name(std::move(name_))
       {
       }
 
       void Print3Column(std::ostream&) const;
       void Print4Column(std::ostream&) const;
-      void Export(Report&) const noexcept;
+      void Export(DebugInfo&) const noexcept;
 
       const Kind unit_kind;
+      const bool is_stt_section;
       u32 starting_address;
       u32 size;
       u32 virtual_address;
       u32 file_offset;
       int alignment;
       std::string name;
-      // This is useful to confirm STT_SECTION symbols which lack a symbol closure unit.
-      const SectionLayout* section_parent;
       // Doubly-linked relationship between entry symbols and their host.
       const Unit* entry_parent;
       // Doubly-linked relationship between entry symbols and their host.
-      std::vector<const Unit*> entry_children;
+      std::list<const Unit*> entry_children;
       // Static library or object name
       std::string module_name;
       // When linking a static library, this is either:
@@ -531,11 +561,18 @@ struct Map
     Error Scan4Column(const char*&, const char*, std::size_t&);
     Error ScanTLOZTP(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    void Export(Report&) const noexcept;
-    virtual bool Empty() const noexcept override { return units.empty(); }
+    void Export(DebugInfo&) const noexcept;
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
+
+    using UnitLookup = std::map<std::string, const Unit&>;
+    using ModuleLookup = std::map<std::string, std::list<UnitLookup>>;
+
+    Error UpdateCurrUnitLookup(const std::string&, const std::string&, const std::string&,
+                               std::string&, std::string&, UnitLookup*&);
 
     std::string name;
     std::list<Unit> units;
+    ModuleLookup lookup;
   };
 
   // CodeWarrior for GCN 2.7
@@ -680,7 +717,7 @@ struct Map
     void PrintSRecordBinFile(std::ostream&) const;
     void PrintRomRamSRecordBinFile(std::ostream&) const;
     void PrintDebug(std::ostream&) const;
-    virtual bool Empty() const noexcept override
+    virtual bool IsEmpty() const noexcept override
     {
       return normal_units.empty() || debug_units.empty();
     }
@@ -709,20 +746,10 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    void Export(Report&) const noexcept;
-    virtual bool Empty() const noexcept override { return units.empty(); }
+    void Export(DebugInfo&) const noexcept;
+    virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
-  };
-
-  struct DebugInfo
-  {
-    const SymbolClosure::NodeReal* symbol_closure_unit = nullptr;
-    const EPPC_PatternMatching::MergingUnit* eppc_pattern_matching_merging_unit = nullptr;
-    const EPPC_PatternMatching::FoldingUnit::Unit* eppc_pattern_matching_folding_unit_unit =
-        nullptr;
-    const SectionLayout::Unit* section_layout_unit = nullptr;
-    const LinkerGeneratedSymbols::Unit* linker_generated_symbol_unit = nullptr;
   };
 
 #ifndef DOLPHIN
@@ -749,7 +776,7 @@ struct Map
   Error ScanForGarbage(const char*, const char*);
 
   void Print(std::ostream&) const;
-  void Export(Report&) const noexcept;
+  void Export(DebugInfo&) const noexcept;
   Version GetMinVersion() const noexcept;
 
   std::string entry_point_name;
@@ -765,5 +792,16 @@ struct Map
   std::list<std::unique_ptr<SectionLayout>> section_layouts;
   std::unique_ptr<MemoryMap> memory_map;
   std::unique_ptr<LinkerGeneratedSymbols> linker_generated_symbols;
+
+  struct UnitDebugInfo
+  {
+    const SymbolClosure::NodeReal* symbol_closure_unit = nullptr;
+    const EPPC_PatternMatching::MergingUnit* eppc_pattern_matching_merging_unit = nullptr;
+    const EPPC_PatternMatching::FoldingUnit::Unit* eppc_pattern_matching_folding_unit_unit =
+        nullptr;
+    const SectionLayout::Unit* section_layout_unit = nullptr;
+    const LinkerGeneratedSymbols::Unit* linker_generated_symbol_unit = nullptr;
+  };
+  DebugInfo debug_info;
 };
 }  // namespace MWLinker
