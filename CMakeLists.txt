@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
 
-project(mwlinkermap-example)
+project(mwlinkermap)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING
@@ -15,5 +15,5 @@ else()
   add_subdirectory(Externals/fmt EXCLUDE_FROM_ALL)
 endif()
 
-include_directories(Source)
+include_directories(Source/Core)
 add_subdirectory(Source)
