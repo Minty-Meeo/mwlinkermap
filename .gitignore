@@ -1,2 +1,6 @@
-*.o
-test
+# Ignore kdevelop files/dirs
+*.kdev4
+# Ignore Visual Studio Code's working dir
+/.vscode/
+# Ignore files output by build
+/[Bb]uild*/

@@ -18,20 +18,10 @@
 // #define DOLPHIN
 
 #ifdef DOLPHIN  // Dolphin Emulator
-#include <fmt/format.h>
-
 #include "Common/CommonTypes.h"
 #else  // mwlinkermap-temp
-#ifdef __clang__
-#include <format>
-#endif
 using u32 = std::uint32_t;
 #endif
-
-namespace Common
-{
-struct IntermediateDB;
-}
 
 namespace MWLinker
 {
