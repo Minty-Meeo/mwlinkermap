@@ -341,9 +341,8 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
   line_number = 0;
 
   // We only see this header once, as every symbol is mashed into an imaginary ".text" section.
-  if (!std::regex_search(head, tail, match, re_section_layout_header_modified_a,
-                         std::regex_constants::match_continuous))
-    return Error::SMGalaxyYouHadOneJob;
+  if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
+                        std::regex_constants::match_continuous))
   {
     line_number += 2;
     head += match.length();
@@ -353,6 +352,10 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     if (error != Error::None)
       return error;
     this->section_layouts.push_back(std::move(portion));
+  }
+  else
+  {
+    return Error::SMGalaxyYouHadOneJob;
   }
   // It seems like a mistake, but for a few examples, a tiny bit of simple-style,
   // headerless, CodeWarrior for Wii 1.0 (at minimum) Memory Map can be found.
