@@ -1,6 +1,8 @@
 #include "MWLinkerMap.h"
 
 #include <cstddef>
+#include <cstdlib>
+#include <iostream>
 #include <istream>
 #include <map>
 #include <ostream>
@@ -20,10 +22,17 @@
 #else  // mwlinkermap-temp
 #include <cassert>
 #define ASSERT assert
+#define DEBUG_ASSERT assert
 using u32 = std::uint32_t;
 #endif
 
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
+
+template <class... Args>
+static void PrintWarning(std::format_string<Args...> fmt, Args&&... args)
+{
+  std::println(std::cerr, std::move(fmt), std::forward<Args>(args)...);
+}
 
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
@@ -1558,22 +1567,59 @@ void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream) const
   std::print(stream, "\r\nLinktime size-increasing optimizations\r\n");
 }
 
-Map::Error Map::SectionLayout::UpdateCurrUnitLookup(
+Map::SectionLayout::Unit::Trait Map::SectionLayout::UpdateCurrUnitLookup(
     const std::string& symbol_name, const std::string& module_name, const std::string& source_name,
     std::string& curr_module_name, std::string& curr_source_name,
-    Map::SectionLayout::UnitLookup*& curr_unit_lookup)
+    Map::SectionLayout::UnitLookup*& curr_unit_lookup, bool& is_in_lcomm, std::size_t& line_number)
 {
+  const bool is_stt_section = (symbol_name == this->name);
+
   if (curr_module_name != module_name || curr_source_name != source_name)
   {
     curr_module_name = module_name;
     curr_source_name = source_name;
     // TODO: Build lookup by static library
     const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-    curr_unit_lookup = &lookup[compilation_unit_name].emplace_back();
+    if (this->lookup.contains(compilation_unit_name) && is_stt_section)
+    {
+      PrintWarning("[Line {:d}] Repeat-name compilation unit detected \"{:s}\" ({:s})",
+                   line_number + 1u, compilation_unit_name, this->name);
+    }
+    curr_unit_lookup = &this->lookup[compilation_unit_name];
+
+    if (is_stt_section)
+    {
+      if (is_in_lcomm)
+      {
+        PrintWarning(
+            "[Line {:d}] .comm symbols found after .lcomm symbols.  Shouldn't this be impossible?",
+            line_number + 1u);
+      }
+      is_in_lcomm = false;
+      return Unit::Trait::STTSection;
+    }
+    else
+    {
+      if (this->name == ".bss")
+      {
+        is_in_lcomm = true;
+        return Unit::Trait::LComm;
+      }
+      if (this->name == "extabindex")
+      {
+        is_in_lcomm = true;
+        return Unit::Trait::ExTabIndex;
+      }
+      // TODO: What happens if it's not ".bss" or "extabindex"?
+      // TODO: What about ".sbss" or ".sbss2"?
+      return Unit::Trait::Normal;
+    }
   }
-  if (curr_unit_lookup->contains(symbol_name))
-    return Error::SectionLayoutOneDefinitionRuleViolated;
-  return Error::None;
+  DEBUG_ASSERT(curr_unit_lookup != nullptr);
+  if (is_in_lcomm)
+    return Unit::Trait::LComm;
+  else
+    return Unit::Trait::Normal;
 }
 
 // clang-format off
@@ -1594,6 +1640,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
   std::cmatch match;
   std::string curr_module_name, curr_source_name;
   UnitLookup* curr_unit_lookup = nullptr;
+  bool is_in_lcomm = false;
 
   while (true)
   {
@@ -1602,15 +1649,13 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     {
       std::string symbol_name = match.str(5), module_name = match.str(6),
                   source_name = match.str(7);
-      const bool is_stt_section = (symbol_name.find(this->name) != std::string::npos);
-      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
-                                              curr_module_name, curr_source_name, curr_unit_lookup);
-      if (error != Error::None)
-        return error;
+      const Unit::Trait unit_trait =
+          UpdateCurrUnitLookup(symbol_name, module_name, source_name, curr_module_name,
+                               curr_source_name, curr_unit_lookup, is_in_lcomm, line_number);
       line_number += 1;
       head += match.length();
       const Unit& unit = this->units.emplace_back(
-          is_stt_section, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+          unit_trait, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
           std::stoi(match.str(4)), symbol_name, std::move(module_name), std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
@@ -1620,14 +1665,12 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     {
       std::string symbol_name = match.str(2), module_name = match.str(3),
                   source_name = match.str(4);
-      // Should never be the STT_SECTION symbol.
-      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
-                                              curr_module_name, curr_source_name, curr_unit_lookup);
-      if (error != Error::None)
-        return error;
+      const Unit::Trait unit_trait =
+          UpdateCurrUnitLookup(symbol_name, module_name, source_name, curr_module_name,
+                               curr_source_name, curr_unit_lookup, is_in_lcomm, line_number);
       line_number += 1;
       head += match.length();
-      const Unit& unit = this->units.emplace_back(false, xstoul(match.str(1)), symbol_name,
+      const Unit& unit = this->units.emplace_back(unit_trait, xstoul(match.str(1)), symbol_name,
                                                   std::move(module_name), std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
@@ -1650,8 +1693,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         line_number += 1;
         head += match.length();
         const Unit& unit = this->units.emplace_back(
-            false, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), symbol_name,
-            &parent_unit, std::move(module_name), std::move(source_name));
+            Unit::Trait::Normal, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+            symbol_name, &parent_unit, std::move(module_name), std::move(source_name));
         curr_unit_lookup->emplace(std::move(symbol_name), unit);
         parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
@@ -1686,6 +1729,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
   std::cmatch match;
   std::string curr_module_name, curr_source_name;
   UnitLookup* curr_unit_lookup = nullptr;
+  bool is_in_lcomm = false;
 
   while (true)
   {
@@ -1694,15 +1738,13 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     {
       std::string symbol_name = match.str(6), module_name = match.str(7),
                   source_name = match.str(8);
-      const bool is_stt_section = (symbol_name == this->name);
-      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
-                                              curr_module_name, curr_source_name, curr_unit_lookup);
-      if (error != Error::None)
-        return error;
+      const Unit::Trait unit_trait =
+          UpdateCurrUnitLookup(symbol_name, module_name, source_name, curr_module_name,
+                               curr_source_name, curr_unit_lookup, is_in_lcomm, line_number);
       line_number += 1;
       head += match.length();
       const Unit& unit = this->units.emplace_back(
-          is_stt_section, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+          unit_trait, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
           xstoul(match.str(4)), std::stoi(match.str(5)), symbol_name, std::move(module_name),
           std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
@@ -1713,14 +1755,12 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     {
       std::string symbol_name = match.str(2), module_name = match.str(3),
                   source_name = match.str(4);
-      // Should never be the STT_SECTION symbol.
-      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
-                                              curr_module_name, curr_source_name, curr_unit_lookup);
-      if (error != Error::None)
-        return error;
+      const Unit::Trait unit_trait =
+          UpdateCurrUnitLookup(symbol_name, module_name, source_name, curr_module_name,
+                               curr_source_name, curr_unit_lookup, is_in_lcomm, line_number);
       line_number += 1;
       head += match.length();
-      const Unit& unit = this->units.emplace_back(false, xstoul(match.str(1)), symbol_name,
+      const Unit& unit = this->units.emplace_back(unit_trait, xstoul(match.str(1)), symbol_name,
                                                   std::move(module_name), std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
@@ -1742,10 +1782,10 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
           return Error::SectionLayoutOneDefinitionRuleViolated;
         line_number += 1;
         head += match.length();
-        const Unit& unit =
-            this->units.emplace_back(false, xstoul(match.str(1)), xstoul(match.str(2)),
-                                     xstoul(match.str(3)), xstoul(match.str(4)), symbol_name,
-                                     &parent_unit, std::move(module_name), std::move(source_name));
+        const Unit& unit = this->units.emplace_back(Unit::Trait::Normal, xstoul(match.str(1)),
+                                                    xstoul(match.str(2)), xstoul(match.str(3)),
+                                                    xstoul(match.str(4)), symbol_name, &parent_unit,
+                                                    std::move(module_name), std::move(source_name));
         curr_unit_lookup->emplace(std::move(symbol_name), unit);
         parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
@@ -1757,16 +1797,27 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_special,
                           std::regex_constants::match_continuous))
     {
+      // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
       std::string special_name = match.str(6);
-      if (special_name != "*fill*" && special_name != "**fill**")
-        return Error::SectionLayoutSpecialNotFill;
-      line_number += 1;
-      head += match.length();
-      this->units.emplace_back(false, xstoul(match.str(1)), xstoul(match.str(2)),
-                               xstoul(match.str(3)), xstoul(match.str(4)), std::stoi(match.str(5)),
-                               std::move(special_name));
-      // Special symbols dom't belong to any compilation unit, so they don't go in any lookup.
-      continue;
+      if (special_name == "*fill*")
+      {
+        line_number += 1;
+        head += match.length();
+        this->units.emplace_back(Unit::Trait::Fill1, xstoul(match.str(1)), xstoul(match.str(2)),
+                                 xstoul(match.str(3)), xstoul(match.str(4)),
+                                 std::stoi(match.str(5)));
+        continue;
+      }
+      if (special_name == "**fill**")
+      {
+        line_number += 1;
+        head += match.length();
+        this->units.emplace_back(Unit::Trait::Fill2, xstoul(match.str(1)), xstoul(match.str(2)),
+                                 xstoul(match.str(3)), xstoul(match.str(4)),
+                                 std::stoi(match.str(5)));
+        continue;
+      }
+      return Error::SectionLayoutSpecialNotFill;
     }
     break;
   }
@@ -1786,6 +1837,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
   std::cmatch match;
   std::string curr_module_name, curr_source_name;
   UnitLookup* curr_unit_lookup = nullptr;
+  bool is_in_lcomm = false;
 
   while (true)
   {
@@ -1794,15 +1846,13 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
     {
       std::string symbol_name = match.str(5), module_name = match.str(6),
                   source_name = match.str(7);
-      const bool is_stt_section = (symbol_name == this->name);
-      const auto error = UpdateCurrUnitLookup(symbol_name, module_name, source_name,
-                                              curr_module_name, curr_source_name, curr_unit_lookup);
-      if (error != Error::None)
-        return error;
+      const Unit::Trait unit_trait =
+          UpdateCurrUnitLookup(symbol_name, module_name, source_name, curr_module_name,
+                               curr_source_name, curr_unit_lookup, is_in_lcomm, line_number);
       line_number += 1;
       head += match.length();
       const Unit& unit = this->units.emplace_back(
-          is_stt_section, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
+          unit_trait, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
           std::stoi(match.str(4)), symbol_name, std::move(module_name), std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
@@ -1825,8 +1875,8 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         line_number += 1;
         head += match.length();
         const Unit& unit = this->units.emplace_back(
-            false, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0, symbol_name,
-            &parent_unit, std::move(module_name), std::move(source_name));
+            Unit::Trait::Normal, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+            0, symbol_name, &parent_unit, std::move(module_name), std::move(source_name));
         curr_unit_lookup->emplace(std::move(symbol_name), unit);
         parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
@@ -1838,16 +1888,25 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_special,
                           std::regex_constants::match_continuous))
     {
+      // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
       std::string special_name = match.str(5);
-      if (special_name != "*fill*" && special_name != "**fill**")
-        return Error::SectionLayoutSpecialNotFill;
-      line_number += 1;
-      head += match.length();
-      this->units.emplace_back(false, xstoul(match.str(1)), xstoul(match.str(2)),
-                               xstoul(match.str(3)), 0, std::stoi(match.str(4)),
-                               std::move(special_name));
-      // Special symbols dom't belong to any compilation unit, so they don't go in any lookup.
-      continue;
+      if (special_name == "*fill*")
+      {
+        line_number += 1;
+        head += match.length();
+        this->units.emplace_back(Unit::Trait::Fill1, xstoul(match.str(1)), xstoul(match.str(2)),
+                                 xstoul(match.str(3)), 0, std::stoi(match.str(4)));
+        continue;
+      }
+      if (special_name == "**fill**")
+      {
+        line_number += 1;
+        head += match.length();
+        this->units.emplace_back(Unit::Trait::Fill2, xstoul(match.str(1)), xstoul(match.str(2)),
+                                 xstoul(match.str(3)), 0, std::stoi(match.str(4)));
+        continue;
+      }
+      return Error::SectionLayoutSpecialNotFill;
     }
     break;
   }
@@ -1925,9 +1984,22 @@ void Map::SectionLayout::Unit::Print4Column(std::ostream& stream) const
   case Kind::Special:
     // "  %08x %06x %08x %08x %2i %s\r\n"
     std::print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s}\r\n", starting_address, size,
-               virtual_address, file_offset, alignment, name);
+               virtual_address, file_offset, alignment, GetSpecialName(unit_trait));
     return;
   }
+}
+
+std::string_view Map::SectionLayout::Unit::GetSpecialName(const Trait unit_trait)
+{
+  static constexpr std::string_view fill1 = "*fill*";
+  static constexpr std::string_view fill2 = "**fill**";
+
+  if (unit_trait == Unit::Trait::Fill1)
+    return fill1;
+  if (unit_trait == Unit::Trait::Fill2)
+    return fill2;
+  ASSERT(false);
+  return fill1;
 }
 
 // void Map::SectionLayout::Export(Report& report) const noexcept

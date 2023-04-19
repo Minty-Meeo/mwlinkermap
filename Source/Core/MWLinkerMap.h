@@ -464,68 +464,79 @@ struct Map
         Special,
       };
 
+      enum class Trait
+      {
+        Normal,
+        STTSection,
+        Comm,
+        LComm,
+        ExTabIndex,
+        Fill1,
+        Fill2,
+      };
+
       // UNUSED symbols
-      Unit(bool is_stt_section_, u32 size_, std::string name_, std::string module_name_,
+      Unit(Trait unit_trait_, u32 size_, std::string name_, std::string module_name_,
            std::string source_name_)
-          : unit_kind(Kind::Unused), is_stt_section(is_stt_section_), size(size_),
+          : unit_kind(Kind::Unused), unit_trait(unit_trait_), size(size_), name(std::move(name_)),
+            module_name(std::move(module_name_)), source_name(std::move(source_name_))
+      {
+      }
+      // 3-column normal symbols
+      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
+           int alignment_, std::string name_, std::string module_name_, std::string source_name_)
+          : unit_kind(Kind::Normal), unit_trait(unit_trait_), starting_address(starting_address_),
+            size(size_), virtual_address(virtual_address_), alignment(alignment_),
             name(std::move(name_)), module_name(std::move(module_name_)),
             source_name(std::move(source_name_))
       {
       }
-      // 3-column normal symbols
-      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
-           int alignment_, std::string name_, std::string module_name_, std::string source_name_)
-          : unit_kind(Kind::Normal), is_stt_section(is_stt_section_),
-            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
+      // 4-column normal symbols
+      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
+           u32 file_offset_, int alignment_, std::string name_, std::string module_name_,
+           std::string source_name_)
+          : unit_kind(Kind::Normal), unit_trait(unit_trait_), starting_address(starting_address_),
+            size(size_), virtual_address(virtual_address_), file_offset(file_offset_),
             alignment(alignment_), name(std::move(name_)), module_name(std::move(module_name_)),
             source_name(std::move(source_name_))
       {
       }
-      // 4-column normal symbols
-      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
-           u32 file_offset_, int alignment_, std::string name_, std::string module_name_,
-           std::string source_name_)
-          : unit_kind(Kind::Normal), is_stt_section(is_stt_section_),
-            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
-            file_offset(file_offset_), alignment(alignment_), name(std::move(name_)),
-            module_name(std::move(module_name_)), source_name(std::move(source_name_))
-      {
-      }
       // 3-column entry symbols
-      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
+      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
            std::string name_, const Unit* entry_parent_, std::string module_name_,
            std::string source_name_)
-          : unit_kind(Kind::Entry), is_stt_section(is_stt_section_),
-            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
+          : unit_kind(Kind::Entry), unit_trait(unit_trait_), starting_address(starting_address_),
+            size(size_), virtual_address(virtual_address_), name(std::move(name_)),
+            entry_parent(entry_parent_), module_name(std::move(module_name_)),
+            source_name(std::move(source_name_))
+      {
+      }
+      // 4-column entry symbols
+      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
+           u32 file_offset_, std::string name_, const Unit* entry_parent_, std::string module_name_,
+           std::string source_name_)
+          : unit_kind(Kind::Entry), unit_trait(unit_trait_), starting_address(starting_address_),
+            size(size_), virtual_address(virtual_address_), file_offset(file_offset_),
             name(std::move(name_)), entry_parent(entry_parent_),
             module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
-      // 4-column entry symbols
-      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
-           u32 file_offset_, std::string name_, const Unit* entry_parent_, std::string module_name_,
-           std::string source_name_)
-          : unit_kind(Kind::Entry), is_stt_section(is_stt_section_),
-            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
-            file_offset(file_offset_), name(std::move(name_)), entry_parent(entry_parent_),
-            module_name(std::move(module_name_)), source_name(std::move(source_name_))
-      {
-      }
       // 4-column special symbols
-      Unit(bool is_stt_section_, u32 starting_address_, u32 size_, u32 virtual_address_,
-           u32 file_offset_, int alignment_, std::string name_)
-          : unit_kind(Kind::Special), is_stt_section(is_stt_section_),
-            starting_address(starting_address_), size(size_), virtual_address(virtual_address_),
-            file_offset(file_offset_), alignment(alignment_), name(std::move(name_))
+      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
+           u32 file_offset_, int alignment_)
+          : unit_kind(Kind::Special), unit_trait(unit_trait_), starting_address(starting_address_),
+            size(size_), virtual_address(virtual_address_), file_offset(file_offset_),
+            alignment(alignment_)
       {
       }
 
       void Print3Column(std::ostream&) const;
       void Print4Column(std::ostream&) const;
+      static std::string_view GetSpecialName(Trait);
       void Export(DebugInfo&) const noexcept;
 
       const Kind unit_kind;
-      const bool is_stt_section;
+      const Trait unit_trait;
       u32 starting_address;
       u32 size;
       u32 virtual_address;
@@ -554,11 +565,11 @@ struct Map
     void Export(DebugInfo&) const noexcept;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
-    using UnitLookup = std::map<std::string, const Unit&>;
-    using ModuleLookup = std::map<std::string, std::list<UnitLookup>>;
+    using UnitLookup = std::multimap<std::string, const Unit&>;
+    using ModuleLookup = std::map<std::string, UnitLookup>;
 
-    Error UpdateCurrUnitLookup(const std::string&, const std::string&, const std::string&,
-                               std::string&, std::string&, UnitLookup*&);
+    Unit::Trait UpdateCurrUnitLookup(const std::string&, const std::string&, const std::string&,
+                                     std::string&, std::string&, UnitLookup*&, bool&, std::size_t&);
 
     std::string name;
     std::list<Unit> units;
