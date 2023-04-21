@@ -28,10 +28,44 @@ using u32 = std::uint32_t;
 
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
 
-template <class... Args>
-static void PrintWarning(std::format_string<Args...> fmt, Args&&... args)
+static void WarnRepeatCompilationUnit(const std::size_t line_number,
+                                      const std::string_view compilation_unit_name,
+                                      const std::string_view section_name)
 {
-  std::println(std::cerr, std::move(fmt), std::forward<Args>(args)...);
+  if (!MWLinker::Map::do_warn_repeat_compilation_unit)
+    return;
+  std::println(std::cerr, "Line {:d}] Repeat-name compilation unit detected \"{:s}\" ({:s})",
+               line_number, compilation_unit_name, section_name);
+}
+
+static void WarnODRViolation(const std::size_t line_number, const std::string_view symbol_name,
+                             const std::string_view compilation_unit_name,
+                             const std::string_view section_name)
+{
+  if (!MWLinker::Map::do_warn_odr_violation)
+    return;
+  std::println(std::cerr,
+               "Line {:d}] One-Definition Rule violation detected: \"{:s}\" in \"{:s}\" ({:s})",
+               line_number, symbol_name, compilation_unit_name, section_name);
+}
+
+static void WarnSymOnFlagDetected(const std::size_t line_number,
+                                  const std::string_view compilation_unit_name,
+                                  const std::string_view section_name)
+{
+  if (!MWLinker::Map::do_warn_sym_on_flag_detected)
+    return;
+  std::println(std::cerr,
+               "Line {:d}] Multiple STT_SECTION symbols seen in an uninterrupted compilation unit "
+               "\"{:s}\" ({:s})",
+               line_number, compilation_unit_name, section_name);
+}
+
+static void WarnCommAfterLComm(const std::size_t line_number)
+{
+  if (!MWLinker::Map::do_warn_comm_after_lcomm)
+    return;
+  std::println(std::cerr, "Line {:d}] .comm symbols found after .lcomm symbols.", line_number);
 }
 
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
@@ -148,6 +182,8 @@ static const std::map<std::string, Map::SectionLayout::Kind> map_section_layout_
     {".bss", Map::SectionLayout::Kind::BSS},
     {".sbss", Map::SectionLayout::Kind::BSS},
     {".sbss2", Map::SectionLayout::Kind::BSS},
+    {".ctors", Map::SectionLayout::Kind::Ctors},
+    {".dtors", Map::SectionLayout::Kind::Dtors},
     {"extab", Map::SectionLayout::Kind::ExTab},
     {"extabindex", Map::SectionLayout::Kind::ExTabIndex},
 };
@@ -1609,14 +1645,16 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
     {
       if (is_repeat_compilation_unit_detected)
       {
-        PrintWarning("[Line {:d}] Repeat-name compilation unit detected \"{:s}\" ({:s})",
-                     line_number + 1u, compilation_unit_name, this->name);
+        // TODO: At some point, a BSS section's second lap for printing .lcomm symbols was given
+        // STT_SECTION symbols, making them indistinguishable from a repeat-name compilation unit
+        // without further heuristics.  In other words, false positives ahoy.
+        // TODO: What version?
+        WarnRepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
       }
       if (is_in_lcomm)
       {
-        PrintWarning(
-            "[Line {:d}] .comm symbols found after .lcomm symbols.  Shouldn't this be impossible?",
-            line_number + 1u);
+        // Shouldn't this be impossible?
+        WarnCommAfterLComm(line_number + 1u);
         is_in_lcomm = false;
       }
       return Unit::Trait::Section;
@@ -1625,8 +1663,8 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
     {
       if (this->section_kind == Kind::BSS)
       {
-        // TODO: There is currently no clean way to detect repeat-name compilation units among
-        // symbols from .lcomm
+        // TODO: There is currently no clean way to detect repeat-name compilation units during
+        // a BSS section's second lap for printing .lcomm symbols.
         is_in_lcomm = true;
         return Unit::Trait::LCommon;
       }
@@ -1637,12 +1675,11 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
         {
           is_after_eti_init_info = true;
         }
-        // TODO: There is currently no clean way to detect repeat-name compilation units among
-        // symbols after _eti_init_info (bss prints all UNUSED extabindex symbols last)
+        // TODO: There is currently no clean way to detect repeat-name compilation units during
+        // an extabindex section's second lap for printing UNUSED symbols after _eti_init_info.
         else if (is_repeat_compilation_unit_detected && !is_after_eti_init_info)
         {
-          PrintWarning("[Line {:d}] Repeat-name compilation unit detected \"{:s}\" ({:s})",
-                       line_number + 1u, compilation_unit_name, this->name);
+          WarnRepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
         }
         return Unit::Trait::ExTabIndex;
       }
@@ -1651,14 +1688,17 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
   }
   if (is_symbol_stt_section)
   {
-    if (!is_multi_stt_section)
+    if (this->section_kind == Kind::Ctors || this->section_kind == Kind::Dtors)
+    {
+      const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
+      WarnRepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
+    }
+    else if (!is_multi_stt_section)
     {
       // Either this compilation unit was compiled with '-sym on', or two repeat-name compilation
       // units are adjacent to one another.
       const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-      PrintWarning("[Line {:d}] Multiple STT_SECTION symbols seen in an uninterrupted compilation "
-                   "unit \"{:s}\" ({:s})",
-                   line_number + 1u, compilation_unit_name, this->name);
+      WarnSymOnFlagDetected(line_number + 1u, compilation_unit_name, this->name);
       is_multi_stt_section = true;
     }
     return Unit::Trait::Section;
@@ -1671,9 +1711,7 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
       // This can be a strong hint that there are two or more repeat-name compilation units in your
       // linker map, assuming it's not messed up in any way.  Note that this does not detect symbols
       // with identical names across section layouts.
-      PrintWarning(
-          "[Line {:d}] One-Definition Rule violation detected: \"{:s}\" in \"{:s}\" ({:s})",
-          line_number + 1u, symbol_name, compilation_unit_name, this->name);
+      WarnODRViolation(line_number + 1u, symbol_name, compilation_unit_name, this->name);
     }
   }
   if (is_in_lcomm)
@@ -1755,8 +1793,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         {
           const std::string& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
-          PrintWarning("[Line {:d}] One-Definition Rule violated: \"{:s}\" in \"{:s}\" ({:s})",
-                       line_number + 1u, symbol_name, compilation_unit_name, this->name);
+          WarnODRViolation(line_number + 1u, symbol_name, compilation_unit_name, this->name);
         }
         if (curr_unit_lookup == nullptr)
           return Error::Fail;
@@ -1852,8 +1889,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         {
           const std::string& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
-          PrintWarning("[Line {:d}] One-Definition Rule violated: \"{:s}\" in \"{:s}\" ({:s})",
-                       line_number + 1u, symbol_name, compilation_unit_name, this->name);
+          WarnODRViolation(line_number + 1u, symbol_name, compilation_unit_name, this->name);
         }
         line_number += 1;
         head += match.length();
@@ -1949,8 +1985,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         {
           const std::string& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
-          PrintWarning("[Line {:d}] One-Definition Rule violated: \"{:s}\" in \"{:s}\" ({:s})",
-                       line_number + 1u, symbol_name, compilation_unit_name, this->name);
+          WarnODRViolation(line_number + 1u, symbol_name, compilation_unit_name, this->name);
         }
         line_number += 1;
         head += match.length();

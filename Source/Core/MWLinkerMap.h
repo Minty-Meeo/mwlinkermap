@@ -456,6 +456,8 @@ struct Map
     {
       Normal,
       BSS,
+      Ctors,
+      Dtors,
       ExTab,
       ExTabIndex,
     };
@@ -814,6 +816,12 @@ struct Map
   std::list<std::unique_ptr<SectionLayout>> section_layouts;
   std::unique_ptr<MemoryMap> memory_map;
   std::unique_ptr<LinkerGeneratedSymbols> linker_generated_symbols;
+
+  // These are a global state because I really don't care.
+  static inline bool do_warn_repeat_compilation_unit = true;
+  static inline bool do_warn_odr_violation = true;
+  static inline bool do_warn_sym_on_flag_detected = true;
+  static inline bool do_warn_comm_after_lcomm = true;
 
   struct UnitDebugInfo
   {
