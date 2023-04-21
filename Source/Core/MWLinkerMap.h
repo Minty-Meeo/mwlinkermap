@@ -112,7 +112,6 @@ struct Map
     SymbolClosureUnrefDupsEmpty,
 
     // TODO: remove
-    SectionLayoutIndistinctObjectName,
     EPPC_PatterMatchingIndistinctObjectName,
 
     EPPC_PatternMatchingMergingFirstNameMismatch,
@@ -122,7 +121,6 @@ struct Map
     EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch,
 
     SectionLayoutBadPrologue,
-    SectionLayoutOneDefinitionRuleViolated,
     SectionLayoutOrphanedEntry,
     SectionLayoutSpecialNotFill,
 
@@ -244,8 +242,8 @@ struct Map
     Error Scan(const char*&, const char*, std::size_t&, std::list<std::string>&);
     virtual void Print(std::ostream&) const override;
     static void PrintPrefix(std::ostream&, int);
-    static const char* GetName(Type) noexcept;
-    static const char* GetName(Bind) noexcept;
+    static const char* ToName(Type) noexcept;
+    static const char* ToName(Bind) noexcept;
     void Export(DebugInfo&) const noexcept;
     virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
 
@@ -454,24 +452,41 @@ struct Map
     //  - Changed to four column info, added *fill* symbols.
     //  - Changed the behavior of the source name when linking static libs
 
+    enum class Kind
+    {
+      Normal,
+      BSS,
+      ExTab,
+      ExTabIndex,
+    };
+
     struct Unit
     {
       enum class Kind
       {
-        Unused,
         Normal,
+        Unused,
         Entry,
         Special,
       };
 
       enum class Trait
       {
-        Normal,
-        STTSection,
-        Comm,
-        LComm,
+        // Nothing special
+        None,
+        // Named after the section they are native to. Multiple can appear in a single compilation
+        // unit with the '-sym on' option. The size of a section symbol is the total of all symbols,
+        // both used and unused, that one is meant to encompass.
+        Section,
+        // BSS .comm symbols. Printed first.
+        Common,
+        // BSS .lcomm symbols. Printed later.
+        LCommon,
+        // Native to the extabindex section.
         ExTabIndex,
+        // *fill*
         Fill1,
+        // **fill**
         Fill2,
       };
 
@@ -532,7 +547,7 @@ struct Map
 
       void Print3Column(std::ostream&) const;
       void Print4Column(std::ostream&) const;
-      static std::string_view GetSpecialName(Trait);
+      static std::string_view ToSpecialName(Trait);
       void Export(DebugInfo&) const noexcept;
 
       const Kind unit_kind;
@@ -555,7 +570,10 @@ struct Map
       std::string source_name;
     };
 
-    SectionLayout(std::string name_) : name(std::move(name_)) {}
+    SectionLayout(std::string name_, Kind section_kind_)
+        : name(std::move(name_)), section_kind(section_kind_)
+    {
+    }
     virtual ~SectionLayout() override = default;
 
     Error Scan3Column(const char*&, const char*, std::size_t&);
@@ -568,12 +586,15 @@ struct Map
     using UnitLookup = std::multimap<std::string, const Unit&>;
     using ModuleLookup = std::map<std::string, UnitLookup>;
 
-    Unit::Trait UpdateCurrUnitLookup(const std::string&, const std::string&, const std::string&,
-                                     std::string&, std::string&, UnitLookup*&, bool&, std::size_t&);
+    static Kind ToSectionKind(const std::string&);
+    Unit::Trait DeduceUsualSubtext(const std::string&, const std::string&, const std::string&,
+                                   std::string&, std::string&, UnitLookup*&, bool&, bool&, bool&,
+                                   std::size_t);
 
     std::string name;
     std::list<Unit> units;
     ModuleLookup lookup;
+    const Kind section_kind;
   };
 
   // CodeWarrior for GCN 2.7
