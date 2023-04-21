@@ -572,6 +572,9 @@ struct Map
       std::string source_name;
     };
 
+    using UnitLookup = std::multimap<std::string, const Unit&>;
+    using ModuleLookup = std::map<std::string, UnitLookup>;
+
     SectionLayout(std::string name_, Kind section_kind_)
         : name(std::move(name_)), section_kind(section_kind_)
     {
@@ -585,18 +588,15 @@ struct Map
     void Export(DebugInfo&) const noexcept;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
-    using UnitLookup = std::multimap<std::string, const Unit&>;
-    using ModuleLookup = std::map<std::string, UnitLookup>;
-
     static Kind ToSectionKind(const std::string&);
     Unit::Trait DeduceUsualSubtext(const std::string&, const std::string&, const std::string&,
                                    std::string&, std::string&, UnitLookup*&, bool&, bool&, bool&,
                                    std::size_t);
 
+    const Kind section_kind;
     std::string name;
     std::list<Unit> units;
     ModuleLookup lookup;
-    const Kind section_kind;
   };
 
   // CodeWarrior for GCN 2.7

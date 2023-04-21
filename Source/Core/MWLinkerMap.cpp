@@ -28,46 +28,6 @@ using u32 = std::uint32_t;
 
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
 
-static void WarnRepeatCompilationUnit(const std::size_t line_number,
-                                      const std::string_view compilation_unit_name,
-                                      const std::string_view section_name)
-{
-  if (!MWLinker::Map::do_warn_repeat_compilation_unit)
-    return;
-  std::println(std::cerr, "Line {:d}] Repeat-name compilation unit detected \"{:s}\" ({:s})",
-               line_number, compilation_unit_name, section_name);
-}
-
-static void WarnODRViolation(const std::size_t line_number, const std::string_view symbol_name,
-                             const std::string_view compilation_unit_name,
-                             const std::string_view section_name)
-{
-  if (!MWLinker::Map::do_warn_odr_violation)
-    return;
-  std::println(std::cerr,
-               "Line {:d}] One-Definition Rule violation detected: \"{:s}\" in \"{:s}\" ({:s})",
-               line_number, symbol_name, compilation_unit_name, section_name);
-}
-
-static void WarnSymOnFlagDetected(const std::size_t line_number,
-                                  const std::string_view compilation_unit_name,
-                                  const std::string_view section_name)
-{
-  if (!MWLinker::Map::do_warn_sym_on_flag_detected)
-    return;
-  std::println(std::cerr,
-               "Line {:d}] Multiple STT_SECTION symbols seen in an uninterrupted compilation unit "
-               "\"{:s}\" ({:s})",
-               line_number, compilation_unit_name, section_name);
-}
-
-static void WarnCommAfterLComm(const std::size_t line_number)
-{
-  if (!MWLinker::Map::do_warn_comm_after_lcomm)
-    return;
-  std::println(std::cerr, "Line {:d}] .comm symbols found after .lcomm symbols.", line_number);
-}
-
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
 
@@ -1621,6 +1581,46 @@ Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(const char*&, const ch
 void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream) const
 {
   std::print(stream, "\r\nLinktime size-increasing optimizations\r\n");
+}
+
+static void WarnRepeatCompilationUnit(const std::size_t line_number,
+                                      const std::string_view compilation_unit_name,
+                                      const std::string_view section_name)
+{
+  if (!MWLinker::Map::do_warn_repeat_compilation_unit)
+    return;
+  std::println(std::cerr, "Line {:d}] Repeat-name compilation unit detected \"{:s}\" ({:s})",
+               line_number, compilation_unit_name, section_name);
+}
+
+static void WarnODRViolation(const std::size_t line_number, const std::string_view symbol_name,
+                             const std::string_view compilation_unit_name,
+                             const std::string_view section_name)
+{
+  if (!MWLinker::Map::do_warn_odr_violation)
+    return;
+  std::println(std::cerr,
+               "Line {:d}] One-Definition Rule violation detected: \"{:s}\" in \"{:s}\" ({:s})",
+               line_number, symbol_name, compilation_unit_name, section_name);
+}
+
+static void WarnSymOnFlagDetected(const std::size_t line_number,
+                                  const std::string_view compilation_unit_name,
+                                  const std::string_view section_name)
+{
+  if (!MWLinker::Map::do_warn_sym_on_flag_detected)
+    return;
+  std::println(std::cerr,
+               "Line {:d}] Multiple STT_SECTION symbols seen in an uninterrupted compilation unit "
+               "\"{:s}\" ({:s})",
+               line_number, compilation_unit_name, section_name);
+}
+
+static void WarnCommAfterLComm(const std::size_t line_number)
+{
+  if (!MWLinker::Map::do_warn_comm_after_lcomm)
+    return;
+  std::println(std::cerr, "Line {:d}] .comm symbols found after .lcomm symbols.", line_number);
 }
 
 Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
