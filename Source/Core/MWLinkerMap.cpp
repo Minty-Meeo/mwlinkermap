@@ -2452,7 +2452,7 @@ void Map::MemoryMap::PrintSimple_old(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintSimple_old(std::ostream& stream) const
 {
   // "  %15s  %08x %08x %08x\r\n"
-  std::print(stream, "  {:15s}  {:08x} {:08x} {:08x}\r\n", name, starting_address, size,
+  std::print(stream, "  {:>15s}  {:08x} {:08x} {:08x}\r\n", name, starting_address, size,
              file_offset);
 }
 
@@ -2468,7 +2468,7 @@ void Map::MemoryMap::PrintRomRam_old(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintRomRam_old(std::ostream& stream) const
 {
   // "  %15s  %08x %08x %08x %08x %08x\r\n"
-  std::print(stream, "  {:15s}  {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", name, starting_address,
+  std::print(stream, "  {:>15s}  {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", name, starting_address,
              size, file_offset, rom_address, ram_buffer_address);
 }
 
@@ -2484,12 +2484,12 @@ void Map::MemoryMap::PrintDebug_old(std::ostream& stream) const
 void Map::MemoryMap::UnitDebug::Print_older(std::ostream& stream) const
 {
   // "  %15s           %06x %08x\r\n"
-  std::print(stream, "  {:15s}           {:06x} {:08x}\r\n", name, size, file_offset);
+  std::print(stream, "  {:>15s}           {:06x} {:08x}\r\n", name, size, file_offset);
 }
 void Map::MemoryMap::UnitDebug::Print_old(std::ostream& stream) const
 {
   // "  %15s           %08x %08x\r\n"
-  std::print(stream, "  {:15s}           {:08x} {:08x}\r\n", name, size, file_offset);
+  std::print(stream, "  {:>15s}           {:08x} {:08x}\r\n", name, size, file_offset);
 }
 
 void Map::MemoryMap::PrintSimple(std::ostream& stream) const
@@ -2504,7 +2504,7 @@ void Map::MemoryMap::PrintSimple(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintSimple(std::ostream& stream) const
 {
   // "  %20s %08x %08x %08x\r\n"
-  std::print(stream, "  {:20s} {:08x} {:08x} {:08x}\r\n", name, starting_address, size,
+  std::print(stream, "  {:>20s} {:08x} {:08x} {:08x}\r\n", name, starting_address, size,
              file_offset);
 }
 
@@ -2520,7 +2520,7 @@ void Map::MemoryMap::PrintRomRam(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintRomRam(std::ostream& stream) const
 {
   // "  %20s %08x %08x %08x %08x %08x\r\n"
-  std::print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", name, starting_address,
+  std::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", name, starting_address,
              size, file_offset, rom_address, ram_buffer_address);
 }
 
@@ -2536,7 +2536,7 @@ void Map::MemoryMap::PrintSRecord(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintSRecord(std::ostream& stream) const
 {
   // "  %20s %08x %08x %08x %10i\r\n"
-  std::print(stream, "  {:20s} {:08x} {:08x} {:08x} {:10d}\r\n", name, starting_address, size,
+  std::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:10d}\r\n", name, starting_address, size,
              file_offset, s_record_line);
 }
 
@@ -2552,7 +2552,7 @@ void Map::MemoryMap::PrintBinFile(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintBinFile(std::ostream& stream) const
 {
   // "  %20s %08x %08x %08x %08x %s\r\n"
-  std::print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:s}\r\n", name, starting_address, size,
+  std::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:s}\r\n", name, starting_address, size,
              file_offset, bin_file_offset, bin_file_name);
 }
 
@@ -2568,7 +2568,7 @@ void Map::MemoryMap::PrintRomRamSRecord(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintRomRamSRecord(std::ostream& stream) const
 {
   // "  %20s %08x %08x %08x %08x %08x %10i\r\n"
-  std::print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:08x} {:10d}\r\n", name,
+  std::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x} {:10d}\r\n", name,
              starting_address, size, file_offset, rom_address, ram_buffer_address, s_record_line);
 }
 
@@ -2584,7 +2584,7 @@ void Map::MemoryMap::PrintRomRamBinFile(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintRomRamBinFile(std::ostream& stream) const
 {
   // "  %20s %08x %08x %08x %08x %08x   %08x %s\r\n"
-  std::print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:08x}   {:08x} {:s}\r\n", name,
+  std::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}   {:08x} {:s}\r\n", name,
              starting_address, size, file_offset, rom_address, ram_buffer_address, bin_file_offset,
              bin_file_name);
 }
@@ -2601,7 +2601,7 @@ void Map::MemoryMap::PrintSRecordBinFile(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintSRecordBinFile(std::ostream& stream) const
 {
   // "  %20s %08x %08x %08x  %10i %08x %s\r\n"
-  std::print(stream, "  {:20s} {:08x} {:08x} {:08x}  {:10d} {:08x} {:s}\r\n", name,
+  std::print(stream, "  {:>20s} {:08x} {:08x} {:08x}  {:10d} {:08x} {:s}\r\n", name,
              starting_address, size, file_offset, s_record_line, bin_file_offset, bin_file_name);
 }
 
@@ -2617,7 +2617,7 @@ void Map::MemoryMap::PrintRomRamSRecordBinFile(std::ostream& stream) const
 void Map::MemoryMap::UnitNormal::PrintRomRamSRecordBinFile(std::ostream& stream) const
 {
   // "  %20s %08x %08x %08x %08x %08x    %10i %08x %s\r\n"
-  std::print(stream, "  {:20s} {:08x} {:08x} {:08x} {:08x} {:08x}    {:10d} {:08x} {:s}\r\n", name,
+  std::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}    {:10d} {:08x} {:s}\r\n", name,
              starting_address, size, file_offset, rom_address, ram_buffer_address, s_record_line,
              bin_file_offset, bin_file_name);
 }
@@ -2630,7 +2630,7 @@ void Map::MemoryMap::PrintDebug(std::ostream& stream) const
 void Map::MemoryMap::UnitDebug::Print(std::ostream& stream) const
 {
   // "  %20s          %08x %08x\r\n"
-  std::print(stream, "  {:20s}          {:08x} {:08x}\r\n", name, size, file_offset);
+  std::print(stream, "  {:>20s}          {:08x} {:08x}\r\n", name, size, file_offset);
 }
 
 // clang-format off
@@ -2664,7 +2664,7 @@ void Map::LinkerGeneratedSymbols::Print(std::ostream& stream) const
 void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream) const
 {
   // "%25s %08x\r\n"
-  std::print(stream, "{:25s} {:08x}\r\n", name, value);
+  std::print(stream, "{:>25s} {:08x}\r\n", name, value);
 }
 
 // void Map::LinkerGeneratedSymbols::Export(Report& report) const noexcept
