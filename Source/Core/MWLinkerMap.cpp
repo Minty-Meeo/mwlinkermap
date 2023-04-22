@@ -113,6 +113,7 @@ void Map::EPPC_PatternMatching::Warn::FoldingOneDefinitionRuleViolation(
     const std::size_t line_number, const std::string_view symbol_name,
     const std::string_view object_name)
 {
+  // For legal linker maps, this should only ever happen in repeat-name objects.
   if (!do_warn_folding_odr_violation)
     return;
   std::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
@@ -133,6 +134,7 @@ void Map::SectionLayout::Warn::OneDefinitionRuleViolation(
     const std::size_t line_number, const std::string_view symbol_name,
     const std::string_view compilation_unit_name, const std::string_view section_name)
 {
+  // For legal linker maps, this should only ever happen in repeat-name compilation units.
   if (!do_warn_odr_violation)
     return;
   std::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\" ({:s})", line_number,
@@ -472,7 +474,8 @@ void Map::Print(std::ostream& stream) const
     eppc_pattern_matching->Print(stream);
   if (dwarf_symbol_closure)
     dwarf_symbol_closure->Print(stream);
-  for (const auto& name : unresolved_symbols)
+  // TODO: move this into symbol closure printing now that line numbers are stored.
+  for (const auto& [line_number, name] : unresolved_symbols)
     // ">>> SYMBOL NOT FOUND: %s\r\n"
     std::print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", name);
   if (linker_opts)
@@ -948,9 +951,9 @@ static const std::map<std::string, Bind> map_symbol_closure_st_bind{
     {"multidef", Bind::multidef}, {"overload", Bind::overload}, {"unknown", Bind::unknown},
 };
 
-Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
-                                    std::size_t& line_number,
-                                    std::list<std::string>& unresolved_symbols)
+Map::Error Map::SymbolClosure::Scan(  //
+    const char*& head, const char* const tail, std::size_t& line_number,
+    std::list<std::pair<std::size_t, std::string>>& unresolved_symbols)
 {
   std::cmatch match;
 
@@ -1060,9 +1063,9 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
     {
       do
       {
+        unresolved_symbols.emplace_back(line_number, match.str(1));
         line_number += 1;
         head += match.length();
-        unresolved_symbols.push_back(match.str(1));
       } while (std::regex_search(head, tail, match, re_unresolved_symbol,
                                  std::regex_constants::match_continuous));
       continue;

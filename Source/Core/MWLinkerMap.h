@@ -240,7 +240,8 @@ struct Map
     SymbolClosure() = default;
     virtual ~SymbolClosure() override = default;
 
-    Error Scan(const char*&, const char*, std::size_t&, std::list<std::string>&);
+    Error Scan(const char*&, const char*, std::size_t&,
+               std::list<std::pair<std::size_t, std::string>>&);
     virtual void Print(std::ostream&) const override;
     static void PrintPrefix(std::ostream&, int);
     static const char* ToName(Type) noexcept;
@@ -842,7 +843,7 @@ struct Map
   std::unique_ptr<SymbolClosure> normal_symbol_closure;
   std::unique_ptr<EPPC_PatternMatching> eppc_pattern_matching;
   std::unique_ptr<SymbolClosure> dwarf_symbol_closure;
-  std::list<std::string> unresolved_symbols;
+  std::list<std::pair<std::size_t, std::string>> unresolved_symbols;
   std::unique_ptr<LinkerOpts> linker_opts;
   std::unique_ptr<MixedModeIslands> mixed_mode_islands;
   std::unique_ptr<BranchIslands> branch_islands;
