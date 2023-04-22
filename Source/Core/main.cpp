@@ -1,21 +1,24 @@
 #include <algorithm>
 #include <cstddef>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 
+#include "Future/CppLibPrint.h"
+
 #include "MWLinkerMap.h"
 
 static void tempfunc(const char* name, int choice)
 {
-  std::cout << name << std::endl;
+  std::println(std::cout, "{:s}", name);
 
   std::ifstream infile(name);
   if (!infile.is_open())
   {
-    std::cout << "Could not open!" << std::endl;
+    std::println(std::cerr, "Could not open!");
     return;
   }
   std::stringstream sstream;
@@ -37,42 +40,27 @@ static void tempfunc(const char* name, int choice)
     error = linker_map.ScanSMGalaxy(temp, line_number);
     break;
   default:
-    std::cout << "bad choice" << std::endl;
+    std::println(std::cerr, "bad choice");
     return;
   }
 
   while (temp.back() == '\0')
     temp.pop_back();
-  std::stringstream outfile;
-  linker_map.Print(outfile);
-  const bool matches = temp == std::move(outfile).str();
-  std::cout << "line: " << line_number + 1 << "   err: " << static_cast<int>(error)
-            << "   matches: " << matches
-            << "   min_version: " << static_cast<int>(linker_map.GetMinVersion()) << std::endl;
+  linker_map.Print(sstream);
+  std::string temp2 = std::move(sstream).str();
 
-  // for (const auto& section_layout : linker_map.section_layouts)
-  // {
-  //   for (const auto& module_lookup : section_layout->lookup)
-  //   {
-  //     int i = 0;
-  //     for (const auto& unit_lookups : module_lookup.second)
-  //     {
-  //       const std::string& compilation_unit_name = module_lookup.first;
-  //       std::cout << ++i << " | " << compilation_unit_name << std::endl;
-
-  //       for (const auto& unit_lookup : unit_lookups)
-  //         std::cout << unit_lookup.first << std::endl;
-  //     }
-  //   }
-  // }
+  const bool matches = (temp == temp2);
+  const MWLinker::Version min_version = linker_map.GetMinVersion();
+  std::println(std::cout, "line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}", line_number,
+               static_cast<int>(error), matches, static_cast<int>(min_version));
 }
 
 int main(const int argc, const char** argv)
 {
   if (argc < 2)
   {
-    std::cout << "Provide the name" << std::endl;
-    return 1;
+    std::println(std::cerr, "Provide the name");
+    return EXIT_FAILURE;
   }
   if (argc < 3)
   {
@@ -88,5 +76,5 @@ int main(const int argc, const char** argv)
       tempfunc(argv[1], 0);
   }
 
-  return 0;
+  return EXIT_SUCCESS;
 }

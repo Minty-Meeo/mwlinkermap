@@ -179,7 +179,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     return Error::Fail;
 
   std::cmatch match;
-  line_number = 0;
+  line_number = 1u;
 
   // Linker maps from Animal Crossing (foresta.map and static.map) and Doubutsu no Mori e+
   // (foresta.map, forestd.map, foresti.map, foresto.map, and static.map) appear to have been
@@ -188,7 +188,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
                         std::regex_constants::match_continuous))
   {
-    line_number += 2;
+    line_number += 2u;
     head += match.length();
     const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
@@ -204,7 +204,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
@@ -214,7 +214,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_entry_point_name,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->entry_point_name = match.str(1);
   }
@@ -267,7 +267,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 2;
+    line_number += 2u;
     head += match.length();
     auto portion = std::make_unique<MixedModeIslands>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -278,7 +278,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_branch_islands_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 2;
+    line_number += 2u;
     head += match.length();
     auto portion = std::make_unique<BranchIslands>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -289,7 +289,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_linktime_size_decreasing_optimizations_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 2;
+    line_number += 2u;
     head += match.length();
     auto portion = std::make_unique<LinktimeSizeDecreasingOptimizations>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -300,7 +300,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (std::regex_search(head, tail, match, re_linktime_size_increasing_optimizations_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 2;
+    line_number += 2u;
     head += match.length();
     auto portion = std::make_unique<LinktimeSizeIncreasingOptimizations>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -312,7 +312,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   while (std::regex_search(head, tail, match, re_section_layout_header,
                            std::regex_constants::match_continuous))
   {
-    line_number += 3;
+    line_number += 3u;
     head += match.length();
     const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
@@ -321,7 +321,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   if (std::regex_search(head, tail, match, re_memory_map_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 3;
+    line_number += 3u;
     head += match.length();
     const auto error = this->ScanPrologue_MemoryMap(head, tail, line_number);
     if (error != Error::None)
@@ -330,7 +330,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   if (std::regex_search(head, tail, match, re_linker_generated_symbols_header,
                         std::regex_constants::match_continuous))
   {
-    line_number += 3;
+    line_number += 3u;
     head += match.length();
     auto portion = std::make_unique<LinkerGeneratedSymbols>();
     const auto error = portion->Scan(head, tail, line_number);
@@ -352,7 +352,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
     return Error::Fail;
 
   std::cmatch match;
-  line_number = 0;
+  line_number = 1u;
 
   this->entry_point_name = "__start";
   // The Legend of Zelda: Twilight Princess features CodeWarrior for GCN 2.7 linker maps that have
@@ -364,7 +364,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
                            std::regex_constants::match_continuous))
   {
     std::string section_name = match.str(1);
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     const SectionLayout::Kind section_kind = SectionLayout::ToSectionKind(section_name);
     auto portion = std::make_unique<SectionLayout>(section_kind, std::move(section_name));
@@ -389,13 +389,13 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     return Error::Fail;
 
   std::cmatch match;
-  line_number = 0;
+  line_number = 1;
 
   // We only see this header once, as every symbol is mashed into an imaginary ".text" section.
   if (std::regex_search(head, tail, match, re_section_layout_header_modified_a,
                         std::regex_constants::match_continuous))
   {
-    line_number += 2;
+    line_number += 2u;
     head += match.length();
     // TODO: detect and split Section Layout subtext by observing the Starting Address
     auto portion = std::make_unique<SectionLayout>(SectionLayout::Kind::Normal, match.str(1));
@@ -519,17 +519,17 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
   if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_1,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_3,
                             std::regex_constants::match_continuous))
       {
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         auto portion = std::make_unique<SectionLayout>(section_kind, std::move(name));
         const auto error = portion->Scan3Column(head, tail, line_number);
@@ -550,17 +550,17 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
   else if (std::regex_search(head, tail, match, re_section_layout_4column_prologue_1,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_section_layout_4column_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       if (std::regex_search(head, tail, match, re_section_layout_4column_prologue_3,
                             std::regex_constants::match_continuous))
       {
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         auto portion = std::make_unique<SectionLayout>(section_kind, std::move(name));
         portion->SetMinVersion(Version::version_3_0_4);
@@ -657,12 +657,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   if (std::regex_search(head, tail, match, re_memory_map_simple_prologue_1_old,
                         std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_simple_prologue_2_old,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(false);
       const auto error = portion->ScanSimple_old(head, tail, line_number);
@@ -678,12 +678,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   else if (std::regex_search(head, tail, match, re_memory_map_romram_prologue_1_old,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_romram_prologue_2_old,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(true);
       const auto error = portion->ScanRomRam_old(head, tail, line_number);
@@ -699,12 +699,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   else if (std::regex_search(head, tail, match, re_memory_map_simple_prologue_1,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_simple_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(false, false, false);
       const auto error = portion->ScanSimple(head, tail, line_number);
@@ -720,12 +720,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   else if (std::regex_search(head, tail, match, re_memory_map_romram_prologue_1,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_romram_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(true, false, false);
       const auto error = portion->ScanRomRam(head, tail, line_number);
@@ -741,12 +741,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   else if (std::regex_search(head, tail, match, re_memory_map_srecord_prologue_1,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_srecord_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(false, true, false);
       const auto error = portion->ScanSRecord(head, tail, line_number);
@@ -762,12 +762,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   else if (std::regex_search(head, tail, match, re_memory_map_binfile_prologue_1,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_binfile_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(false, false, true);
       const auto error = portion->ScanBinFile(head, tail, line_number);
@@ -783,12 +783,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   else if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_prologue_1,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(true, true, false);
       const auto error = portion->ScanRomRamSRecord(head, tail, line_number);
@@ -804,12 +804,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   else if (std::regex_search(head, tail, match, re_memory_map_romram_binfile_prologue_1,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_romram_binfile_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(true, false, true);
       const auto error = portion->ScanRomRamBinFile(head, tail, line_number);
@@ -825,12 +825,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   else if (std::regex_search(head, tail, match, re_memory_map_srecord_binfile_prologue_1,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_srecord_binfile_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(false, true, true);
       const auto error = portion->ScanSRecordBinFile(head, tail, line_number);
@@ -846,12 +846,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   else if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_binfile_prologue_1,
                              std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_binfile_prologue_2,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       auto portion = std::make_unique<MemoryMap>(true, true, true);
       const auto error = portion->ScanRomRamSRecordBinFile(head, tail, line_number);
@@ -933,7 +933,7 @@ Map::Error Map::SymbolClosure::Scan(  //
         return Error::SymbolClosureInvalidSymbolType;
       if (!map_symbol_closure_st_bind.contains(bind))
         return Error::SymbolClosureInvalidSymbolBind;
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
@@ -951,7 +951,7 @@ Map::Error Map::SymbolClosure::Scan(  //
           return Error::SymbolClosureUnrefDupsHierarchyMismatch;
         if (match.str(2) != next_node->name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         while (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                  std::regex_constants::match_continuous))
@@ -963,7 +963,7 @@ Map::Error Map::SymbolClosure::Scan(  //
             return Error::SymbolClosureInvalidSymbolType;
           if (!map_symbol_closure_st_bind.contains(unref_dup_bind))
             return Error::SymbolClosureInvalidSymbolType;
-          line_number += 1;
+          line_number += 1u;
           head += match.length();
           next_node->unref_dups.emplace_back(map_symbol_closure_st_type.at(unref_dup_type),
                                              map_symbol_closure_st_bind.at(unref_dup_bind),
@@ -996,7 +996,7 @@ Map::Error Map::SymbolClosure::Scan(  //
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
@@ -1022,7 +1022,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       do
       {
         unresolved_symbols.emplace_back(line_number, match.str(1));
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
       } while (std::regex_search(head, tail, match, re_unresolved_symbol,
                                  std::regex_constants::match_continuous));
@@ -1184,7 +1184,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     {
       std::string first_name = match.str(1), second_name = match.str(2);
       const u32 size = static_cast<u32>(std::stoul(match.str(3)));
-      line_number += 2;
+      line_number += 2u;
       head += match.length();
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
@@ -1193,14 +1193,14 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
         if (match.str(2) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
-        line_number += 3;
+        line_number += 3u;
         head += match.length();
         will_be_replaced = true;
       }
+      if (merging_lookup.contains(first_name))
+        Warn::MergingOneDefinitionRuleViolation(line_number - 5u, first_name);
       const MergingUnit& unit = this->merging_units.emplace_back(
           first_name, std::move(second_name), size, will_be_replaced, was_interchanged);
-      if (merging_lookup.contains(first_name))
-        Warn::MergingOneDefinitionRuleViolation(line_number - 4u, first_name);
       merging_lookup.emplace(std::move(first_name), unit);
       continue;
     }
@@ -1210,7 +1210,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       std::string first_name = match.str(1), second_name = match.str(2);
       const u32 size = static_cast<u32>(std::stoul(match.str(3)));
       was_interchanged = true;
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
@@ -1220,7 +1220,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         if (match.str(2) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
 
-        line_number += 3;
+        line_number += 3u;
         head += match.length();
         will_be_replaced = true;
       }
@@ -1233,17 +1233,17 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
         if (std::stoul(match.str(3)) != size)
           return Error::EPPC_PatternMatchingMergingSizeMismatch;
-        line_number += 2;
+        line_number += 2u;
         head += match.length();
       }
       else
       {
         return Error::EPPC_PatternMatchingMergingInterchangeMissingEpilogue;
       }
+      if (merging_lookup.contains(first_name))
+        Warn::MergingOneDefinitionRuleViolation(line_number - 5u, first_name);
       const MergingUnit& unit = this->merging_units.emplace_back(
           first_name, std::move(second_name), size, will_be_replaced, was_interchanged);
-      if (merging_lookup.contains(first_name))
-        Warn::MergingOneDefinitionRuleViolation(line_number - 4u, first_name);
       merging_lookup.emplace(std::move(first_name), unit);
       continue;
     }
@@ -1255,10 +1255,10 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
   {
     const std::string object_name = match.str(1);
     if (this->folding_lookup.contains(object_name))
-      Warn::FoldingRepeatObject(line_number + 4u, object_name);
+      Warn::FoldingRepeatObject(line_number + 3u, object_name);
     FoldingUnit::UnitLookup& curr_unit_lookup = this->folding_lookup[object_name];
     auto folding_unit = FoldingUnit(object_name);
-    line_number += 4;
+    line_number += 4u;
     head += match.length();
     while (true)
     {
@@ -1267,8 +1267,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       {
         std::string first_name = match.str(1);
         if (curr_unit_lookup.contains(first_name))
-          Warn::FoldingOneDefinitionRuleViolation(line_number + 1u, first_name, object_name);
-        line_number += 2;
+          Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
+        line_number += 2u;
         head += match.length();
         const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
             first_name, match.str(2), std::stoul(match.str(3)), false);
@@ -1282,8 +1282,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         if (first_name != match.str(4))  // It is my assumption that they will always match.
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
         if (curr_unit_lookup.contains(first_name))
-          Warn::FoldingOneDefinitionRuleViolation(line_number + 1u, first_name, object_name);
-        line_number += 2;
+          Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
+        line_number += 2u;
         head += match.length();
         const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
             first_name, match.str(2), std::stoul(match.str(3)), true);
@@ -1419,7 +1419,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_not_near,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       this->units.emplace_back(Unit::Kind::NotNear, match.str(1), match.str(2), match.str(3));
       continue;
@@ -1427,7 +1427,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_disassemble_error,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       this->units.emplace_back(match.str(1), match.str(2));
       continue;
@@ -1435,7 +1435,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_address_not_computed,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       this->units.emplace_back(Unit::Kind::NotComputed, match.str(1), match.str(2), match.str(3));
       continue;
@@ -1444,7 +1444,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_optimized,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       this->units.emplace_back(Unit::Kind::Optimized, match.str(1), match.str(2), match.str(3));
       continue;
@@ -1507,7 +1507,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       this->units.emplace_back(match.str(1), match.str(2), false);
       continue;
@@ -1515,7 +1515,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       this->units.emplace_back(match.str(1), match.str(2), true);
       continue;
@@ -1563,7 +1563,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_branch_islands_created,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       this->units.emplace_back(match.str(1), match.str(2), false);
       continue;
@@ -1571,7 +1571,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_branch_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       this->units.emplace_back(match.str(1), match.str(2), true);
       continue;
@@ -1647,12 +1647,12 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
         // STT_SECTION symbols, making them indistinguishable from a repeat-name compilation unit
         // without further heuristics.  In other words, false positives ahoy.
         // TODO: What version?
-        Warn::RepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
+        Warn::RepeatCompilationUnit(line_number, compilation_unit_name, this->name);
       }
       if (is_in_lcomm)
       {
         // Shouldn't this be impossible?
-        Warn::CommAfterLComm(line_number + 1u);
+        Warn::CommAfterLComm(line_number);
         is_in_lcomm = false;
       }
       return Unit::Trait::Section;
@@ -1677,7 +1677,7 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
         // an extabindex section's second lap for printing UNUSED symbols after _eti_init_info.
         else if (is_repeat_compilation_unit_detected && !is_after_eti_init_info)
         {
-          Warn::RepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
+          Warn::RepeatCompilationUnit(line_number, compilation_unit_name, this->name);
         }
         return Unit::Trait::ExTabIndex;
       }
@@ -1689,14 +1689,14 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
     if (this->section_kind == Kind::Ctors || this->section_kind == Kind::Dtors)
     {
       const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-      Warn::RepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
+      Warn::RepeatCompilationUnit(line_number, compilation_unit_name, this->name);
     }
     else if (!is_multi_stt_section)
     {
       // Either this compilation unit was compiled with '-sym on', or two repeat-name compilation
       // units are adjacent to one another.
       const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-      Warn::SymOnFlagDetected(line_number + 1u, compilation_unit_name, this->name);
+      Warn::SymOnFlagDetected(line_number, compilation_unit_name, this->name);
       is_multi_stt_section = true;
     }
     return Unit::Trait::Section;
@@ -1709,8 +1709,7 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
       // This can be a strong hint that there are two or more repeat-name compilation units in your
       // linker map, assuming it's not messed up in any way.  Note that this does not detect symbols
       // with identical names across section layouts.
-      Warn::OneDefinitionRuleViolation(line_number + 1u, symbol_name, compilation_unit_name,
-                                       this->name);
+      Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name, this->name);
     }
   }
   if (is_in_lcomm)
@@ -1750,7 +1749,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
       if (curr_unit_lookup == nullptr) [[unlikely]]
         return Error::Fail;
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       const Unit& unit = this->units.emplace_back(
           unit_trait, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
@@ -1768,7 +1767,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
       if (curr_unit_lookup == nullptr) [[unlikely]]
         return Error::Fail;
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       const Unit& unit = this->units.emplace_back(unit_trait, xstoul(match.str(1)), symbol_name,
                                                   std::move(module_name), std::move(source_name));
@@ -1792,12 +1791,12 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         {
           const std::string& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
-          Warn::OneDefinitionRuleViolation(line_number + 1u, symbol_name, compilation_unit_name,
+          Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name,
                                            this->name);
         }
         if (curr_unit_lookup == nullptr)
           return Error::Fail;
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         const Unit& unit = this->units.emplace_back(
             Unit::Trait::None, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
@@ -1848,7 +1847,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
       const Unit::Trait unit_trait = DeduceUsualSubtext(
           symbol_name, module_name, source_name, curr_module_name, curr_source_name,
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       const Unit& unit = this->units.emplace_back(
           unit_trait, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
@@ -1865,7 +1864,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
       const Unit::Trait unit_trait = DeduceUsualSubtext(
           symbol_name, module_name, source_name, curr_module_name, curr_source_name,
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       const Unit& unit = this->units.emplace_back(unit_trait, xstoul(match.str(1)), symbol_name,
                                                   std::move(module_name), std::move(source_name));
@@ -1889,10 +1888,10 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         {
           const std::string& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
-          Warn::OneDefinitionRuleViolation(line_number + 1u, symbol_name, compilation_unit_name,
+          Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name,
                                            this->name);
         }
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         const Unit& unit =
             this->units.emplace_back(Unit::Trait::None, xstoul(match.str(1)), xstoul(match.str(2)),
@@ -1913,7 +1912,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
       std::string special_name = match.str(6);
       if (special_name == "*fill*")
       {
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         this->units.emplace_back(Unit::Trait::Fill1, xstoul(match.str(1)), xstoul(match.str(2)),
                                  xstoul(match.str(3)), xstoul(match.str(4)),
@@ -1922,7 +1921,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
       }
       if (special_name == "**fill**")
       {
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         this->units.emplace_back(Unit::Trait::Fill2, xstoul(match.str(1)), xstoul(match.str(2)),
                                  xstoul(match.str(3)), xstoul(match.str(4)),
@@ -1961,7 +1960,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       const Unit::Trait unit_trait = DeduceUsualSubtext(
           symbol_name, module_name, source_name, curr_module_name, curr_source_name,
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
-      line_number += 1;
+      line_number += 1u;
       head += match.length();
       const Unit& unit = this->units.emplace_back(
           unit_trait, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
@@ -1986,10 +1985,10 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         {
           const std::string& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
-          Warn::OneDefinitionRuleViolation(line_number + 1u, symbol_name, compilation_unit_name,
+          Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name,
                                            this->name);
         }
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         const Unit& unit = this->units.emplace_back(
             Unit::Trait::None, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
@@ -2009,7 +2008,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       std::string special_name = match.str(5);
       if (special_name == "*fill*")
       {
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         this->units.emplace_back(Unit::Trait::Fill1, xstoul(match.str(1)), xstoul(match.str(2)),
                                  xstoul(match.str(3)), 0, std::stoi(match.str(4)));
@@ -2017,7 +2016,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       }
       if (special_name == "**fill**")
       {
-        line_number += 1;
+        line_number += 1u;
         head += match.length();
         this->units.emplace_back(Unit::Trait::Fill2, xstoul(match.str(1)), xstoul(match.str(2)),
                                  xstoul(match.str(3)), 0, std::stoi(match.str(4)));
@@ -2145,7 +2144,7 @@ Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const t
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple_old,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)));
@@ -2167,7 +2166,7 @@ Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const t
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_old,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), xstoul(match.str(5)),
@@ -2191,7 +2190,7 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug_old,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     std::string temp = match.str(2);
     if (temp.length() == 8 && temp.front() == '0')  // Make sure it's not just an overflowed value
@@ -2215,7 +2214,7 @@ Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)));
@@ -2237,7 +2236,7 @@ Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), xstoul(match.str(5)),
@@ -2260,7 +2259,7 @@ Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), std::stoi(match.str(5)));
@@ -2282,7 +2281,7 @@ Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_binfile,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), xstoul(match.str(5)), match.str(6));
@@ -2304,7 +2303,7 @@ Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), xstoul(match.str(5)),
@@ -2327,7 +2326,7 @@ Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_binfile,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), xstoul(match.str(5)),
@@ -2350,7 +2349,7 @@ Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* con
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), std::stoi(match.str(5)),
@@ -2373,7 +2372,7 @@ Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const cha
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
                                     xstoul(match.str(4)), xstoul(match.str(5)),
@@ -2397,7 +2396,7 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
   }
@@ -2647,7 +2646,7 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_linker_generated_symbols_unit,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1;
+    line_number += 1u;
     head += match.length();
     this->units.emplace_back(match.str(1), xstoul(match.str(2)));
   }
