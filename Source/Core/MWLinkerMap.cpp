@@ -975,13 +975,13 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
       line_number += 1;
       head += match.length();
 
-      auto next_node = std::make_unique<NodeReal>(match.str(2), map_symbol_closure_st_type.at(type),
-                                                  map_symbol_closure_st_bind.at(bind), match.str(5),
-                                                  match.str(6));
-
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
       curr_hierarchy_level = next_hierarchy_level;
+
+      auto next_node = std::make_unique<NodeReal>(
+          curr_node, match.str(2), map_symbol_closure_st_type.at(type),
+          map_symbol_closure_st_bind.at(bind), match.str(5), match.str(6));
 
       if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
                             std::regex_constants::match_continuous))
@@ -1013,7 +1013,6 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
         this->SetMinVersion(Version::version_2_3_3_build_137);
       }
 
-      next_node->parent = curr_node;
       // Though I do not understand it, the following is a normal occurrence for _dtors$99:
       // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
       // "    3] .text (section,local) found in xyz.cpp lib.a"
@@ -1021,9 +1020,8 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
                                  next_node->module_name == "Linker Generated Symbol File");
           void(curr_node = curr_node->children.emplace_back(next_node.release()).get()), is_weird)
       {
-        auto dummy_node = std::make_unique<NodeBase>();
-        dummy_node->parent = curr_node;
-        curr_node = curr_node->children.emplace_back(dummy_node.release()).get();
+        // Create a dummy node for hierarchy level 2.
+        curr_node = curr_node->children.emplace_back(new NodeBase(curr_node)).get();
         ++curr_hierarchy_level;
         this->SetMinVersion(Version::version_3_0_4);
       }
@@ -1040,14 +1038,11 @@ Map::Error Map::SymbolClosure::Scan(const char*& head, const char* const tail,
       line_number += 1;
       head += match.length();
 
-      auto next_node = std::make_unique<NodeReal>(match.str(2));
-
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
       curr_hierarchy_level = next_hierarchy_level;
 
-      next_node->parent = curr_node;
-      curr_node = curr_node->children.emplace_back(next_node.release()).get();
+      curr_node = curr_node->children.emplace_back(new NodeReal(curr_node, match.str(2))).get();
       continue;
     }
     // Up until CodeWarrior for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the

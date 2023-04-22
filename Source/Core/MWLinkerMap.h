@@ -172,13 +172,14 @@ struct Map
 
     struct NodeBase
     {
-      NodeBase() = default;  // Necessary for root and fake _dtor$99 node
+      NodeBase() = default;  // Necessary for root node
+      NodeBase(NodeBase* parent_) : parent(parent_) {}
       virtual ~NodeBase() = default;
 
       virtual void Print(std::ostream&, int) const;  // Necessary for root and fake _dtor$99 node
       // virtual void Export(DebugInfo&) const noexcept;
 
-      NodeBase* parent = nullptr;
+      NodeBase* parent;
       std::list<std::unique_ptr<NodeBase>> children;
     };
 
@@ -207,15 +208,15 @@ struct Map
         std::string source_name;
       };
 
-      NodeReal(std::string name_, Type type_, Bind bind_, std::string module_name_,
-               std::string source_name_)
-          : unit_kind(Kind::Normal), name(std::move(name_)), type(type_), bind(bind_),
-            module_name(std::move(module_name_)), source_name(std::move(source_name_))
+      NodeReal(NodeBase* parent_, std::string name_, Type type_, Bind bind_,
+               std::string module_name_, std::string source_name_)
+          : NodeBase(parent_), unit_kind(Kind::Normal), name(std::move(name_)), type(type_),
+            bind(bind_), module_name(std::move(module_name_)), source_name(std::move(source_name_))
       {
       }
-      NodeReal(std::string name_)
-          : unit_kind(Kind::LinkerGenerated), name(std::move(name_)), type(Type::notype),
-            bind(Bind::global)
+      NodeReal(NodeBase* parent_, std::string name_)
+          : NodeBase(parent_), unit_kind(Kind::LinkerGenerated), name(std::move(name_)),
+            type(Type::notype), bind(Bind::global)
       {
       }
       virtual ~NodeReal() override = default;
