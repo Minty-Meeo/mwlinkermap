@@ -33,64 +33,6 @@ using u32 = std::uint32_t;
 
 namespace MWLinker
 {
-#ifdef DOLPHIN  // Dolphin Emulator
-#else           // mwlinkermap-temp
-Map::Error Map::Scan(std::istream& stream, std::size_t& line_number)
-{
-  std::stringstream sstream;
-  sstream << stream.rdbuf();
-  return this->Scan(sstream, line_number);
-}
-Map::Error Map::Scan(const std::stringstream& sstream, std::size_t& line_number)
-{
-  // TODO: donkey dick
-  return this->Scan(std::move(sstream).str(), line_number);
-}
-#endif
-Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
-{
-  return this->Scan(string_view.data(), string_view.data() + string_view.size(), line_number);
-}
-
-#ifdef DOLPHIN  // Dolphin Emulator
-#else           // mwlinkermap-temp
-Map::Error Map::ScanTLOZTP(std::istream& stream, std::size_t& line_number)
-{
-  std::stringstream sstream;
-  sstream << stream.rdbuf();
-  return this->ScanTLOZTP(sstream, line_number);
-}
-Map::Error Map::ScanTLOZTP(const std::stringstream& sstream, std::size_t& line_number)
-{
-  // TODO: donkey dick
-  return this->ScanTLOZTP(std::move(sstream).str(), line_number);
-}
-#endif
-Map::Error Map::ScanTLOZTP(const std::string_view string_view, std::size_t& line_number)
-{
-  return this->ScanTLOZTP(string_view.data(), string_view.data() + string_view.size(), line_number);
-}
-
-#ifdef DOLPHIN  // Dolphin Emulator
-#else           // mwlinkermap-temp
-Map::Error Map::ScanSMGalaxy(std::istream& stream, std::size_t& line_number)
-{
-  std::stringstream sstream;
-  sstream << stream.rdbuf();
-  return this->ScanSMGalaxy(sstream, line_number);
-}
-Map::Error Map::ScanSMGalaxy(const std::stringstream& sstream, std::size_t& line_number)
-{
-  // TODO: donkey dick
-  return this->ScanSMGalaxy(std::move(sstream).str(), line_number);
-}
-#endif
-Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& line_number)
-{
-  return this->ScanSMGalaxy(string_view.data(), string_view.data() + string_view.size(),
-                            line_number);
-}
-
 void Map::EPPC_PatternMatching::Warn::MergingOneDefinitionRuleViolation(
     const std::size_t line_number, const std::string_view symbol_name)
 {
@@ -224,6 +166,11 @@ Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string& se
     return map_section_layout_kind.at(section_name);
   else
     return Map::SectionLayout::Kind::Normal;
+}
+
+Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
+{
+  return this->Scan(string_view.data(), string_view.data() + string_view.size(), line_number);
 }
 
 Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line_number)
@@ -394,6 +341,11 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
   return this->ScanForGarbage(head, tail);
 }
 
+Map::Error Map::ScanTLOZTP(const std::string_view string_view, std::size_t& line_number)
+{
+  return this->ScanTLOZTP(string_view.data(), string_view.data() + string_view.size(), line_number);
+}
+
 Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t& line_number)
 {
   if (head == nullptr || tail == nullptr || head > tail)
@@ -423,6 +375,12 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
     this->section_layouts.push_back(std::move(portion));
   }
   return this->ScanForGarbage(head, tail);
+}
+
+Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& line_number)
+{
+  return this->ScanSMGalaxy(string_view.data(), string_view.data() + string_view.size(),
+                            line_number);
 }
 
 Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size_t& line_number)

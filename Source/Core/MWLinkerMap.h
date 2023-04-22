@@ -812,22 +812,10 @@ struct Map
     std::list<Unit> units;
   };
 
-#ifndef DOLPHIN
-  Error Scan(std::istream&, std::size_t&);
-  Error Scan(const std::stringstream&, std::size_t&);
-#endif
   Error Scan(std::string_view, std::size_t&);
   Error Scan(const char*, const char*, std::size_t&);
-#ifndef DOLPHIN
-  Error ScanTLOZTP(std::istream&, std::size_t&);
-  Error ScanTLOZTP(const std::stringstream&, std::size_t&);
-#endif
   Error ScanTLOZTP(std::string_view, std::size_t&);
   Error ScanTLOZTP(const char*, const char*, std::size_t&);
-#ifndef DOLPHIN
-  Error ScanSMGalaxy(std::istream&, std::size_t&);
-  Error ScanSMGalaxy(const std::stringstream&, std::size_t&);
-#endif
   Error ScanSMGalaxy(std::string_view, std::size_t&);
   Error ScanSMGalaxy(const char*, const char*, std::size_t&);
 
