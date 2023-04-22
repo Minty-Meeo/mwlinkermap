@@ -298,6 +298,9 @@ struct Map
         bool new_branch_function;
       };
 
+      using UnitLookup = std::multimap<std::string, const Unit&>;
+      using ModuleLookup = std::map<std::string, UnitLookup>;
+
       FoldingUnit(std::string object_name_) : object_name(std::move(object_name_)) {}
 
       void Print(std::ostream&) const;
@@ -306,12 +309,13 @@ struct Map
       std::list<Unit> units;
     };
 
+    using MergingUnitLookup = std::multimap<std::string, const MergingUnit&>;
+
     EPPC_PatternMatching() { SetMinVersion(Version::version_4_2_build_142); }
     virtual ~EPPC_PatternMatching() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    void Export(DebugInfo&) const noexcept;
     virtual bool IsEmpty() const noexcept override
     {
       return merging_units.empty() || folding_units.empty();
@@ -319,6 +323,21 @@ struct Map
 
     std::list<MergingUnit> merging_units;
     std::list<FoldingUnit> folding_units;
+    MergingUnitLookup merging_lookup;
+    FoldingUnit::ModuleLookup folding_lookup;
+
+  private:
+    struct Warn
+    {
+      static void MergingOneDefinitionRuleViolation(std::size_t, std::string_view);
+      static void FoldingRepeatObject(std::size_t, std::string_view);
+      static void FoldingOneDefinitionRuleViolation(std::size_t, std::string_view,
+                                                    std::string_view);
+
+      static inline bool do_warn_merging_odr_violation = true;
+      static inline bool do_warn_folding_repeat_object = true;
+      static inline bool do_warn_folding_odr_violation = true;
+    };
   };
 
   struct LinkerOpts final : PortionBase
@@ -575,8 +594,8 @@ struct Map
     using UnitLookup = std::multimap<std::string, const Unit&>;
     using ModuleLookup = std::map<std::string, UnitLookup>;
 
-    SectionLayout(std::string name_, Kind section_kind_)
-        : name(std::move(name_)), section_kind(section_kind_)
+    SectionLayout(Kind section_kind_, std::string name_)
+        : section_kind(section_kind_), name(std::move(name_))
     {
     }
     virtual ~SectionLayout() override = default;
@@ -597,6 +616,21 @@ struct Map
     std::string name;
     std::list<Unit> units;
     ModuleLookup lookup;
+
+  private:
+    struct Warn
+    {
+      static void RepeatCompilationUnit(std::size_t, std::string_view, std::string_view);
+      static void OneDefinitionRuleViolation(std::size_t, std::string_view, std::string_view,
+                                             std::string_view);
+      static void SymOnFlagDetected(std::size_t, std::string_view, std::string_view);
+      static void CommAfterLComm(std::size_t);
+
+      static inline bool do_warn_repeat_compilation_unit = true;
+      static inline bool do_warn_odr_violation = true;
+      static inline bool do_warn_sym_on_flag_detected = true;
+      static inline bool do_warn_comm_after_lcomm = true;
+    };
   };
 
   // CodeWarrior for GCN 2.7
@@ -816,12 +850,6 @@ struct Map
   std::list<std::unique_ptr<SectionLayout>> section_layouts;
   std::unique_ptr<MemoryMap> memory_map;
   std::unique_ptr<LinkerGeneratedSymbols> linker_generated_symbols;
-
-  // These are a global state because I really don't care.
-  static inline bool do_warn_repeat_compilation_unit = true;
-  static inline bool do_warn_odr_violation = true;
-  static inline bool do_warn_sym_on_flag_detected = true;
-  static inline bool do_warn_comm_after_lcomm = true;
 
   struct UnitDebugInfo
   {

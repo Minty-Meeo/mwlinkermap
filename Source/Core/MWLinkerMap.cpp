@@ -91,6 +91,74 @@ Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& li
                             line_number);
 }
 
+void Map::EPPC_PatternMatching::Warn::MergingOneDefinitionRuleViolation(
+    const std::size_t line_number, const std::string_view symbol_name)
+{
+  // Could be a false positive, as code merging has no information about where the symbol came from.
+  if (!do_warn_merging_odr_violation)
+    return;
+  std::println(std::cerr, "Line {:d}] \"{:s}\" seen again", line_number, symbol_name);
+}
+
+void Map::EPPC_PatternMatching::Warn::FoldingRepeatObject(const std::size_t line_number,
+                                                          const std::string_view object_name)
+{
+  // This warning is pretty much the only one guaranteed to not produce false positives.
+  if (!do_warn_folding_repeat_object)
+    std::println(std::cerr, "Line {:d}] Detected repeat-name object \"{:s}\"", line_number,
+                 object_name);
+}
+
+void Map::EPPC_PatternMatching::Warn::FoldingOneDefinitionRuleViolation(
+    const std::size_t line_number, const std::string_view symbol_name,
+    const std::string_view object_name)
+{
+  if (!do_warn_folding_odr_violation)
+    return;
+  std::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
+               object_name);
+}
+
+void Map::SectionLayout::Warn::RepeatCompilationUnit(const std::size_t line_number,
+                                                     const std::string_view compilation_unit_name,
+                                                     const std::string_view section_name)
+{
+  if (!do_warn_repeat_compilation_unit)
+    return;
+  std::println(std::cerr, "Line {:d}] Detected repeat-name compilation unit \"{:s}\" ({:s})",
+               line_number, compilation_unit_name, section_name);
+}
+
+void Map::SectionLayout::Warn::OneDefinitionRuleViolation(
+    const std::size_t line_number, const std::string_view symbol_name,
+    const std::string_view compilation_unit_name, const std::string_view section_name)
+{
+  if (!do_warn_odr_violation)
+    return;
+  std::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\" ({:s})", line_number,
+               symbol_name, compilation_unit_name, section_name);
+}
+
+void Map::SectionLayout::Warn::SymOnFlagDetected(const std::size_t line_number,
+                                                 const std::string_view compilation_unit_name,
+                                                 const std::string_view section_name)
+{
+  // Multiple STT_SECTION symbols were seen in an uninterrupted compilation unit.  This could be
+  // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
+  if (!do_warn_sym_on_flag_detected)
+    return;
+  std::println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" ({:s})", line_number,
+               compilation_unit_name, section_name);
+}
+
+void Map::SectionLayout::Warn::CommAfterLComm(const std::size_t line_number)
+{
+  // Shouldn't this be impossible?
+  if (!do_warn_comm_after_lcomm)
+    return;
+  std::println(std::cerr, "Line {:d}] .comm symbols found after .lcomm symbols.", line_number);
+}
+
 // clang-format off
 static const std::regex re_entry_point_name{
 //  "Link map of %s\r\n"
@@ -345,7 +413,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
     line_number += 1;
     head += match.length();
     const SectionLayout::Kind section_kind = SectionLayout::ToSectionKind(section_name);
-    auto portion = std::make_unique<SectionLayout>(std::move(section_name), section_kind);
+    auto portion = std::make_unique<SectionLayout>(section_kind, std::move(section_name));
     portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->ScanTLOZTP(head, tail, line_number);
     if (error != Error::None)
@@ -370,7 +438,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     line_number += 2;
     head += match.length();
     // TODO: detect and split Section Layout subtext by observing the Starting Address
-    auto portion = std::make_unique<SectionLayout>(match.str(1), SectionLayout::Kind::Normal);
+    auto portion = std::make_unique<SectionLayout>(SectionLayout::Kind::Normal, match.str(1));
     portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
@@ -502,7 +570,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
       {
         line_number += 1;
         head += match.length();
-        auto portion = std::make_unique<SectionLayout>(std::move(name), section_kind);
+        auto portion = std::make_unique<SectionLayout>(section_kind, std::move(name));
         const auto error = portion->Scan3Column(head, tail, line_number);
         if (error != Error::None)
           return error;
@@ -533,7 +601,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
       {
         line_number += 1;
         head += match.length();
-        auto portion = std::make_unique<SectionLayout>(std::move(name), section_kind);
+        auto portion = std::make_unique<SectionLayout>(section_kind, std::move(name));
         portion->SetMinVersion(Version::version_3_0_4);
         const auto error = portion->Scan4Column(head, tail, line_number);
         if (error != Error::None)
@@ -1150,22 +1218,18 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
 {
   std::cmatch match;
 
-  std::string last;
-
   while (true)
   {
-    bool will_be_replaced = false;
-    bool was_interchanged = false;
+    bool will_be_replaced = false, was_interchanged = false;
     // EPPC_PatternMatching looks for functions that are duplicates of one another and prints what
     // it has changed in real-time to the linker map.
     if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                           std::regex_constants::match_continuous))
     {
+      std::string first_name = match.str(1), second_name = match.str(2);
+      const u32 size = static_cast<u32>(std::stoul(match.str(3)));
       line_number += 2;
       head += match.length();
-      std::string first_name = match.str(1);
-      std::string second_name = match.str(2);
-      const u32 size = static_cast<u32>(std::stoul(match.str(3)));
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
@@ -1177,18 +1241,19 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         head += match.length();
         will_be_replaced = true;
       }
-      this->merging_units.emplace_back(std::move(first_name), std::move(second_name), size,
-                                       will_be_replaced, was_interchanged);
+      const MergingUnit& unit = this->merging_units.emplace_back(
+          first_name, std::move(second_name), size, will_be_replaced, was_interchanged);
+      if (merging_lookup.contains(first_name))
+        Warn::MergingOneDefinitionRuleViolation(line_number - 4u, first_name);
+      merging_lookup.emplace(std::move(first_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_code_merging_was_interchanged,
                           std::regex_constants::match_continuous))
     {
-      std::string first_name = match.str(1);
-      std::string second_name = match.str(2);
+      std::string first_name = match.str(1), second_name = match.str(2);
       const u32 size = static_cast<u32>(std::stoul(match.str(3)));
       was_interchanged = true;
-
       line_number += 1;
       head += match.length();
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
@@ -1198,6 +1263,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
         if (match.str(2) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
+
         line_number += 3;
         head += match.length();
         will_be_replaced = true;
@@ -1218,8 +1284,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       {
         return Error::EPPC_PatternMatchingMergingInterchangeMissingEpilogue;
       }
-      this->merging_units.emplace_back(std::move(first_name), std::move(second_name), size,
-                                       will_be_replaced, was_interchanged);
+      const MergingUnit& unit = this->merging_units.emplace_back(
+          first_name, std::move(second_name), size, will_be_replaced, was_interchanged);
+      if (merging_lookup.contains(first_name))
+        Warn::MergingOneDefinitionRuleViolation(line_number - 4u, first_name);
+      merging_lookup.emplace(std::move(first_name), unit);
       continue;
     }
     break;
@@ -1228,7 +1297,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
   while (std::regex_search(head, tail, match, re_code_folding_header,
                            std::regex_constants::match_continuous))
   {
-    auto folding_unit = FoldingUnit(match.str(1));
+    const std::string object_name = match.str(1);
+    if (this->folding_lookup.contains(object_name))
+      Warn::FoldingRepeatObject(line_number + 4u, object_name);
+    FoldingUnit::UnitLookup& curr_unit_lookup = this->folding_lookup[object_name];
+    auto folding_unit = FoldingUnit(object_name);
     line_number += 4;
     head += match.length();
     while (true)
@@ -1236,20 +1309,29 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
                             std::regex_constants::match_continuous))
       {
+        std::string first_name = match.str(1);
+        if (curr_unit_lookup.contains(first_name))
+          Warn::FoldingOneDefinitionRuleViolation(line_number + 1u, first_name, object_name);
         line_number += 2;
         head += match.length();
-        folding_unit.units.emplace_back(match.str(1), match.str(2), std::stoul(match.str(3)),
-                                        false);
+        const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
+            first_name, match.str(2), std::stoul(match.str(3)), false);
+        curr_unit_lookup.emplace(std::move(first_name), unit);
         continue;
       }
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
                             std::regex_constants::match_continuous))
       {
-        if (match.str(1) != match.str(4))  // It is my assumption that they will always match.
+        std::string first_name = match.str(1);
+        if (first_name != match.str(4))  // It is my assumption that they will always match.
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
+        if (curr_unit_lookup.contains(first_name))
+          Warn::FoldingOneDefinitionRuleViolation(line_number + 1u, first_name, object_name);
         line_number += 2;
         head += match.length();
-        folding_unit.units.emplace_back(match.str(1), match.str(2), std::stoul(match.str(3)), true);
+        const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
+            first_name, match.str(2), std::stoul(match.str(3)), true);
+        curr_unit_lookup.emplace(std::move(first_name), unit);
         continue;
       }
       break;
@@ -1583,51 +1665,11 @@ void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream) const
   std::print(stream, "\r\nLinktime size-increasing optimizations\r\n");
 }
 
-static void WarnRepeatCompilationUnit(const std::size_t line_number,
-                                      const std::string_view compilation_unit_name,
-                                      const std::string_view section_name)
-{
-  if (!MWLinker::Map::do_warn_repeat_compilation_unit)
-    return;
-  std::println(std::cerr, "Line {:d}] Repeat-name compilation unit detected \"{:s}\" ({:s})",
-               line_number, compilation_unit_name, section_name);
-}
-
-static void WarnODRViolation(const std::size_t line_number, const std::string_view symbol_name,
-                             const std::string_view compilation_unit_name,
-                             const std::string_view section_name)
-{
-  if (!MWLinker::Map::do_warn_odr_violation)
-    return;
-  std::println(std::cerr,
-               "Line {:d}] One-Definition Rule violation detected: \"{:s}\" in \"{:s}\" ({:s})",
-               line_number, symbol_name, compilation_unit_name, section_name);
-}
-
-static void WarnSymOnFlagDetected(const std::size_t line_number,
-                                  const std::string_view compilation_unit_name,
-                                  const std::string_view section_name)
-{
-  if (!MWLinker::Map::do_warn_sym_on_flag_detected)
-    return;
-  std::println(std::cerr,
-               "Line {:d}] Multiple STT_SECTION symbols seen in an uninterrupted compilation unit "
-               "\"{:s}\" ({:s})",
-               line_number, compilation_unit_name, section_name);
-}
-
-static void WarnCommAfterLComm(const std::size_t line_number)
-{
-  if (!MWLinker::Map::do_warn_comm_after_lcomm)
-    return;
-  std::println(std::cerr, "Line {:d}] .comm symbols found after .lcomm symbols.", line_number);
-}
-
 Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
     const std::string& symbol_name, const std::string& module_name, const std::string& source_name,
-    std::string& curr_module_name, std::string& curr_source_name,
-    Map::SectionLayout::UnitLookup*& curr_unit_lookup, bool& is_in_lcomm,
-    bool& is_after_eti_init_info, bool& is_multi_stt_section, const std::size_t line_number)
+    std::string& curr_module_name, std::string& curr_source_name, UnitLookup*& curr_unit_lookup,
+    bool& is_in_lcomm, bool& is_after_eti_init_info, bool& is_multi_stt_section,
+    const std::size_t line_number)
 {
   const bool is_symbol_stt_section = (symbol_name == this->name);
 
@@ -1649,12 +1691,12 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
         // STT_SECTION symbols, making them indistinguishable from a repeat-name compilation unit
         // without further heuristics.  In other words, false positives ahoy.
         // TODO: What version?
-        WarnRepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
+        Warn::RepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
       }
       if (is_in_lcomm)
       {
         // Shouldn't this be impossible?
-        WarnCommAfterLComm(line_number + 1u);
+        Warn::CommAfterLComm(line_number + 1u);
         is_in_lcomm = false;
       }
       return Unit::Trait::Section;
@@ -1679,7 +1721,7 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
         // an extabindex section's second lap for printing UNUSED symbols after _eti_init_info.
         else if (is_repeat_compilation_unit_detected && !is_after_eti_init_info)
         {
-          WarnRepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
+          Warn::RepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
         }
         return Unit::Trait::ExTabIndex;
       }
@@ -1691,14 +1733,14 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
     if (this->section_kind == Kind::Ctors || this->section_kind == Kind::Dtors)
     {
       const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-      WarnRepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
+      Warn::RepeatCompilationUnit(line_number + 1u, compilation_unit_name, this->name);
     }
     else if (!is_multi_stt_section)
     {
       // Either this compilation unit was compiled with '-sym on', or two repeat-name compilation
       // units are adjacent to one another.
       const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-      WarnSymOnFlagDetected(line_number + 1u, compilation_unit_name, this->name);
+      Warn::SymOnFlagDetected(line_number + 1u, compilation_unit_name, this->name);
       is_multi_stt_section = true;
     }
     return Unit::Trait::Section;
@@ -1711,7 +1753,8 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
       // This can be a strong hint that there are two or more repeat-name compilation units in your
       // linker map, assuming it's not messed up in any way.  Note that this does not detect symbols
       // with identical names across section layouts.
-      WarnODRViolation(line_number + 1u, symbol_name, compilation_unit_name, this->name);
+      Warn::OneDefinitionRuleViolation(line_number + 1u, symbol_name, compilation_unit_name,
+                                       this->name);
     }
   }
   if (is_in_lcomm)
@@ -1793,7 +1836,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         {
           const std::string& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
-          WarnODRViolation(line_number + 1u, symbol_name, compilation_unit_name, this->name);
+          Warn::OneDefinitionRuleViolation(line_number + 1u, symbol_name, compilation_unit_name,
+                                           this->name);
         }
         if (curr_unit_lookup == nullptr)
           return Error::Fail;
@@ -1889,7 +1933,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         {
           const std::string& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
-          WarnODRViolation(line_number + 1u, symbol_name, compilation_unit_name, this->name);
+          Warn::OneDefinitionRuleViolation(line_number + 1u, symbol_name, compilation_unit_name,
+                                           this->name);
         }
         line_number += 1;
         head += match.length();
@@ -1985,7 +2030,8 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         {
           const std::string& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
-          WarnODRViolation(line_number + 1u, symbol_name, compilation_unit_name, this->name);
+          Warn::OneDefinitionRuleViolation(line_number + 1u, symbol_name, compilation_unit_name,
+                                           this->name);
         }
         line_number += 1;
         head += match.length();
