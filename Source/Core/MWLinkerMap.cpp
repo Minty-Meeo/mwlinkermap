@@ -62,6 +62,28 @@ void Map::EPPC_PatternMatching::Warn::FoldingOneDefinitionRuleViolation(
                object_name);
 }
 
+void Map::SymbolClosure::Warn::OneDefinitionRuleViolation(
+    const std::size_t line_number, const std::string_view symbol_name,
+    const std::string_view compilation_unit_name)
+{
+  // For legal linker maps, this should only ever happen in repeat-name compilation units.
+  if (!do_warn_odr_violation)
+    return;
+  std::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
+               compilation_unit_name);
+}
+
+void Map::SymbolClosure::Warn::SymOnFlagDetected(const std::size_t line_number,
+                                                 const std::string_view compilation_unit_name)
+{
+  // Multiple STT_SECTION symbols were seen in an uninterrupted compilation unit.  This could be
+  // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
+  if (!do_warn_sym_on_flag_detected)
+    return;
+  std::println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" (.text)", line_number,
+               compilation_unit_name);
+}
+
 void Map::SectionLayout::Warn::RepeatCompilationUnit(const std::size_t line_number,
                                                      const std::string_view compilation_unit_name,
                                                      const std::string_view section_name)
@@ -917,6 +939,7 @@ Map::Error Map::SymbolClosure::Scan(  //
 
   NodeBase* curr_node = &this->root;
   int curr_hierarchy_level = 0;
+  bool after_dtors_99 = false;
 
   while (true)
   {
@@ -928,11 +951,25 @@ Map::Error Map::SymbolClosure::Scan(  //
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
+      if (after_dtors_99 && next_hierarchy_level != 3)
+        return Error::SymbolClosureAfterDtors99Irregularity;
       const std::string type = match.str(3), bind = match.str(4);
       if (!map_symbol_closure_st_type.contains(type))
         return Error::SymbolClosureInvalidSymbolType;
       if (!map_symbol_closure_st_bind.contains(bind))
         return Error::SymbolClosureInvalidSymbolBind;
+      std::string symbol_name = match.str(2), module_name = match.str(5),
+                  source_name = match.str(6);
+      const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
+      NodeLookup& curr_node_lookup = this->lookup[compilation_unit_name];
+      if (curr_node_lookup.contains(symbol_name))
+      {
+        if (after_dtors_99 && symbol_name == ".text")
+          Warn::SymOnFlagDetected(line_number, compilation_unit_name);
+        else
+          Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name);
+      }
+
       line_number += 1u;
       head += match.length();
 
@@ -940,16 +977,14 @@ Map::Error Map::SymbolClosure::Scan(  //
         curr_node = curr_node->parent;
       curr_hierarchy_level = next_hierarchy_level;
 
-      auto next_node = std::make_unique<NodeReal>(
-          curr_node, match.str(2), map_symbol_closure_st_type.at(type),
-          map_symbol_closure_st_bind.at(bind), match.str(5), match.str(6));
+      std::list<NodeReal::UnreferencedDuplicate> unref_dups;
 
       if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
                             std::regex_constants::match_continuous))
       {
         if (std::stoi(match.str(1)) != curr_hierarchy_level)
           return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-        if (match.str(2) != next_node->name)
+        if (match.str(2) != symbol_name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
         line_number += 1u;
         head += match.length();
@@ -965,26 +1000,35 @@ Map::Error Map::SymbolClosure::Scan(  //
             return Error::SymbolClosureInvalidSymbolType;
           line_number += 1u;
           head += match.length();
-          next_node->unref_dups.emplace_back(map_symbol_closure_st_type.at(unref_dup_type),
-                                             map_symbol_closure_st_bind.at(unref_dup_bind),
-                                             match.str(4), match.str(5));
+          unref_dups.emplace_back(map_symbol_closure_st_type.at(unref_dup_type),
+                                  map_symbol_closure_st_bind.at(unref_dup_bind), match.str(4),
+                                  match.str(5));
         }
-        if (next_node->unref_dups.empty())
+        if (unref_dups.empty())
           return Error::SymbolClosureUnrefDupsEmpty;
         this->SetMinVersion(Version::version_2_3_3_build_137);
       }
 
+      const bool is_dtors_99 = (!after_dtors_99 && symbol_name == "_dtors$99" &&
+                                module_name == "Linker Generated Symbol File");
+
+      NodeReal* next_node =
+          new NodeReal(curr_node, symbol_name, map_symbol_closure_st_type.at(type),
+                       map_symbol_closure_st_bind.at(bind), std::move(module_name),
+                       std::move(source_name), std::move(unref_dups));
+      curr_node = curr_node->children.emplace_back(next_node).get();
+      curr_node_lookup.emplace(std::move(symbol_name), *next_node);
+
       // Though I do not understand it, the following is a normal occurrence for _dtors$99:
       // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
       // "    3] .text (section,local) found in xyz.cpp lib.a"
-      if (const bool is_weird = (next_node->name == "_dtors$99" &&  // Redundancy out of paranoia
-                                 next_node->module_name == "Linker Generated Symbol File");
-          void(curr_node = curr_node->children.emplace_back(next_node.release()).get()), is_weird)
+      if (is_dtors_99)
       {
         // Create a dummy node for hierarchy level 2.
         curr_node = curr_node->children.emplace_back(new NodeBase(curr_node)).get();
         ++curr_hierarchy_level;
         this->SetMinVersion(Version::version_3_0_4);
+        after_dtors_99 = true;
       }
       continue;
     }
@@ -996,6 +1040,8 @@ Map::Error Map::SymbolClosure::Scan(  //
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
+      std::string symbol_name = match.str(2);
+
       line_number += 1u;
       head += match.length();
 
@@ -1003,7 +1049,8 @@ Map::Error Map::SymbolClosure::Scan(  //
         curr_node = curr_node->parent;
       curr_hierarchy_level = next_hierarchy_level;
 
-      curr_node = curr_node->children.emplace_back(new NodeReal(curr_node, match.str(2))).get();
+      curr_node =
+          curr_node->children.emplace_back(new NodeLinkerGenerated(curr_node, symbol_name)).get();
       continue;
     }
     // Up until CodeWarrior for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the
@@ -1015,17 +1062,14 @@ Map::Error Map::SymbolClosure::Scan(  //
     // closures are disabled, this scan function will still parse the unresolved symbol prints.
     // There are also a few linker maps I've found where it appears the unresolved symbols are
     // pre-printed before the first symbol closure. Wouldn't you know it, this scanning code also
-    // handles that.
+    // handles that. The line number is stored so the Map::Print method can accurately reproduce any
+    // of the aeformentioned arrangements, though if you find another use for it, good for you.
     if (std::regex_search(head, tail, match, re_unresolved_symbol,
                           std::regex_constants::match_continuous))
     {
-      do
-      {
-        unresolved_symbols.emplace_back(line_number, match.str(1));
-        line_number += 1u;
-        head += match.length();
-      } while (std::regex_search(head, tail, match, re_unresolved_symbol,
-                                 std::regex_constants::match_continuous));
+      unresolved_symbols.emplace_back(line_number, match.str(1));
+      line_number += 1u;
+      head += match.length();
       continue;
     }
     break;
@@ -1033,14 +1077,21 @@ Map::Error Map::SymbolClosure::Scan(  //
   return Error::None;
 }
 
-void Map::SymbolClosure::PrintPrefix(std::ostream& stream, const int hierarchy_level)
+void Map::SymbolClosure::Print(std::ostream& stream) const
+{
+  this->root.Print(stream, 0);
+}
+
+void Map::SymbolClosure::NodeBase::PrintPrefix(std::ostream& stream, const int hierarchy_level)
 {
   if (hierarchy_level >= 0)
     for (int i = 0; i <= hierarchy_level; ++i)
       stream.put(' ');
-  std::print(stream, "{:d}] ", hierarchy_level);  // "%i] "
+  // "%i] "
+  std::print(stream, "{:d}] ", hierarchy_level);
 }
-const char* Map::SymbolClosure::ToName(const Type st_type) noexcept
+
+constexpr std::string_view Map::SymbolClosure::NodeBase::ToName(const Type st_type) noexcept
 {
   switch (st_type)
   {
@@ -1058,7 +1109,8 @@ const char* Map::SymbolClosure::ToName(const Type st_type) noexcept
     return "unknown";
   }
 }
-const char* Map::SymbolClosure::ToName(const Bind st_bind) noexcept
+
+constexpr std::string_view Map::SymbolClosure::NodeBase::ToName(const Bind st_bind) noexcept
 {
   switch (st_bind)
   {
@@ -1077,11 +1129,6 @@ const char* Map::SymbolClosure::ToName(const Bind st_bind) noexcept
   }
 }
 
-void Map::SymbolClosure::Print(std::ostream& stream) const
-{
-  this->root.Print(stream, 0);
-}
-
 void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarchy_level) const
 {
   for (const auto& node : this->children)
@@ -1091,41 +1138,37 @@ void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarc
 void Map::SymbolClosure::NodeReal::Print(std::ostream& stream, const int hierarchy_level) const
 {
   PrintPrefix(stream, hierarchy_level);
-  if (unit_kind == Kind::Normal)
+  // "%s (%s,%s) found in %s %s\r\n"
+  std::print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", name, ToName(type), ToName(bind),
+             module_name, source_name);
+  if (!this->unref_dups.empty())
   {
-    // libc++ std::format requires lvalue references for the args.
-    const char *type_s = ToName(type), *bind_s = ToName(bind);
-    // "%s (%s,%s) found in %s %s\r\n"
-    std::print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", name, type_s, bind_s, module_name,
-               source_name);
-    if (!this->unref_dups.empty())
-    {
-      PrintPrefix(stream, hierarchy_level);
-      // ">>> UNREFERENCED DUPLICATE %s\r\n"
-      std::print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", name);
-      for (const auto& unref_dup : unref_dups)
-        unref_dup.Print(stream, hierarchy_level);
-    }
+    PrintPrefix(stream, hierarchy_level);
+    // ">>> UNREFERENCED DUPLICATE %s\r\n"
+    std::print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", name);
+    for (const auto& unref_dup : unref_dups)
+      unref_dup.Print(stream, hierarchy_level);
   }
-  else
-  {
-    // "%s found as linker generated symbol\r\n"
-    std::print(stream, "{:s} found as linker generated symbol\r\n", name);
-    for (const auto& node : children)            // Linker generated symbols should have
-      node->Print(stream, hierarchy_level + 1);  // no children but we'll check anyway.
-  }
-  for (const auto& node : children)
-    node->Print(stream, hierarchy_level + 1);
+  NodeBase::Print(stream, hierarchy_level);
+}
+
+void Map::SymbolClosure::NodeLinkerGenerated::Print(std::ostream& stream,
+                                                    const int hierarchy_level) const
+{
+  PrintPrefix(stream, hierarchy_level);
+  // "%s found as linker generated symbol\r\n"
+  std::print(stream, "{:s} found as linker generated symbol\r\n", name);
+  // Linker generated symbols should have no children but we'll check anyway.
+  NodeBase::Print(stream, hierarchy_level);
 }
 
 void Map::SymbolClosure::NodeReal::UnreferencedDuplicate::Print(std::ostream& stream,
                                                                 const int hierarchy_level) const
 {
   PrintPrefix(stream, hierarchy_level);
-  const char *type_s = ToName(type), *bind_s = ToName(bind);
   // ">>> (%s,%s) found in %s %s\r\n"
-  std::print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", type_s, bind_s, module_name,
-             source_name);
+  std::print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", ToName(type), ToName(bind),
+             module_name, source_name);
 }
 
 // void Map::SymbolClosure::Export(Report& report) const noexcept

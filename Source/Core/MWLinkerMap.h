@@ -105,6 +105,7 @@ struct Map
 
     SymbolClosureHierarchySkip,
     SymbolClosureInvalidHierarchy,
+    SymbolClosureAfterDtors99Irregularity,
     SymbolClosureInvalidSymbolType,
     SymbolClosureInvalidSymbolBind,
     SymbolClosureUnrefDupsHierarchyMismatch,
@@ -177,6 +178,9 @@ struct Map
       virtual ~NodeBase() = default;
 
       virtual void Print(std::ostream&, int) const;  // Necessary for root and fake _dtor$99 node
+      static void PrintPrefix(std::ostream&, int);
+      static constexpr std::string_view ToName(Type) noexcept;
+      static constexpr std::string_view ToName(Bind) noexcept;
       // virtual void Export(DebugInfo&) const noexcept;
 
       NodeBase* parent;
@@ -185,12 +189,6 @@ struct Map
 
     struct NodeReal final : NodeBase
     {
-      enum class Kind
-      {
-        Normal,
-        LinkerGenerated,
-      };
-
       struct UnreferencedDuplicate
       {
         UnreferencedDuplicate(Type type_, Bind bind_, std::string module_name_,
@@ -209,14 +207,11 @@ struct Map
       };
 
       NodeReal(NodeBase* parent_, std::string name_, Type type_, Bind bind_,
-               std::string module_name_, std::string source_name_)
-          : NodeBase(parent_), unit_kind(Kind::Normal), name(std::move(name_)), type(type_),
-            bind(bind_), module_name(std::move(module_name_)), source_name(std::move(source_name_))
-      {
-      }
-      NodeReal(NodeBase* parent_, std::string name_)
-          : NodeBase(parent_), unit_kind(Kind::LinkerGenerated), name(std::move(name_)),
-            type(Type::notype), bind(Bind::global)
+               std::string module_name_, std::string source_name_,
+               std::list<UnreferencedDuplicate> unref_dups_)
+          : NodeBase(parent_), name(std::move(name_)), type(type_), bind(bind_),
+            module_name(std::move(module_name_)), source_name(std::move(source_name_)),
+            unref_dups(std::move(unref_dups_))
       {
       }
       virtual ~NodeReal() override = default;
@@ -224,7 +219,6 @@ struct Map
       virtual void Print(std::ostream&, int) const override;
       // virtual void Export(DebugInfo&) const noexcept override;
 
-      const Kind unit_kind;
       std::string name;
       Type type;
       Bind bind;
@@ -237,19 +231,44 @@ struct Map
       std::list<UnreferencedDuplicate> unref_dups;
     };
 
+    struct NodeLinkerGenerated final : NodeBase
+    {
+      NodeLinkerGenerated(NodeBase* parent_, std::string name_)
+          : NodeBase(parent_), name(std::move(name_))
+      {
+      }
+      virtual ~NodeLinkerGenerated() override = default;
+
+      virtual void Print(std::ostream&, int) const override;
+      // virtual void Export(DebugInfo&) const noexcept override;
+
+      std::string name;
+    };
+
+    using NodeLookup = std::multimap<std::string, const NodeReal&>;
+    using ModuleLookup = std::map<std::string, NodeLookup>;
+
     SymbolClosure() = default;
     virtual ~SymbolClosure() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&,
                std::list<std::pair<std::size_t, std::string>>&);
     virtual void Print(std::ostream&) const override;
-    static void PrintPrefix(std::ostream&, int);
-    static const char* ToName(Type) noexcept;
-    static const char* ToName(Bind) noexcept;
     void Export(DebugInfo&) const noexcept;
     virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
 
     NodeBase root;
+    ModuleLookup lookup;
+
+  private:
+    struct Warn
+    {
+      static void OneDefinitionRuleViolation(std::size_t, std::string_view, std::string_view);
+      static void SymOnFlagDetected(std::size_t, std::string_view);
+
+      static inline bool do_warn_odr_violation = true;
+      static inline bool do_warn_sym_on_flag_detected = true;
+    };
   };
 
   struct EPPC_PatternMatching final : PortionBase
