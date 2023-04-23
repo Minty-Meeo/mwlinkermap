@@ -193,7 +193,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
       return error;
-    goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE;
+    goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
   }
   // Linker maps from Doubutsu no Mori + (foresta.map2 and static.map2) are modified similarly
   // to their counterparts in Doubutsu no Mori e+, though now with no preceding newlines. The
@@ -209,7 +209,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
     if (error != Error::None)
       return error;
-    goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE;
+    goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
   }
   if (std::regex_search(head, tail, match, re_entry_point_name,
                         std::regex_constants::match_continuous))
@@ -308,7 +308,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
       return error;
     this->linktime_size_increasing_optimizations = std::move(portion);
   }
-NINTENDO_EAD_TRIMMED_LINKER_MAPS_SKIP_TO_HERE:
+NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   while (std::regex_search(head, tail, match, re_section_layout_header,
                            std::regex_constants::match_continuous))
   {
