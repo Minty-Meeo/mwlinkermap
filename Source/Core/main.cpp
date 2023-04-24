@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
@@ -26,8 +27,19 @@ static void tempfunc(const char* name, int choice)
   std::string temp = std::move(sstream).str();
 
   MWLinker::Map linker_map;
+  MWLinker::Map::SymbolClosure::Warn::do_warn_odr_violation = false;
+  MWLinker::Map::SymbolClosure::Warn::do_warn_sym_on_flag_detected = false;
+  MWLinker::Map::EPPC_PatternMatching::Warn::do_warn_folding_odr_violation = false;
+  MWLinker::Map::EPPC_PatternMatching::Warn::do_warn_folding_repeat_object = false;
+  MWLinker::Map::EPPC_PatternMatching::Warn::do_warn_merging_odr_violation = false;
+  MWLinker::Map::SectionLayout::Warn::do_warn_comm_after_lcomm = false;
+  MWLinker::Map::SectionLayout::Warn::do_warn_odr_violation = false;
+  MWLinker::Map::SectionLayout::Warn::do_warn_repeat_compilation_unit = false;
+  MWLinker::Map::SectionLayout::Warn::do_warn_sym_on_flag_detected = false;
+
   std::size_t line_number;
   MWLinker::Map::Error error;
+  const auto time_start = std::chrono::high_resolution_clock::now();
   switch (choice)
   {
   case 0:
@@ -43,6 +55,7 @@ static void tempfunc(const char* name, int choice)
     std::println(std::cerr, "bad choice");
     return;
   }
+  const auto time_end = std::chrono::high_resolution_clock::now();
 
   while (temp.back() == '\0')
     temp.pop_back();
@@ -51,8 +64,11 @@ static void tempfunc(const char* name, int choice)
 
   const bool matches = (temp == temp2);
   const MWLinker::Version min_version = linker_map.GetMinVersion();
-  std::println(std::cout, "line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}", line_number,
-               static_cast<int>(error), matches, static_cast<int>(min_version));
+  std::print(std::cout,
+             "line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}   time: ", line_number,
+             static_cast<int>(error), matches, static_cast<int>(min_version));
+  std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start)
+            << std::endl;
 }
 
 int main(const int argc, const char** argv)
