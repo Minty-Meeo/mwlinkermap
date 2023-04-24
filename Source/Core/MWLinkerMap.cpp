@@ -28,6 +28,13 @@ using u32 = std::uint32_t;
 
 #define xstoul(__s) std::stoul(__s, nullptr, 16)
 
+// https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
+// This version assumes the submatch is valid.  Don't give me an invalid submatch!
+constexpr static std::string_view ToStringView(const std::csub_match& submatch)
+{
+  return std::string_view{submatch.first, submatch.second};
+}
+
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
 
@@ -172,7 +179,7 @@ static const std::regex re_linker_generated_symbols_header{
 // "<<< Failure in %s: GetFilePos is %x, sect->calc_offset is %x\r\n"
 // "<<< Failure in %s: GetFilePos is %x, sect->bin_offset is %x\r\n"
 
-static const std::map<std::string, Map::SectionLayout::Kind> map_section_layout_kind{
+static const std::map<std::string_view, Map::SectionLayout::Kind> map_section_layout_kind{
     {".bss", Map::SectionLayout::Kind::BSS},
     {".sbss", Map::SectionLayout::Kind::BSS},
     {".sbss2", Map::SectionLayout::Kind::BSS},
@@ -182,7 +189,7 @@ static const std::map<std::string, Map::SectionLayout::Kind> map_section_layout_
     {"extabindex", Map::SectionLayout::Kind::ExTabIndex},
 };
 
-Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string& section_name)
+Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string_view section_name)
 {
   if (map_section_layout_kind.contains(section_name))
     return map_section_layout_kind.at(section_name);
@@ -922,11 +929,11 @@ static const std::regex re_symbol_closure_node_linker_generated{
     "   *(\\d+)\\] (.*) found as linker generated symbol\r?\n"};
 // clang-format on
 
-static const std::map<std::string, Type> map_symbol_closure_st_type{
+static const std::map<std::string_view, Type> map_symbol_closure_st_type{
     {"notype", Type::notype},   {"object", Type::object}, {"func", Type::func},
     {"section", Type::section}, {"file", Type::file},     {"unknown", Type::unknown},
 };
-static const std::map<std::string, Bind> map_symbol_closure_st_bind{
+static const std::map<std::string_view, Bind> map_symbol_closure_st_bind{
     {"local", Bind::local},       {"global", Bind::global},     {"weak", Bind::weak},
     {"multidef", Bind::multidef}, {"overload", Bind::overload}, {"unknown", Bind::unknown},
 };
@@ -953,7 +960,7 @@ Map::Error Map::SymbolClosure::Scan(  //
         return Error::SymbolClosureHierarchySkip;
       if (after_dtors_99 && next_hierarchy_level != 3)
         return Error::SymbolClosureAfterDtors99Irregularity;
-      const std::string type = match.str(3), bind = match.str(4);
+      const std::string_view type = ToStringView(match[3]), bind = ToStringView(match[4]);
       if (!map_symbol_closure_st_type.contains(type))
         return Error::SymbolClosureInvalidSymbolType;
       if (!map_symbol_closure_st_bind.contains(bind))
@@ -993,7 +1000,8 @@ Map::Error Map::SymbolClosure::Scan(  //
         {
           if (std::stoi(match.str(1)) != curr_hierarchy_level)
             return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-          const std::string unref_dup_type = match.str(2), unref_dup_bind = match.str(3);
+          const std::string_view unref_dup_type = ToStringView(match[2]),
+                                 unref_dup_bind = ToStringView(match[3]);
           if (!map_symbol_closure_st_type.contains(unref_dup_type))
             return Error::SymbolClosureInvalidSymbolType;
           if (!map_symbol_closure_st_bind.contains(unref_dup_bind))
@@ -1040,7 +1048,6 @@ Map::Error Map::SymbolClosure::Scan(  //
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
-      std::string symbol_name = match.str(2);
 
       line_number += 1u;
       head += match.length();
@@ -1050,7 +1057,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       curr_hierarchy_level = next_hierarchy_level;
 
       curr_node =
-          curr_node->children.emplace_back(new NodeLinkerGenerated(curr_node, symbol_name)).get();
+          curr_node->children.emplace_back(new NodeLinkerGenerated(curr_node, match.str(2))).get();
       continue;
     }
     // Up until CodeWarrior for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the
@@ -1296,13 +1303,13 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
   while (std::regex_search(head, tail, match, re_code_folding_header,
                            std::regex_constants::match_continuous))
   {
-    const std::string object_name = match.str(1);
+    std::string object_name = match.str(1);
     if (this->folding_lookup.contains(object_name))
       Warn::FoldingRepeatObject(line_number + 3u, object_name);
     FoldingUnit::UnitLookup& curr_unit_lookup = this->folding_lookup[object_name];
-    auto folding_unit = FoldingUnit(object_name);
     line_number += 4u;
     head += match.length();
+    std::list<FoldingUnit::Unit> units;
     while (true)
     {
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
@@ -1313,8 +1320,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         line_number += 2u;
         head += match.length();
-        const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
-            first_name, match.str(2), std::stoul(match.str(3)), false);
+        const FoldingUnit::Unit& unit =
+            units.emplace_back(first_name, match.str(2), std::stoul(match.str(3)), false);
         curr_unit_lookup.emplace(std::move(first_name), unit);
         continue;
       }
@@ -1328,14 +1335,14 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         line_number += 2u;
         head += match.length();
-        const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
-            first_name, match.str(2), std::stoul(match.str(3)), true);
+        const FoldingUnit::Unit& unit =
+            units.emplace_back(first_name, match.str(2), std::stoul(match.str(3)), true);
         curr_unit_lookup.emplace(std::move(first_name), unit);
         continue;
       }
       break;
     }
-    this->folding_units.push_back(std::move(folding_unit));
+    this->folding_units.emplace_back(std::move(object_name), std::move(units));
   }
   return Error::None;
 }
@@ -1952,7 +1959,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
-      std::string special_name = match.str(6);
+      std::string_view special_name = ToStringView(match[6]);
       if (special_name == "*fill*")
       {
         line_number += 1u;
@@ -2048,7 +2055,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                           std::regex_constants::match_continuous))
     {
       // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
-      std::string special_name = match.str(5);
+      std::string_view special_name = ToStringView(match[5]);
       if (special_name == "*fill*")
       {
         line_number += 1u;
@@ -2235,10 +2242,10 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
   {
     line_number += 1u;
     head += match.length();
-    std::string temp = match.str(2);
-    if (temp.length() == 8 && temp.front() == '0')  // Make sure it's not just an overflowed value
+    std::string size = match.str(2);
+    if (size.length() == 8 && size.front() == '0')  // Make sure it's not just an overflowed value
       this->SetMinVersion(Version::version_3_0_4);
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
+    this->debug_units.emplace_back(match.str(1), xstoul(size), xstoul(match.str(3)));
   }
   return Error::None;
 }

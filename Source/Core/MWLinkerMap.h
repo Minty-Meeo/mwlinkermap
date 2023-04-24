@@ -322,7 +322,10 @@ struct Map
       using UnitLookup = std::multimap<std::string, const Unit&>;
       using ModuleLookup = std::map<std::string, UnitLookup>;
 
-      FoldingUnit(std::string object_name_) : object_name(std::move(object_name_)) {}
+      FoldingUnit(std::string object_name_, std::list<Unit> units_)
+          : object_name(std::move(object_name_)), units(std::move(units_))
+      {
+      }
 
       void Print(std::ostream&) const;
 
@@ -628,7 +631,7 @@ struct Map
     void Export(DebugInfo&) const noexcept;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
-    static Kind ToSectionKind(const std::string&);
+    static Kind ToSectionKind(std::string_view);
     Unit::Trait DeduceUsualSubtext(const std::string&, const std::string&, const std::string&,
                                    std::string&, std::string&, UnitLookup*&, bool&, bool&, bool&,
                                    std::size_t);
