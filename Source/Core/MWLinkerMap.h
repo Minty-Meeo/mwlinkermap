@@ -379,15 +379,14 @@ struct Map
         DisassembleError,
       };
 
-      Unit(std::string module_name_, std::string name_)
-          : unit_kind(Kind::DisassembleError), module_name(std::move(module_name_)),
-            name(std::move(name_))
+      Unit(std::string_view module_name_, std::string_view name_)
+          : unit_kind(Kind::DisassembleError), module_name(module_name_), name(name_)
       {
       }
-      Unit(const Kind unit_kind_, std::string module_name_, std::string name_,
-           std::string reference_name_)
-          : unit_kind(unit_kind_), module_name(std::move(module_name_)), name(std::move(name_)),
-            reference_name(std::move(reference_name_))
+      Unit(const Kind unit_kind_, std::string_view module_name_, std::string_view name_,
+           std::string_view reference_name_)
+          : unit_kind(unit_kind_), module_name(module_name_), name(name_),
+            reference_name(reference_name_)
       {
       }
 
@@ -416,9 +415,8 @@ struct Map
 
     struct Unit
     {
-      Unit(std::string first_name_, std::string second_name_, bool is_safe_)
-          : first_name(std::move(first_name_)), second_name(std::move(second_name_)),
-            is_safe(is_safe_)
+      Unit(std::string_view first_name_, std::string_view second_name_, bool is_safe_)
+          : first_name(first_name_), second_name(second_name_), is_safe(is_safe_)
       {
       }
 
@@ -446,9 +444,8 @@ struct Map
 
     struct Unit
     {
-      Unit(std::string first_name_, std::string second_name_, bool is_safe_)
-          : first_name(std::move(first_name_)), second_name(std::move(second_name_)),
-            is_safe(is_safe_)
+      Unit(std::string_view first_name_, std::string_view second_name_, bool is_safe_)
+          : first_name(first_name_), second_name(second_name_), is_safe(is_safe_)
       {
       }
 
@@ -636,8 +633,8 @@ struct Map
       const Trait unit_trait;
     };
 
-    SectionLayout(Kind section_kind_, std::string name_)
-        : section_kind(section_kind_), name(std::move(name_))
+    SectionLayout(Kind section_kind_, std::string_view name_)
+        : section_kind(section_kind_), name(name_)
     {
     }
     virtual ~SectionLayout() override = default;
@@ -650,9 +647,6 @@ struct Map
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     static Kind ToSectionKind(std::string_view);
-    Unit::Trait DeduceUsualSubtext(const std::string&, const std::string&, const std::string&,
-                                   std::string&, std::string&, UnitLookup*&, bool&, bool&, bool&,
-                                   std::size_t);
 
     const Kind section_kind;
     std::string name;
@@ -685,61 +679,60 @@ struct Map
   {
     struct UnitNormal
     {
-      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_)
-          : name(std::move(name_)), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_)
+      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_)
+          : name(name_), starting_address(starting_address_), size(size_), file_offset(file_offset_)
       {
       }
-      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  int s_record_line_)
-          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+          : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), s_record_line(s_record_line_)
       {
       }
-      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  u32 rom_address_, u32 ram_buffer_address_)
-          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+          : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_)
       {
       }
-      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  u32 rom_address_, u32 ram_buffer_address_, int s_record_line_)
-          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+          : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_)
       {
       }
-      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
-                 u32 bin_file_offset_, std::string bin_file_name_)
-          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
+                 u32 bin_file_offset_, std::string_view bin_file_name_)
+          : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), bin_file_offset(bin_file_offset_),
-            bin_file_name(std::move(bin_file_name_))
+            bin_file_name(bin_file_name_)
       {
       }
-      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
-                 int s_record_line_, u32 bin_file_offset_, std::string bin_file_name_)
-          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
+                 int s_record_line_, u32 bin_file_offset_, std::string_view bin_file_name_)
+          : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), s_record_line(s_record_line_),
-            bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_))
+            bin_file_offset(bin_file_offset_), bin_file_name(bin_file_name_)
       {
       }
-      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  u32 rom_address_, u32 ram_buffer_address_, u32 bin_file_offset_,
-                 std::string bin_file_name_)
-          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+                 std::string_view bin_file_name_)
+          : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), bin_file_offset(bin_file_offset_),
-            bin_file_name(std::move(bin_file_name_))
+            bin_file_name(bin_file_name_)
       {
       }
-      UnitNormal(std::string name_, u32 starting_address_, u32 size_, u32 file_offset_,
+      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
                  u32 rom_address_, u32 ram_buffer_address_, int s_record_line_,
-                 u32 bin_file_offset_, std::string bin_file_name_)
-          : name(std::move(name_)), starting_address(starting_address_), size(size_),
+                 u32 bin_file_offset_, std::string_view bin_file_name_)
+          : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_),
-            bin_file_offset(bin_file_offset_), bin_file_name(std::move(bin_file_name_))
+            bin_file_offset(bin_file_offset_), bin_file_name(bin_file_name_)
       {
       }
 
@@ -769,8 +762,8 @@ struct Map
     // names, but I couldn't be bothered to look into it.
     struct UnitDebug
     {
-      UnitDebug(std::string name_, u32 size_, u32 file_offset_)
-          : name(std::move(name_)), size(size_), file_offset(file_offset_)
+      UnitDebug(std::string_view name_, u32 size_, u32 file_offset_)
+          : name(name_), size(size_), file_offset(file_offset_)
       {
       }
 
@@ -835,7 +828,7 @@ struct Map
   {
     struct Unit
     {
-      Unit(std::string name_, u32 value_) : name(std::move(name_)), value(value_) {}
+      Unit(std::string_view name_, u32 value_) : name(name_), value(value_) {}
 
       void Print(std::ostream&) const;
 
@@ -861,7 +854,7 @@ struct Map
   Error ScanSMGalaxy(std::string_view, std::size_t&);
   Error ScanSMGalaxy(const char*, const char*, std::size_t&);
 
-  Error ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string);
+  Error ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string_view);
   Error ScanPrologue_MemoryMap(const char*&, const char*, std::size_t&);
   Error ScanForGarbage(const char*, const char*);
 

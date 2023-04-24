@@ -12,8 +12,8 @@ inline T __svto(const std::string_view sv, std::size_t* pos = nullptr, int base 
 {
   const char *first = sv.data(), *last = first + sv.size();
   T value{};
-  auto [ptr, ec] = std::from_chars(first, last, value, base);
-  // Don't bother throwing std::invalid_argument or std::out_of_range.  I never write bad code :)
+  const char* ptr = std::from_chars(first, last, value, base).ptr;
+  // Don't bother throwing std::invalid_argument or std::out_of_range.  I never write bad code :^)
   if (pos != nullptr)
     *pos = std::distance(first, ptr);
   return value;
@@ -41,6 +41,7 @@ inline long svtoull(const std::string_view sv, std::size_t* pos = nullptr, int b
 }
 
 // https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
+
 // This code assumes you are passing in a valid std::csub_match from a std::cmatch_results.
 constexpr static std::string_view  //
 to_string_view(const std::pair<const char*, const char*>& pair)
@@ -65,5 +66,4 @@ to_wstring_view(const std::pair<std::wstring::const_iterator, std::wstring::cons
 {
   return {pair.first, pair.second};
 }
-
 }  // namespace util

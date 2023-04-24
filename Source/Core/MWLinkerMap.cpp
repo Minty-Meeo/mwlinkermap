@@ -214,7 +214,8 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 2u;
     head += match.length();
-    const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
+    const auto error =
+        this->ScanPrologue_SectionLayout(head, tail, line_number, util::to_string_view(match[1]));
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -230,7 +231,8 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 1u;
     head += match.length();
-    const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
+    const auto error =
+        this->ScanPrologue_SectionLayout(head, tail, line_number, util::to_string_view(match[1]));
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -338,7 +340,8 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   {
     line_number += 3u;
     head += match.length();
-    const auto error = this->ScanPrologue_SectionLayout(head, tail, line_number, match.str(1));
+    const auto error =
+        this->ScanPrologue_SectionLayout(head, tail, line_number, util::to_string_view(match[1]));
     if (error != Error::None)
       return error;
   }
@@ -387,11 +390,11 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
   while (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
                            std::regex_constants::match_continuous))
   {
-    std::string section_name = match.str(1);
+    std::string_view section_name = util::to_string_view(match[1]);
     line_number += 1u;
     head += match.length();
     const SectionLayout::Kind section_kind = SectionLayout::ToSectionKind(section_name);
-    auto portion = std::make_unique<SectionLayout>(section_kind, std::move(section_name));
+    auto portion = std::make_unique<SectionLayout>(section_kind, section_name);
     portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->ScanTLOZTP(head, tail, line_number);
     if (error != Error::None)
@@ -422,7 +425,8 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     line_number += 2u;
     head += match.length();
     // TODO: detect and split Section Layout subtext by observing the Starting Address
-    auto portion = std::make_unique<SectionLayout>(SectionLayout::Kind::Normal, match.str(1));
+    auto portion = std::make_unique<SectionLayout>(SectionLayout::Kind::Normal,
+                                                   util::to_string_view(match[1]));
     portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
@@ -535,7 +539,7 @@ static const std::regex re_section_layout_4column_prologue_3{
 // clang-format on
 
 Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const tail,
-                                           std::size_t& line_number, std::string name)
+                                           std::size_t& line_number, std::string_view name)
 {
   std::cmatch match;
   const SectionLayout::Kind section_kind = SectionLayout::ToSectionKind(name);
@@ -555,7 +559,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
       {
         line_number += 1u;
         head += match.length();
-        auto portion = std::make_unique<SectionLayout>(section_kind, std::move(name));
+        auto portion = std::make_unique<SectionLayout>(section_kind, name);
         const auto error = portion->Scan3Column(head, tail, line_number);
         if (error != Error::None)
           return error;
@@ -586,7 +590,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
       {
         line_number += 1u;
         head += match.length();
-        auto portion = std::make_unique<SectionLayout>(section_kind, std::move(name));
+        auto portion = std::make_unique<SectionLayout>(section_kind, name);
         portion->SetMinVersion(Version::version_3_0_4);
         const auto error = portion->Scan4Column(head, tail, line_number);
         if (error != Error::None)
@@ -1466,7 +1470,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     {
       line_number += 1u;
       head += match.length();
-      this->units.emplace_back(Unit::Kind::NotNear, match.str(1), match.str(2), match.str(3));
+      this->units.emplace_back(Unit::Kind::NotNear, util::to_string_view(match[1]),
+                               util::to_string_view(match[2]), util::to_string_view(match[3]));
       continue;
     }
     if (std::regex_search(head, tail, match, re_linker_opts_unit_disassemble_error,
@@ -1474,7 +1479,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     {
       line_number += 1u;
       head += match.length();
-      this->units.emplace_back(match.str(1), match.str(2));
+      this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]));
       continue;
     }
     if (std::regex_search(head, tail, match, re_linker_opts_unit_address_not_computed,
@@ -1482,7 +1487,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     {
       line_number += 1u;
       head += match.length();
-      this->units.emplace_back(Unit::Kind::NotComputed, match.str(1), match.str(2), match.str(3));
+      this->units.emplace_back(Unit::Kind::NotComputed, util::to_string_view(match[1]),
+                               util::to_string_view(match[2]), util::to_string_view(match[3]));
       continue;
     }
     // I have not seen a single linker map with this
@@ -1491,7 +1497,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     {
       line_number += 1u;
       head += match.length();
-      this->units.emplace_back(Unit::Kind::Optimized, match.str(1), match.str(2), match.str(3));
+      this->units.emplace_back(Unit::Kind::Optimized, util::to_string_view(match[1]),
+                               util::to_string_view(match[2]), util::to_string_view(match[3]));
       continue;
     }
     break;
@@ -1554,7 +1561,8 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     {
       line_number += 1u;
       head += match.length();
-      this->units.emplace_back(match.str(1), match.str(2), false);
+      this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
+                               false);
       continue;
     }
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created_safe,
@@ -1562,7 +1570,8 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     {
       line_number += 1u;
       head += match.length();
-      this->units.emplace_back(match.str(1), match.str(2), true);
+      this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
+                               true);
       continue;
     }
     break;
@@ -1610,7 +1619,8 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     {
       line_number += 1u;
       head += match.length();
-      this->units.emplace_back(match.str(1), match.str(2), false);
+      this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
+                               false);
       continue;
     }
     if (std::regex_search(head, tail, match, re_branch_islands_created_safe,
@@ -1618,7 +1628,8 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     {
       line_number += 1u;
       head += match.length();
-      this->units.emplace_back(match.str(1), match.str(2), true);
+      this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
+                               true);
       continue;
     }
     break;
@@ -2197,9 +2208,9 @@ Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const t
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
-                                    xsvtoul(util::to_string_view(match[3])),
-                                    xsvtoul(util::to_string_view(match[4])));
+    this->normal_units.emplace_back(
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])));
   }
   return ScanDebug_old(head, tail, line_number);
 }
@@ -2221,7 +2232,7 @@ Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const t
     line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(
-        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
         xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])));
   }
@@ -2248,7 +2259,7 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
     std::string_view size = util::to_string_view(match[2]);
     if (size.length() == 8 && size.front() == '0')  // Make sure it's not just an overflowed value
       this->SetMinVersion(Version::version_3_0_4);
-    this->debug_units.emplace_back(match.str(1), xsvtoul(size),
+    this->debug_units.emplace_back(util::to_string_view(match[1]), xsvtoul(size),
                                    xsvtoul(util::to_string_view(match[3])));
   }
   return Error::None;
@@ -2270,9 +2281,9 @@ Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
-                                    xsvtoul(util::to_string_view(match[3])),
-                                    xsvtoul(util::to_string_view(match[4])));
+    this->normal_units.emplace_back(
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2294,7 +2305,7 @@ Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
     line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(
-        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
         xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])));
   }
@@ -2317,10 +2328,10 @@ Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
-                                    xsvtoul(util::to_string_view(match[3])),
-                                    xsvtoul(util::to_string_view(match[4])),
-                                    util::svtoi(util::to_string_view(match[5])));
+    this->normal_units.emplace_back(
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+        util::svtoi(util::to_string_view(match[5])));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2341,10 +2352,10 @@ Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
-                                    xsvtoul(util::to_string_view(match[3])),
-                                    xsvtoul(util::to_string_view(match[4])),
-                                    xsvtoul(util::to_string_view(match[5])), match.str(6));
+    this->normal_units.emplace_back(
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+        xsvtoul(util::to_string_view(match[5])), util::to_string_view(match[6]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2366,10 +2377,10 @@ Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* cons
     line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(
-        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
         xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
-        std::stoi(match.str(7)));
+        util::svtoi(util::to_string_view(match[7])));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2391,10 +2402,10 @@ Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* cons
     line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(
-        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
         xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
-        xsvtoul(util::to_string_view(match[7])), match.str(8));
+        xsvtoul(util::to_string_view(match[7])), util::to_string_view(match[8]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2415,11 +2426,11 @@ Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* con
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
-                                    xsvtoul(util::to_string_view(match[3])),
-                                    xsvtoul(util::to_string_view(match[4])),
-                                    util::svtoi(util::to_string_view(match[5])),
-                                    xsvtoul(util::to_string_view(match[6])), match.str(7));
+    this->normal_units.emplace_back(
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+        util::svtoi(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
+        util::to_string_view(match[7]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2441,10 +2452,11 @@ Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const cha
     line_number += 1u;
     head += match.length();
     this->normal_units.emplace_back(
-        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
         xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
-        std::stoi(match.str(7)), xsvtoul(util::to_string_view(match[8])), match.str(9));
+        util::svtoi(util::to_string_view(match[7])), xsvtoul(util::to_string_view(match[8])),
+        util::to_string_view(match[9]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2465,7 +2477,8 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
   {
     line_number += 1u;
     head += match.length();
-    this->debug_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
+    this->debug_units.emplace_back(util::to_string_view(match[1]),
+                                   xsvtoul(util::to_string_view(match[2])),
                                    xsvtoul(util::to_string_view(match[3])));
   }
   return Error::None;
@@ -2716,7 +2729,8 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
   {
     line_number += 1u;
     head += match.length();
-    this->units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])));
+    this->units.emplace_back(util::to_string_view(match[1]),
+                             xsvtoul(util::to_string_view(match[2])));
   }
   return Error::None;
 }
