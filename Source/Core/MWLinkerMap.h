@@ -105,7 +105,6 @@ struct Map
 
     SymbolClosureHierarchySkip,
     SymbolClosureInvalidHierarchy,
-    SymbolClosureAfterDtors99Irregularity,
     SymbolClosureInvalidSymbolType,
     SymbolClosureInvalidSymbolBind,
     SymbolClosureUnrefDupsHierarchyMismatch,

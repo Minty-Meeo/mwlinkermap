@@ -946,7 +946,6 @@ Map::Error Map::SymbolClosure::Scan(  //
 
   NodeBase* curr_node = &this->root;
   int curr_hierarchy_level = 0;
-  bool after_dtors_99 = false;
 
   while (true)
   {
@@ -958,8 +957,6 @@ Map::Error Map::SymbolClosure::Scan(  //
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
-      if (after_dtors_99 && next_hierarchy_level != 3)
-        return Error::SymbolClosureAfterDtors99Irregularity;
       const std::string_view type = ToStringView(match[3]), bind = ToStringView(match[4]);
       if (!map_symbol_closure_st_type.contains(type))
         return Error::SymbolClosureInvalidSymbolType;
@@ -971,10 +968,8 @@ Map::Error Map::SymbolClosure::Scan(  //
       NodeLookup& curr_node_lookup = this->lookup[compilation_unit_name];
       if (curr_node_lookup.contains(symbol_name))
       {
-        if (after_dtors_99 && symbol_name == ".text")
-          Warn::SymOnFlagDetected(line_number, compilation_unit_name);
-        else
-          Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name);
+        // TODO: restore sym on detection (it was flawed)
+        Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name);
       }
 
       line_number += 1u;
@@ -1017,8 +1012,8 @@ Map::Error Map::SymbolClosure::Scan(  //
         this->SetMinVersion(Version::version_2_3_3_build_137);
       }
 
-      const bool is_dtors_99 = (!after_dtors_99 && symbol_name == "_dtors$99" &&
-                                module_name == "Linker Generated Symbol File");
+      const bool is_dtors_99 =
+          (symbol_name == "_dtors$99" && module_name == "Linker Generated Symbol File");
 
       NodeReal* next_node =
           new NodeReal(curr_node, symbol_name, map_symbol_closure_st_type.at(type),
@@ -1036,7 +1031,6 @@ Map::Error Map::SymbolClosure::Scan(  //
         curr_node = curr_node->children.emplace_back(new NodeBase(curr_node)).get();
         ++curr_hierarchy_level;
         this->SetMinVersion(Version::version_3_0_4);
-        after_dtors_99 = true;
       }
       continue;
     }
