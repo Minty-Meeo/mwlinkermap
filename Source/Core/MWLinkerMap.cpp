@@ -962,16 +962,10 @@ Map::Error Map::SymbolClosure::Scan(  //
         return Error::SymbolClosureInvalidSymbolType;
       if (!map_symbol_closure_st_bind.contains(bind))
         return Error::SymbolClosureInvalidSymbolBind;
-      std::string symbol_name = match.str(2), module_name = match.str(5),
-                  source_name = match.str(6);
-      const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-      NodeLookup& curr_node_lookup = this->lookup[compilation_unit_name];
-      if (curr_node_lookup.contains(symbol_name))
-      {
-        // TODO: restore sym on detection (it was flawed)
-        Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name);
-      }
-
+      std::string_view symbol_name = util::to_string_view(match[2]),
+                       module_name = util::to_string_view(match[5]),
+                       source_name = util::to_string_view(match[6]);
+      const std::size_t line_number_backup = line_number;  // unfortunate
       line_number += 1u;
       head += match.length();
 
@@ -986,7 +980,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       {
         if (util::svtoi(util::to_string_view(match[1])) != curr_hierarchy_level)
           return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-        if (match.str(2) != symbol_name)
+        if (util::to_string_view(match[2]) != symbol_name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
         line_number += 1u;
         head += match.length();
@@ -1001,31 +995,36 @@ Map::Error Map::SymbolClosure::Scan(  //
             return Error::SymbolClosureInvalidSymbolType;
           if (!map_symbol_closure_st_bind.contains(unref_dup_bind))
             return Error::SymbolClosureInvalidSymbolType;
+          unref_dups.emplace_back(map_symbol_closure_st_type.at(unref_dup_type),
+                                  map_symbol_closure_st_bind.at(unref_dup_bind),
+                                  util::to_string_view(match[4]), util::to_string_view(match[5]));
           line_number += 1u;
           head += match.length();
-          unref_dups.emplace_back(map_symbol_closure_st_type.at(unref_dup_type),
-                                  map_symbol_closure_st_bind.at(unref_dup_bind), match.str(4),
-                                  match.str(5));
         }
         if (unref_dups.empty())
           return Error::SymbolClosureUnrefDupsEmpty;
         this->SetMinVersion(Version::version_2_3_3_build_137);
       }
 
-      const bool is_dtors_99 =
-          (symbol_name == "_dtors$99" && module_name == "Linker Generated Symbol File");
-
-      NodeReal* next_node =
-          new NodeReal(curr_node, symbol_name, map_symbol_closure_st_type.at(type),
-                       map_symbol_closure_st_bind.at(bind), std::move(module_name),
-                       std::move(source_name), std::move(unref_dups));
+      NodeReal* next_node = new NodeReal(  // Non-owning pointer.
+          curr_node, symbol_name, map_symbol_closure_st_type.at(type),
+          map_symbol_closure_st_bind.at(bind), module_name, source_name, std::move(unref_dups));
       curr_node = curr_node->children.emplace_back(next_node).get();
-      curr_node_lookup.emplace(std::move(symbol_name), *next_node);
+
+      const std::string_view& compilation_unit_name =
+          next_node->source_name.empty() ? next_node->module_name : next_node->source_name;
+      NodeLookup& curr_node_lookup = this->lookup[compilation_unit_name];
+      if (curr_node_lookup.contains(symbol_name))
+      {
+        // TODO: restore sym on detection (it was flawed)
+        Warn::OneDefinitionRuleViolation(line_number_backup, symbol_name, compilation_unit_name);
+      }
+      curr_node_lookup.emplace(next_node->name, *next_node);
 
       // Though I do not understand it, the following is a normal occurrence for _dtors$99:
       // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
       // "    3] .text (section,local) found in xyz.cpp lib.a"
-      if (is_dtors_99)
+      if (symbol_name == "_dtors$99" && module_name == "Linker Generated Symbol File")
       {
         // Create a dummy node for hierarchy level 2.
         curr_node = curr_node->children.emplace_back(new NodeBase(curr_node)).get();
@@ -1043,15 +1042,16 @@ Map::Error Map::SymbolClosure::Scan(  //
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
 
-      line_number += 1u;
-      head += match.length();
-
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
       curr_hierarchy_level = next_hierarchy_level;
 
-      curr_node =
-          curr_node->children.emplace_back(new NodeLinkerGenerated(curr_node, match.str(2))).get();
+      // clang-format off
+      curr_node = curr_node->children.emplace_back(new NodeLinkerGenerated(curr_node, util::to_string_view(match[2]))).get();
+      // clang-format on
+
+      line_number += 1u;
+      head += match.length();
       continue;
     }
     // Up until CodeWarrior for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the

@@ -190,10 +190,9 @@ struct Map
     {
       struct UnreferencedDuplicate
       {
-        UnreferencedDuplicate(Type type_, Bind bind_, std::string module_name_,
-                              std::string source_name_)
-            : type(type_), bind(bind_), module_name(std::move(module_name_)),
-              source_name(std::move(source_name_))
+        UnreferencedDuplicate(Type type_, Bind bind_, std::string_view module_name_,
+                              std::string_view source_name_)
+            : type(type_), bind(bind_), module_name(module_name_), source_name(source_name_)
         {
         }
 
@@ -205,12 +204,11 @@ struct Map
         std::string source_name;
       };
 
-      NodeReal(NodeBase* parent_, std::string name_, Type type_, Bind bind_,
-               std::string module_name_, std::string source_name_,
+      NodeReal(NodeBase* parent_, std::string_view name_, Type type_, Bind bind_,
+               std::string_view module_name_, std::string_view source_name_,
                std::list<UnreferencedDuplicate> unref_dups_)
-          : NodeBase(parent_), name(std::move(name_)), type(type_), bind(bind_),
-            module_name(std::move(module_name_)), source_name(std::move(source_name_)),
-            unref_dups(std::move(unref_dups_))
+          : NodeBase(parent_), name(name_), type(type_), bind(bind_), module_name(module_name_),
+            source_name(source_name_), unref_dups(std::move(unref_dups_))
       {
       }
       virtual ~NodeReal() override = default;
@@ -232,8 +230,8 @@ struct Map
 
     struct NodeLinkerGenerated final : NodeBase
     {
-      NodeLinkerGenerated(NodeBase* parent_, std::string name_)
-          : NodeBase(parent_), name(std::move(name_))
+      NodeLinkerGenerated(NodeBase* parent_, std::string_view name_)
+          : NodeBase(parent_), name(name_)
       {
       }
       virtual ~NodeLinkerGenerated() override = default;
@@ -244,8 +242,8 @@ struct Map
       std::string name;
     };
 
-    using NodeLookup = std::multimap<std::string, const NodeReal&>;
-    using ModuleLookup = std::map<std::string, NodeLookup>;
+    using NodeLookup = std::multimap<std::string_view, const NodeReal&>;
+    using ModuleLookup = std::map<std::string_view, NodeLookup>;
 
     SymbolClosure() = default;
     virtual ~SymbolClosure() override = default;
