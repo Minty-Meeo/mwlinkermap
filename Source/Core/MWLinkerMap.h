@@ -505,6 +505,11 @@ struct Map
       ExTabIndex,
     };
 
+    struct Unit;
+
+    using UnitLookup = std::multimap<std::string_view, const Unit&>;
+    using ModuleLookup = std::map<std::string_view, UnitLookup>;
+
     struct Unit
     {
       enum class Kind
@@ -536,67 +541,82 @@ struct Map
       };
 
       // UNUSED symbols
-      Unit(Trait unit_trait_, u32 size_, std::string name_, std::string module_name_,
-           std::string source_name_)
-          : unit_kind(Kind::Unused), unit_trait(unit_trait_), size(size_), name(std::move(name_)),
-            module_name(std::move(module_name_)), source_name(std::move(source_name_))
+      Unit(u32 size_, std::string_view name_, std::string_view module_name_,
+           std::string_view source_name_, SectionLayout& section_layout,
+           std::string_view& curr_module_name, std::string_view& curr_source_name,
+           UnitLookup*& curr_unit_lookup, bool& is_in_lcomm, bool& is_after_eti_init_info,
+           bool& is_multi_stt_section, std::size_t line_number)
+          : unit_kind(Kind::Unused), size(size_), name(name_), module_name(module_name_),
+            source_name(source_name_),
+            unit_trait(DeduceUsualSubtext(section_layout, curr_module_name, curr_source_name,
+                                          curr_unit_lookup, is_in_lcomm, is_after_eti_init_info,
+                                          is_multi_stt_section, line_number))
       {
       }
       // 3-column normal symbols
-      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
-           int alignment_, std::string name_, std::string module_name_, std::string source_name_)
-          : unit_kind(Kind::Normal), unit_trait(unit_trait_), starting_address(starting_address_),
-            size(size_), virtual_address(virtual_address_), alignment(alignment_),
-            name(std::move(name_)), module_name(std::move(module_name_)),
-            source_name(std::move(source_name_))
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, int alignment_,
+           std::string_view name_, std::string_view module_name_, std::string_view source_name_,
+           SectionLayout& section_layout, std::string_view& curr_module_name,
+           std::string_view& curr_source_name, UnitLookup*& curr_unit_lookup, bool& is_in_lcomm,
+           bool& is_after_eti_init_info, bool& is_multi_stt_section, std::size_t line_number)
+          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), alignment(alignment_), name(name_),
+            module_name(module_name_), source_name(source_name_),
+            unit_trait(DeduceUsualSubtext(section_layout, curr_module_name, curr_source_name,
+                                          curr_unit_lookup, is_in_lcomm, is_after_eti_init_info,
+                                          is_multi_stt_section, line_number))
       {
       }
       // 4-column normal symbols
-      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
-           u32 file_offset_, int alignment_, std::string name_, std::string module_name_,
-           std::string source_name_)
-          : unit_kind(Kind::Normal), unit_trait(unit_trait_), starting_address(starting_address_),
-            size(size_), virtual_address(virtual_address_), file_offset(file_offset_),
-            alignment(alignment_), name(std::move(name_)), module_name(std::move(module_name_)),
-            source_name(std::move(source_name_))
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
+           std::string_view name_, std::string_view module_name_, std::string_view source_name_,
+           SectionLayout& section_layout, std::string_view& curr_module_name,
+           std::string_view& curr_source_name, UnitLookup*& curr_unit_lookup, bool& is_in_lcomm,
+           bool& is_after_eti_init_info, bool& is_multi_stt_section, std::size_t line_number)
+          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
+            name(name_), module_name(module_name_), source_name(source_name_),
+            unit_trait(DeduceUsualSubtext(section_layout, curr_module_name, curr_source_name,
+                                          curr_unit_lookup, is_in_lcomm, is_after_eti_init_info,
+                                          is_multi_stt_section, line_number))
       {
       }
       // 3-column entry symbols
-      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
-           std::string name_, const Unit* entry_parent_, std::string module_name_,
-           std::string source_name_)
-          : unit_kind(Kind::Entry), unit_trait(unit_trait_), starting_address(starting_address_),
-            size(size_), virtual_address(virtual_address_), name(std::move(name_)),
-            entry_parent(entry_parent_), module_name(std::move(module_name_)),
-            source_name(std::move(source_name_))
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, std::string_view name_,
+           const Unit* entry_parent_, std::string_view module_name_, std::string_view source_name_,
+           Trait unit_trait_)
+          : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), name(name_), entry_parent(entry_parent_),
+            module_name(module_name_), source_name(source_name_), unit_trait(unit_trait_)
       {
       }
       // 4-column entry symbols
-      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
-           u32 file_offset_, std::string name_, const Unit* entry_parent_, std::string module_name_,
-           std::string source_name_)
-          : unit_kind(Kind::Entry), unit_trait(unit_trait_), starting_address(starting_address_),
-            size(size_), virtual_address(virtual_address_), file_offset(file_offset_),
-            name(std::move(name_)), entry_parent(entry_parent_),
-            module_name(std::move(module_name_)), source_name(std::move(source_name_))
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_,
+           std::string_view name_, const Unit* entry_parent_, std::string_view module_name_,
+           std::string_view source_name_, Trait unit_trait_)
+          : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), file_offset(file_offset_), name(name_),
+            entry_parent(entry_parent_), module_name(module_name_), source_name(source_name_),
+            unit_trait(unit_trait_)
       {
       }
       // 4-column special symbols
-      Unit(Trait unit_trait_, u32 starting_address_, u32 size_, u32 virtual_address_,
-           u32 file_offset_, int alignment_)
-          : unit_kind(Kind::Special), unit_trait(unit_trait_), starting_address(starting_address_),
-            size(size_), virtual_address(virtual_address_), file_offset(file_offset_),
-            alignment(alignment_)
+      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
+           Trait unit_trait_)
+          : unit_kind(Kind::Special), starting_address(starting_address_), size(size_),
+            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
+            unit_trait(unit_trait_)
       {
       }
 
       void Print3Column(std::ostream&) const;
       void Print4Column(std::ostream&) const;
+      Unit::Trait DeduceUsualSubtext(SectionLayout&, std::string_view&, std::string_view&,
+                                     UnitLookup*&, bool&, bool&, bool&, std::size_t);
       static std::string_view ToSpecialName(Trait);
       void Export(DebugInfo&) const noexcept;
 
       const Kind unit_kind;
-      const Trait unit_trait;
       u32 starting_address;
       u32 size;
       u32 virtual_address;
@@ -613,10 +633,8 @@ struct Map
       // A) The name of the STT_FILE symbol from the relevant object in the static library.
       // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
       std::string source_name;
+      const Trait unit_trait;
     };
-
-    using UnitLookup = std::multimap<std::string, const Unit&>;
-    using ModuleLookup = std::map<std::string, UnitLookup>;
 
     SectionLayout(Kind section_kind_, std::string name_)
         : section_kind(section_kind_), name(std::move(name_))

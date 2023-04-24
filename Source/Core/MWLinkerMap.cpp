@@ -1666,23 +1666,24 @@ void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream) const
   std::print(stream, "\r\nLinktime size-increasing optimizations\r\n");
 }
 
-Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
-    const std::string& symbol_name, const std::string& module_name, const std::string& source_name,
-    std::string& curr_module_name, std::string& curr_source_name, UnitLookup*& curr_unit_lookup,
-    bool& is_in_lcomm, bool& is_after_eti_init_info, bool& is_multi_stt_section,
-    const std::size_t line_number)
+Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(
+    Map::SectionLayout& section_layout, std::string_view& curr_module_name,
+    std::string_view& curr_source_name, UnitLookup*& curr_unit_lookup, bool& is_in_lcomm,
+    bool& is_after_eti_init_info, bool& is_multi_stt_section, const std::size_t line_number)
 {
-  const bool is_symbol_stt_section = (symbol_name == this->name);
+  const bool is_symbol_stt_section = (this->name == section_layout.name);
 
   // Detect a change in compilation unit
-  if (curr_module_name != module_name || curr_source_name != source_name)
+  if (curr_module_name != this->module_name || curr_source_name != this->source_name)
   {
-    curr_module_name = module_name;
-    curr_source_name = source_name;
+    curr_module_name = this->module_name;
+    curr_source_name = this->source_name;
     is_multi_stt_section = false;
-    const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-    const bool is_repeat_compilation_unit_detected = this->lookup.contains(compilation_unit_name);
-    curr_unit_lookup = &this->lookup[compilation_unit_name];
+    const std::string_view& compilation_unit_name =
+        this->source_name.empty() ? this->module_name : this->source_name;
+    const bool is_repeat_compilation_unit_detected =
+        section_layout.lookup.contains(compilation_unit_name);
+    curr_unit_lookup = &section_layout.lookup[compilation_unit_name];
 
     if (is_symbol_stt_section)
     {
@@ -1692,28 +1693,29 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
         // STT_SECTION symbols, making them indistinguishable from a repeat-name compilation unit
         // without further heuristics.  In other words, false positives ahoy.
         // TODO: What version?
-        Warn::RepeatCompilationUnit(line_number, compilation_unit_name, this->name);
+        Map::SectionLayout::Warn::RepeatCompilationUnit(line_number, compilation_unit_name,
+                                                        section_layout.name);
       }
       if (is_in_lcomm)
       {
         // Shouldn't this be impossible?
-        Warn::CommAfterLComm(line_number);
+        Map::SectionLayout::Warn::CommAfterLComm(line_number);
         is_in_lcomm = false;
       }
       return Unit::Trait::Section;
     }
     else
     {
-      if (this->section_kind == Kind::BSS)
+      if (section_layout.section_kind == Map::SectionLayout::Kind::BSS)
       {
         // TODO: There is currently no clean way to detect repeat-name compilation units during
         // a BSS section's second lap for printing .lcomm symbols.
         is_in_lcomm = true;
         return Unit::Trait::LCommon;
       }
-      if (this->section_kind == Kind::ExTabIndex)
+      if (section_layout.section_kind == Map::SectionLayout::Kind::ExTabIndex)
       {
-        if (symbol_name == "_eti_init_info" &&
+        if (this->name == "_eti_init_info" &&
             compilation_unit_name == "Linker Generated Symbol File")
         {
           is_after_eti_init_info = true;
@@ -1722,7 +1724,8 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
         // an extabindex section's second lap for printing UNUSED symbols after _eti_init_info.
         else if (is_repeat_compilation_unit_detected && !is_after_eti_init_info)
         {
-          Warn::RepeatCompilationUnit(line_number, compilation_unit_name, this->name);
+          Map::SectionLayout::Warn::RepeatCompilationUnit(line_number, compilation_unit_name,
+                                                          section_layout.name);
         }
         return Unit::Trait::ExTabIndex;
       }
@@ -1731,30 +1734,35 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::DeduceUsualSubtext(
   }
   if (is_symbol_stt_section)
   {
-    if (this->section_kind == Kind::Ctors || this->section_kind == Kind::Dtors)
+    if (section_layout.section_kind == Map::SectionLayout::Kind::Ctors ||
+        section_layout.section_kind == Map::SectionLayout::Kind::Dtors)
     {
-      const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-      Warn::RepeatCompilationUnit(line_number, compilation_unit_name, this->name);
+      const std::string_view& compilation_unit_name =
+          this->source_name.empty() ? this->module_name : this->source_name;
+      Warn::RepeatCompilationUnit(line_number, compilation_unit_name, section_layout.name);
     }
     else if (!is_multi_stt_section)
     {
       // Either this compilation unit was compiled with '-sym on', or two repeat-name compilation
       // units are adjacent to one another.
-      const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-      Warn::SymOnFlagDetected(line_number, compilation_unit_name, this->name);
+      const std::string_view& compilation_unit_name =
+          this->source_name.empty() ? this->module_name : this->source_name;
+      Warn::SymOnFlagDetected(line_number, compilation_unit_name, section_layout.name);
       is_multi_stt_section = true;
     }
     return Unit::Trait::Section;
   }
   else
   {
-    const std::string& compilation_unit_name = source_name.empty() ? module_name : source_name;
-    if (curr_unit_lookup->contains(symbol_name))
+    const std::string_view& compilation_unit_name =
+        this->source_name.empty() ? this->module_name : this->source_name;
+    if (curr_unit_lookup->contains(this->name))
     {
       // This can be a strong hint that there are two or more repeat-name compilation units in your
       // linker map, assuming it's not messed up in any way.  Note that this does not detect symbols
       // with identical names across section layouts.
-      Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name, this->name);
+      Warn::OneDefinitionRuleViolation(line_number, this->name, compilation_unit_name,
+                                       section_layout.name);
     }
   }
   if (is_in_lcomm)
@@ -1778,7 +1786,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                                            std::size_t& line_number)
 {
   std::cmatch match;
-  std::string curr_module_name, curr_source_name;
+  std::string_view curr_module_name, curr_source_name;
   UnitLookup* curr_unit_lookup = nullptr;
   bool is_in_lcomm = false, is_multi_stt_section = false, is_after_eti_init_info = false;
 
@@ -1787,46 +1795,37 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
-      std::string symbol_name = match.str(5), module_name = match.str(6),
-                  source_name = match.str(7);
-      const Unit::Trait unit_trait = DeduceUsualSubtext(
-          symbol_name, module_name, source_name, curr_module_name, curr_source_name,
+      const Unit& unit = this->units.emplace_back(
+          xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+          xsvtoul(util::to_string_view(match[3])), util::svtoi(util::to_string_view(match[4])),
+          util::to_string_view(match[5]), util::to_string_view(match[6]),
+          util::to_string_view(match[7]), *this, curr_module_name, curr_source_name,
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
-      if (curr_unit_lookup == nullptr) [[unlikely]]
-        return Error::Fail;
+      curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head += match.length();
-      const Unit& unit = this->units.emplace_back(
-          unit_trait, xsvtoul(util::to_string_view(match[1])),
-          xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
-          util::svtoi(util::to_string_view(match[4])), symbol_name, std::move(module_name),
-          std::move(source_name));
-      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      std::string symbol_name = match.str(2), module_name = match.str(3),
-                  source_name = match.str(4);
-      const Unit::Trait unit_trait = DeduceUsualSubtext(
-          symbol_name, module_name, source_name, curr_module_name, curr_source_name,
-          curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
-      if (curr_unit_lookup == nullptr) [[unlikely]]
-        return Error::Fail;
+      const Unit& unit = this->units.emplace_back(
+          xsvtoul(util::to_string_view(match[1])), util::to_string_view(match[2]),
+          util::to_string_view(match[3]), util::to_string_view(match[4]), *this, curr_module_name,
+          curr_source_name, curr_unit_lookup, is_in_lcomm, is_multi_stt_section,
+          is_after_eti_init_info, line_number);
+      curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head += match.length();
-      const Unit& unit =
-          this->units.emplace_back(unit_trait, xsvtoul(util::to_string_view(match[1])), symbol_name,
-                                   std::move(module_name), std::move(source_name));
-      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string symbol_name = match.str(4), entry_parent_name = match.str(5),
-                  module_name = match.str(6), source_name = match.str(7);
+      std::string_view symbol_name = util::to_string_view(match[4]),
+                       entry_parent_name = util::to_string_view(match[5]),
+                       module_name = util::to_string_view(match[6]),
+                       source_name = util::to_string_view(match[7]);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
         if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
@@ -1837,21 +1836,19 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
         if (curr_unit_lookup->contains(symbol_name))
         {
-          const std::string& compilation_unit_name =
+          const std::string_view& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
           Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name,
                                            this->name);
         }
-        if (curr_unit_lookup == nullptr)
-          return Error::Fail;
+        const Unit& unit = this->units.emplace_back(
+            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+            xsvtoul(util::to_string_view(match[3])), symbol_name, &parent_unit, module_name,
+            source_name, Unit::Trait::None);
+        curr_unit_lookup->emplace(unit.name, unit);
+        parent_unit.entry_children.push_back(&unit);
         line_number += 1u;
         head += match.length();
-        const Unit& unit = this->units.emplace_back(
-            Unit::Trait::None, xsvtoul(util::to_string_view(match[1])),
-            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
-            symbol_name, &parent_unit, std::move(module_name), std::move(source_name));
-        curr_unit_lookup->emplace(std::move(symbol_name), unit);
-        parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1882,7 +1879,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                                            std::size_t& line_number)
 {
   std::cmatch match;
-  std::string curr_module_name, curr_source_name;
+  std::string_view curr_module_name, curr_source_name;
   UnitLookup* curr_unit_lookup = nullptr;
   bool is_in_lcomm = false, is_multi_stt_section = false, is_after_eti_init_info = false;
 
@@ -1891,42 +1888,38 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_normal,
                           std::regex_constants::match_continuous))
     {
-      std::string symbol_name = match.str(6), module_name = match.str(7),
-                  source_name = match.str(8);
-      const Unit::Trait unit_trait = DeduceUsualSubtext(
-          symbol_name, module_name, source_name, curr_module_name, curr_source_name,
-          curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
+      const Unit& unit = this->units.emplace_back(
+          xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+          xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+          util::svtoi(util::to_string_view(match[5])), util::to_string_view(match[6]),
+          util::to_string_view(match[7]), util::to_string_view(match[8]), *this, curr_module_name,
+          curr_source_name, curr_unit_lookup, is_in_lcomm, is_multi_stt_section,
+          is_after_eti_init_info, line_number);
+      curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head += match.length();
-      const Unit& unit = this->units.emplace_back(
-          unit_trait, xsvtoul(util::to_string_view(match[1])),
-          xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
-          xsvtoul(util::to_string_view(match[4])), util::svtoi(util::to_string_view(match[5])),
-          symbol_name, std::move(module_name), std::move(source_name));
-      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      std::string symbol_name = match.str(2), module_name = match.str(3),
-                  source_name = match.str(4);
-      const Unit::Trait unit_trait = DeduceUsualSubtext(
-          symbol_name, module_name, source_name, curr_module_name, curr_source_name,
-          curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
+      const Unit& unit = this->units.emplace_back(
+          xsvtoul(util::to_string_view(match[1])), util::to_string_view(match[2]),
+          util::to_string_view(match[3]), util::to_string_view(match[4]), *this, curr_module_name,
+          curr_source_name, curr_unit_lookup, is_in_lcomm, is_multi_stt_section,
+          is_after_eti_init_info, line_number);
+      curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head += match.length();
-      const Unit& unit =
-          this->units.emplace_back(unit_trait, xsvtoul(util::to_string_view(match[1])), symbol_name,
-                                   std::move(module_name), std::move(source_name));
-      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string symbol_name = match.str(5), entry_parent_name = match.str(6),
-                  module_name = match.str(7), source_name = match.str(8);
+      std::string_view symbol_name = util::to_string_view(match[5]),
+                       entry_parent_name = util::to_string_view(match[6]),
+                       module_name = util::to_string_view(match[7]),
+                       source_name = util::to_string_view(match[8]);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
         if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
@@ -1937,20 +1930,19 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
         if (curr_unit_lookup->contains(symbol_name))
         {
-          const std::string& compilation_unit_name =
+          const std::string_view& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
           Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name,
                                            this->name);
         }
+        const Unit& unit = this->units.emplace_back(
+            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+            xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+            symbol_name, &parent_unit, module_name, source_name, Unit::Trait::None);
+        curr_unit_lookup->emplace(unit.name, unit);
+        parent_unit.entry_children.push_back(&unit);
         line_number += 1u;
         head += match.length();
-        const Unit& unit = this->units.emplace_back(
-            Unit::Trait::None, xsvtoul(util::to_string_view(match[1])),
-            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
-            xsvtoul(util::to_string_view(match[4])), symbol_name, &parent_unit,
-            std::move(module_name), std::move(source_name));
-        curr_unit_lookup->emplace(std::move(symbol_name), unit);
-        parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1961,25 +1953,25 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
-      std::string_view special_name = util::to_string_view(match[6]);
+      const std::string_view special_name = util::to_string_view(match[6]);
       if (special_name == "*fill*")
       {
+        this->units.emplace_back(
+            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+            xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+            util::svtoi(util::to_string_view(match[5])), Unit::Trait::Fill1);
         line_number += 1u;
         head += match.length();
-        this->units.emplace_back(
-            Unit::Trait::Fill1, xsvtoul(util::to_string_view(match[1])),
-            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
-            xsvtoul(util::to_string_view(match[4])), util::svtoi(util::to_string_view(match[5])));
         continue;
       }
       if (special_name == "**fill**")
       {
+        this->units.emplace_back(
+            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+            xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+            util::svtoi(util::to_string_view(match[5])), Unit::Trait::Fill2);
         line_number += 1u;
         head += match.length();
-        this->units.emplace_back(
-            Unit::Trait::Fill2, xsvtoul(util::to_string_view(match[1])),
-            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
-            xsvtoul(util::to_string_view(match[4])), util::svtoi(util::to_string_view(match[5])));
         continue;
       }
       return Error::SectionLayoutSpecialNotFill;
@@ -2000,7 +1992,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                                           std::size_t& line_number)
 {
   std::cmatch match;
-  std::string curr_module_name, curr_source_name;
+  std::string_view curr_module_name, curr_source_name;
   UnitLookup* curr_unit_lookup = nullptr;
   bool is_in_lcomm = false, is_multi_stt_section = false, is_after_eti_init_info = false;
 
@@ -2009,26 +2001,24 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
-      std::string symbol_name = match.str(5), module_name = match.str(6),
-                  source_name = match.str(7);
-      const Unit::Trait unit_trait = DeduceUsualSubtext(
-          symbol_name, module_name, source_name, curr_module_name, curr_source_name,
+      const Unit& unit = this->units.emplace_back(
+          xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+          xsvtoul(util::to_string_view(match[3])), 0u, util::svtoi(util::to_string_view(match[4])),
+          util::to_string_view(match[5]), util::to_string_view(match[6]),
+          util::to_string_view(match[7]), *this, curr_module_name, curr_source_name,
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
+      curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head += match.length();
-      const Unit& unit = this->units.emplace_back(
-          unit_trait, xsvtoul(util::to_string_view(match[1])),
-          xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])), 0,
-          util::svtoi(util::to_string_view(match[4])), symbol_name, std::move(module_name),
-          std::move(source_name));
-      curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string symbol_name = match.str(4), entry_parent_name = match.str(5),
-                  module_name = match.str(6), source_name = match.str(7);
+      std::string_view symbol_name = util::to_string_view(match[4]),
+                       entry_parent_name = util::to_string_view(match[5]),
+                       module_name = util::to_string_view(match[6]),
+                       source_name = util::to_string_view(match[7]);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
         if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
@@ -2039,19 +2029,19 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
         if (curr_unit_lookup->contains(symbol_name))
         {
-          const std::string& compilation_unit_name =
+          const std::string_view& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
           Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name,
                                            this->name);
         }
+        const Unit& unit = this->units.emplace_back(
+            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+            xsvtoul(util::to_string_view(match[3])), 0u, symbol_name, &parent_unit, module_name,
+            source_name, Unit::Trait::None);
+        curr_unit_lookup->emplace(unit.name, unit);
+        parent_unit.entry_children.push_back(&unit);
         line_number += 1u;
         head += match.length();
-        const Unit& unit = this->units.emplace_back(
-            Unit::Trait::None, xsvtoul(util::to_string_view(match[1])),
-            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])), 0,
-            symbol_name, &parent_unit, std::move(module_name), std::move(source_name));
-        curr_unit_lookup->emplace(std::move(symbol_name), unit);
-        parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -2067,20 +2057,20 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       {
         line_number += 1u;
         head += match.length();
-        this->units.emplace_back(Unit::Trait::Fill1, xsvtoul(util::to_string_view(match[1])),
-                                 xsvtoul(util::to_string_view(match[2])),
-                                 xsvtoul(util::to_string_view(match[3])), 0,
-                                 util::svtoi(util::to_string_view(match[4])));
+        this->units.emplace_back(  //
+            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+            xsvtoul(util::to_string_view(match[3])), 0u,
+            util::svtoi(util::to_string_view(match[4])), Unit::Trait::Fill1);
         continue;
       }
       if (special_name == "**fill**")
       {
         line_number += 1u;
         head += match.length();
-        this->units.emplace_back(Unit::Trait::Fill2, xsvtoul(util::to_string_view(match[1])),
-                                 xsvtoul(util::to_string_view(match[2])),
-                                 xsvtoul(util::to_string_view(match[3])), 0,
-                                 util::svtoi(util::to_string_view(match[4])));
+        this->units.emplace_back(  //
+            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
+            xsvtoul(util::to_string_view(match[3])), 0u,
+            util::svtoi(util::to_string_view(match[4])), Unit::Trait::Fill2);
         continue;
       }
       return Error::SectionLayoutSpecialNotFill;
