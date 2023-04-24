@@ -63,6 +63,11 @@ static void tempfunc(const char* name, int choice)
   std::string temp2 = std::move(sstream).str();
 
   const bool matches = (temp == temp2);
+  // This clobbering to check while debugging that I made no ownership mistakes. Some portions of
+  // the linker map have a lookup map which have std::string_view keys.  The owners of the memory
+  // containing the string is meant to be the unit within the linker map portion / the value stored
+  // by reference in the map.
+  std::fill(temp.begin(), temp.end(), '\0');
   const MWLinker::Version min_version = linker_map.GetMinVersion();
   std::print(std::cout,
              "line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}   time: ", line_number,

@@ -14,6 +14,8 @@
 #include <typeinfo>
 #include <utility>
 
+#include "Util.h"
+
 #include "Future/CppLibPrint.h"
 
 #ifdef DOLPHIN  // Dolphin Emulator
@@ -26,14 +28,7 @@
 using u32 = std::uint32_t;
 #endif
 
-#define xstoul(__s) std::stoul(__s, nullptr, 16)
-
-// https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
-// This version assumes the submatch is valid.  Don't give me an invalid submatch!
-constexpr static std::string_view ToStringView(const std::csub_match& submatch)
-{
-  return std::string_view{submatch.first, submatch.second};
-}
+#define xsvtoul(__s) util::svtoul(__s, nullptr, 16)
 
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
@@ -952,12 +947,13 @@ Map::Error Map::SymbolClosure::Scan(  //
     if (std::regex_search(head, tail, match, re_symbol_closure_node_normal,
                           std::regex_constants::match_continuous))
     {
-      const int next_hierarchy_level = std::stoi(match.str(1));
+      const int next_hierarchy_level = util::svtoi(util::to_string_view(match[1]));
       if (next_hierarchy_level <= 0)
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
-      const std::string_view type = ToStringView(match[3]), bind = ToStringView(match[4]);
+      const std::string_view type = util::to_string_view(match[3]),
+                             bind = util::to_string_view(match[4]);
       if (!map_symbol_closure_st_type.contains(type))
         return Error::SymbolClosureInvalidSymbolType;
       if (!map_symbol_closure_st_bind.contains(bind))
@@ -984,7 +980,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
                             std::regex_constants::match_continuous))
       {
-        if (std::stoi(match.str(1)) != curr_hierarchy_level)
+        if (util::svtoi(util::to_string_view(match[1])) != curr_hierarchy_level)
           return Error::SymbolClosureUnrefDupsHierarchyMismatch;
         if (match.str(2) != symbol_name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
@@ -993,10 +989,10 @@ Map::Error Map::SymbolClosure::Scan(  //
         while (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                  std::regex_constants::match_continuous))
         {
-          if (std::stoi(match.str(1)) != curr_hierarchy_level)
+          if (util::svtoi(util::to_string_view(match[1])) != curr_hierarchy_level)
             return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-          const std::string_view unref_dup_type = ToStringView(match[2]),
-                                 unref_dup_bind = ToStringView(match[3]);
+          const std::string_view unref_dup_type = util::to_string_view(match[2]),
+                                 unref_dup_bind = util::to_string_view(match[3]);
           if (!map_symbol_closure_st_type.contains(unref_dup_type))
             return Error::SymbolClosureInvalidSymbolType;
           if (!map_symbol_closure_st_bind.contains(unref_dup_bind))
@@ -1037,7 +1033,7 @@ Map::Error Map::SymbolClosure::Scan(  //
     if (std::regex_search(head, tail, match, re_symbol_closure_node_linker_generated,
                           std::regex_constants::match_continuous))
     {
-      const int next_hierarchy_level = std::stoi(match.str(1));
+      const int next_hierarchy_level = util::svtoi(util::to_string_view(match[1]));
       if (next_hierarchy_level <= 0)
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
@@ -1226,42 +1222,44 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                           std::regex_constants::match_continuous))
     {
-      std::string first_name = match.str(1), second_name = match.str(2);
-      const u32 size = static_cast<u32>(std::stoul(match.str(3)));
+      const std::string_view first_name = util::to_string_view(match[1]),
+                             second_name = util::to_string_view(match[2]);
+      const u32 size = static_cast<u32>(util::svtoul(util::to_string_view(match[3])));
       line_number += 2u;
       head += match.length();
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
-        if (match.str(1) != first_name)
+        if (util::to_string_view(match[1]) != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
-        if (match.str(2) != second_name)
+        if (util::to_string_view(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
         line_number += 3u;
         head += match.length();
         will_be_replaced = true;
       }
+      const MergingUnit& unit = this->merging_units.emplace_back(
+          first_name, second_name, size, will_be_replaced, was_interchanged);
       if (merging_lookup.contains(first_name))
         Warn::MergingOneDefinitionRuleViolation(line_number - 5u, first_name);
-      const MergingUnit& unit = this->merging_units.emplace_back(
-          first_name, std::move(second_name), size, will_be_replaced, was_interchanged);
-      merging_lookup.emplace(std::move(first_name), unit);
+      merging_lookup.emplace(unit.first_name, unit);
       continue;
     }
     if (std::regex_search(head, tail, match, re_code_merging_was_interchanged,
                           std::regex_constants::match_continuous))
     {
-      std::string first_name = match.str(1), second_name = match.str(2);
-      const u32 size = static_cast<u32>(std::stoul(match.str(3)));
+      const std::string_view first_name = util::to_string_view(match[1]),
+                             second_name = util::to_string_view(match[2]);
+      const u32 size = static_cast<u32>(util::svtoul(util::to_string_view(match[3])));
       was_interchanged = true;
       line_number += 1u;
       head += match.length();
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
-        if (match.str(1) != first_name)
+        if (util::to_string_view(match[1]) != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
-        if (match.str(2) != second_name)
+        if (util::to_string_view(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
 
         line_number += 3u;
@@ -1271,11 +1269,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                             std::regex_constants::match_continuous))
       {
-        if (match.str(1) != first_name)
+        if (util::to_string_view(match[1]) != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
-        if (match.str(2) != second_name)
+        if (util::to_string_view(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
-        if (std::stoul(match.str(3)) != size)
+        if (util::svtoul(util::to_string_view(match[3])) != size)
           return Error::EPPC_PatternMatchingMergingSizeMismatch;
         line_number += 2u;
         head += match.length();
@@ -1284,11 +1282,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       {
         return Error::EPPC_PatternMatchingMergingInterchangeMissingEpilogue;
       }
+      const MergingUnit& unit = this->merging_units.emplace_back(
+          first_name, second_name, size, will_be_replaced, was_interchanged);
       if (merging_lookup.contains(first_name))
         Warn::MergingOneDefinitionRuleViolation(line_number - 5u, first_name);
-      const MergingUnit& unit = this->merging_units.emplace_back(
-          first_name, std::move(second_name), size, will_be_replaced, was_interchanged);
-      merging_lookup.emplace(std::move(first_name), unit);
+      merging_lookup.emplace(unit.first_name, unit);
       continue;
     }
     break;
@@ -1297,46 +1295,49 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
   while (std::regex_search(head, tail, match, re_code_folding_header,
                            std::regex_constants::match_continuous))
   {
-    std::string object_name = match.str(1);
+    std::string_view object_name = util::to_string_view(match[1]);
     if (this->folding_lookup.contains(object_name))
       Warn::FoldingRepeatObject(line_number + 3u, object_name);
-    FoldingUnit::UnitLookup& curr_unit_lookup = this->folding_lookup[object_name];
+    FoldingUnit& folding_unit = this->folding_units.emplace_back(object_name);
+
+    FoldingUnit::UnitLookup& curr_unit_lookup = this->folding_lookup[folding_unit.object_name];
     line_number += 4u;
     head += match.length();
-    std::list<FoldingUnit::Unit> units;
     while (true)
     {
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
                             std::regex_constants::match_continuous))
       {
-        std::string first_name = match.str(1);
+        std::string_view first_name = util::to_string_view(match[1]);
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         line_number += 2u;
         head += match.length();
         const FoldingUnit::Unit& unit =
-            units.emplace_back(first_name, match.str(2), std::stoul(match.str(3)), false);
-        curr_unit_lookup.emplace(std::move(first_name), unit);
+            folding_unit.units.emplace_back(first_name, util::to_string_view(match[2]),
+                                            util::svtoul(util::to_string_view(match[3])), false);
+        curr_unit_lookup.emplace(unit.first_name, unit);
         continue;
       }
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
                             std::regex_constants::match_continuous))
       {
-        std::string first_name = match.str(1);
-        if (first_name != match.str(4))  // It is my assumption that they will always match.
+        std::string_view first_name = util::to_string_view(match[1]);
+        // It is my assumption that these will always match.
+        if (first_name != util::to_string_view(match[4]))
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         line_number += 2u;
         head += match.length();
         const FoldingUnit::Unit& unit =
-            units.emplace_back(first_name, match.str(2), std::stoul(match.str(3)), true);
-        curr_unit_lookup.emplace(std::move(first_name), unit);
+            folding_unit.units.emplace_back(first_name, util::to_string_view(match[2]),
+                                            util::svtoul(util::to_string_view(match[3])), true);
+        curr_unit_lookup.emplace(unit.first_name, unit);
         continue;
       }
       break;
     }
-    this->folding_units.emplace_back(std::move(object_name), std::move(units));
   }
   return Error::None;
 }
@@ -1796,8 +1797,10 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
       line_number += 1u;
       head += match.length();
       const Unit& unit = this->units.emplace_back(
-          unit_trait, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-          std::stoi(match.str(4)), symbol_name, std::move(module_name), std::move(source_name));
+          unit_trait, xsvtoul(util::to_string_view(match[1])),
+          xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
+          util::svtoi(util::to_string_view(match[4])), symbol_name, std::move(module_name),
+          std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
@@ -1813,8 +1816,9 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         return Error::Fail;
       line_number += 1u;
       head += match.length();
-      const Unit& unit = this->units.emplace_back(unit_trait, xstoul(match.str(1)), symbol_name,
-                                                  std::move(module_name), std::move(source_name));
+      const Unit& unit =
+          this->units.emplace_back(unit_trait, xsvtoul(util::to_string_view(match[1])), symbol_name,
+                                   std::move(module_name), std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
@@ -1843,7 +1847,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         line_number += 1u;
         head += match.length();
         const Unit& unit = this->units.emplace_back(
-            Unit::Trait::None, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
+            Unit::Trait::None, xsvtoul(util::to_string_view(match[1])),
+            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
             symbol_name, &parent_unit, std::move(module_name), std::move(source_name));
         curr_unit_lookup->emplace(std::move(symbol_name), unit);
         parent_unit.entry_children.push_back(&unit);
@@ -1894,9 +1899,10 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
       line_number += 1u;
       head += match.length();
       const Unit& unit = this->units.emplace_back(
-          unit_trait, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)),
-          xstoul(match.str(4)), std::stoi(match.str(5)), symbol_name, std::move(module_name),
-          std::move(source_name));
+          unit_trait, xsvtoul(util::to_string_view(match[1])),
+          xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
+          xsvtoul(util::to_string_view(match[4])), util::svtoi(util::to_string_view(match[5])),
+          symbol_name, std::move(module_name), std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
@@ -1910,8 +1916,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
       line_number += 1u;
       head += match.length();
-      const Unit& unit = this->units.emplace_back(unit_trait, xstoul(match.str(1)), symbol_name,
-                                                  std::move(module_name), std::move(source_name));
+      const Unit& unit =
+          this->units.emplace_back(unit_trait, xsvtoul(util::to_string_view(match[1])), symbol_name,
+                                   std::move(module_name), std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
@@ -1937,10 +1944,11 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         }
         line_number += 1u;
         head += match.length();
-        const Unit& unit =
-            this->units.emplace_back(Unit::Trait::None, xstoul(match.str(1)), xstoul(match.str(2)),
-                                     xstoul(match.str(3)), xstoul(match.str(4)), symbol_name,
-                                     &parent_unit, std::move(module_name), std::move(source_name));
+        const Unit& unit = this->units.emplace_back(
+            Unit::Trait::None, xsvtoul(util::to_string_view(match[1])),
+            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
+            xsvtoul(util::to_string_view(match[4])), symbol_name, &parent_unit,
+            std::move(module_name), std::move(source_name));
         curr_unit_lookup->emplace(std::move(symbol_name), unit);
         parent_unit.entry_children.push_back(&unit);
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
@@ -1953,23 +1961,25 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
-      std::string_view special_name = ToStringView(match[6]);
+      std::string_view special_name = util::to_string_view(match[6]);
       if (special_name == "*fill*")
       {
         line_number += 1u;
         head += match.length();
-        this->units.emplace_back(Unit::Trait::Fill1, xstoul(match.str(1)), xstoul(match.str(2)),
-                                 xstoul(match.str(3)), xstoul(match.str(4)),
-                                 std::stoi(match.str(5)));
+        this->units.emplace_back(
+            Unit::Trait::Fill1, xsvtoul(util::to_string_view(match[1])),
+            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
+            xsvtoul(util::to_string_view(match[4])), util::svtoi(util::to_string_view(match[5])));
         continue;
       }
       if (special_name == "**fill**")
       {
         line_number += 1u;
         head += match.length();
-        this->units.emplace_back(Unit::Trait::Fill2, xstoul(match.str(1)), xstoul(match.str(2)),
-                                 xstoul(match.str(3)), xstoul(match.str(4)),
-                                 std::stoi(match.str(5)));
+        this->units.emplace_back(
+            Unit::Trait::Fill2, xsvtoul(util::to_string_view(match[1])),
+            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])),
+            xsvtoul(util::to_string_view(match[4])), util::svtoi(util::to_string_view(match[5])));
         continue;
       }
       return Error::SectionLayoutSpecialNotFill;
@@ -2007,8 +2017,10 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       line_number += 1u;
       head += match.length();
       const Unit& unit = this->units.emplace_back(
-          unit_trait, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
-          std::stoi(match.str(4)), symbol_name, std::move(module_name), std::move(source_name));
+          unit_trait, xsvtoul(util::to_string_view(match[1])),
+          xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])), 0,
+          util::svtoi(util::to_string_view(match[4])), symbol_name, std::move(module_name),
+          std::move(source_name));
       curr_unit_lookup->emplace(std::move(symbol_name), unit);
       continue;
     }
@@ -2035,7 +2047,8 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         line_number += 1u;
         head += match.length();
         const Unit& unit = this->units.emplace_back(
-            Unit::Trait::None, xstoul(match.str(1)), xstoul(match.str(2)), xstoul(match.str(3)), 0,
+            Unit::Trait::None, xsvtoul(util::to_string_view(match[1])),
+            xsvtoul(util::to_string_view(match[2])), xsvtoul(util::to_string_view(match[3])), 0,
             symbol_name, &parent_unit, std::move(module_name), std::move(source_name));
         curr_unit_lookup->emplace(std::move(symbol_name), unit);
         parent_unit.entry_children.push_back(&unit);
@@ -2049,21 +2062,25 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                           std::regex_constants::match_continuous))
     {
       // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
-      std::string_view special_name = ToStringView(match[5]);
+      std::string_view special_name = util::to_string_view(match[5]);
       if (special_name == "*fill*")
       {
         line_number += 1u;
         head += match.length();
-        this->units.emplace_back(Unit::Trait::Fill1, xstoul(match.str(1)), xstoul(match.str(2)),
-                                 xstoul(match.str(3)), 0, std::stoi(match.str(4)));
+        this->units.emplace_back(Unit::Trait::Fill1, xsvtoul(util::to_string_view(match[1])),
+                                 xsvtoul(util::to_string_view(match[2])),
+                                 xsvtoul(util::to_string_view(match[3])), 0,
+                                 util::svtoi(util::to_string_view(match[4])));
         continue;
       }
       if (special_name == "**fill**")
       {
         line_number += 1u;
         head += match.length();
-        this->units.emplace_back(Unit::Trait::Fill2, xstoul(match.str(1)), xstoul(match.str(2)),
-                                 xstoul(match.str(3)), 0, std::stoi(match.str(4)));
+        this->units.emplace_back(Unit::Trait::Fill2, xsvtoul(util::to_string_view(match[1])),
+                                 xsvtoul(util::to_string_view(match[2])),
+                                 xsvtoul(util::to_string_view(match[3])), 0,
+                                 util::svtoi(util::to_string_view(match[4])));
         continue;
       }
       return Error::SectionLayoutSpecialNotFill;
@@ -2190,8 +2207,9 @@ Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const t
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)));
+    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
+                                    xsvtoul(util::to_string_view(match[3])),
+                                    xsvtoul(util::to_string_view(match[4])));
   }
   return ScanDebug_old(head, tail, line_number);
 }
@@ -2212,9 +2230,10 @@ Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const t
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), xstoul(match.str(5)),
-                                    xstoul(match.str(6)));
+    this->normal_units.emplace_back(
+        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])));
   }
   return ScanDebug_old(head, tail, line_number);
 }
@@ -2236,10 +2255,11 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
   {
     line_number += 1u;
     head += match.length();
-    std::string size = match.str(2);
+    std::string_view size = util::to_string_view(match[2]);
     if (size.length() == 8 && size.front() == '0')  // Make sure it's not just an overflowed value
       this->SetMinVersion(Version::version_3_0_4);
-    this->debug_units.emplace_back(match.str(1), xstoul(size), xstoul(match.str(3)));
+    this->debug_units.emplace_back(match.str(1), xsvtoul(size),
+                                   xsvtoul(util::to_string_view(match[3])));
   }
   return Error::None;
 }
@@ -2260,8 +2280,9 @@ Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)));
+    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
+                                    xsvtoul(util::to_string_view(match[3])),
+                                    xsvtoul(util::to_string_view(match[4])));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2282,9 +2303,10 @@ Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), xstoul(match.str(5)),
-                                    xstoul(match.str(6)));
+    this->normal_units.emplace_back(
+        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2305,8 +2327,10 @@ Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), std::stoi(match.str(5)));
+    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
+                                    xsvtoul(util::to_string_view(match[3])),
+                                    xsvtoul(util::to_string_view(match[4])),
+                                    util::svtoi(util::to_string_view(match[5])));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2327,8 +2351,10 @@ Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), xstoul(match.str(5)), match.str(6));
+    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
+                                    xsvtoul(util::to_string_view(match[3])),
+                                    xsvtoul(util::to_string_view(match[4])),
+                                    xsvtoul(util::to_string_view(match[5])), match.str(6));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2349,9 +2375,11 @@ Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* cons
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), xstoul(match.str(5)),
-                                    xstoul(match.str(6)), std::stoi(match.str(7)));
+    this->normal_units.emplace_back(
+        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
+        std::stoi(match.str(7)));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2372,9 +2400,11 @@ Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* cons
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), xstoul(match.str(5)),
-                                    xstoul(match.str(6)), xstoul(match.str(7)), match.str(8));
+    this->normal_units.emplace_back(
+        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
+        xsvtoul(util::to_string_view(match[7])), match.str(8));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2395,9 +2425,11 @@ Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* con
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), std::stoi(match.str(5)),
-                                    xstoul(match.str(6)), match.str(7));
+    this->normal_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
+                                    xsvtoul(util::to_string_view(match[3])),
+                                    xsvtoul(util::to_string_view(match[4])),
+                                    util::svtoi(util::to_string_view(match[5])),
+                                    xsvtoul(util::to_string_view(match[6])), match.str(7));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2418,10 +2450,11 @@ Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const cha
   {
     line_number += 1u;
     head += match.length();
-    this->normal_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)),
-                                    xstoul(match.str(4)), xstoul(match.str(5)),
-                                    xstoul(match.str(6)), std::stoi(match.str(7)),
-                                    xstoul(match.str(8)), match.str(9));
+    this->normal_units.emplace_back(
+        match.str(1), xsvtoul(util::to_string_view(match[2])),
+        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
+        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
+        std::stoi(match.str(7)), xsvtoul(util::to_string_view(match[8])), match.str(9));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2442,7 +2475,8 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
   {
     line_number += 1u;
     head += match.length();
-    this->debug_units.emplace_back(match.str(1), xstoul(match.str(2)), xstoul(match.str(3)));
+    this->debug_units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])),
+                                   xsvtoul(util::to_string_view(match[3])));
   }
   return Error::None;
 }
@@ -2692,7 +2726,7 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
   {
     line_number += 1u;
     head += match.length();
-    this->units.emplace_back(match.str(1), xstoul(match.str(2)));
+    this->units.emplace_back(match.str(1), xsvtoul(util::to_string_view(match[2])));
   }
   return Error::None;
 }

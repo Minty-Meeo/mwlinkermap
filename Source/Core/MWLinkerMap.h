@@ -279,9 +279,9 @@ struct Map
 
     struct MergingUnit
     {
-      MergingUnit(std::string first_name_, std::string second_name_, u32 size_,
+      MergingUnit(std::string_view first_name_, std::string_view second_name_, u32 size_,
                   bool will_be_replaced_, bool was_interchanged_)
-          : first_name(std::move(first_name_)), second_name(std::move(second_name_)), size(size_),
+          : first_name(first_name_), second_name(second_name_), size(size_),
             will_be_replaced(will_be_replaced_), was_interchanged(was_interchanged_)
       {
       }
@@ -305,9 +305,9 @@ struct Map
     {
       struct Unit
       {
-        Unit(std::string first_name_, std::string second_name_, u32 size_,
+        Unit(std::string_view first_name_, std::string_view second_name_, u32 size_,
              bool new_branch_function_)
-            : first_name(first_name_), second_name(std::move(second_name_)), size(size_),
+            : first_name(first_name_), second_name(second_name_), size(size_),
               new_branch_function(new_branch_function_)
         {
         }
@@ -320,13 +320,10 @@ struct Map
         bool new_branch_function;
       };
 
-      using UnitLookup = std::multimap<std::string, const Unit&>;
-      using ModuleLookup = std::map<std::string, UnitLookup>;
+      using UnitLookup = std::multimap<std::string_view, const Unit&>;
+      using ModuleLookup = std::map<std::string_view, UnitLookup>;
 
-      FoldingUnit(std::string object_name_, std::list<Unit> units_)
-          : object_name(std::move(object_name_)), units(std::move(units_))
-      {
-      }
+      FoldingUnit(std::string_view object_name_) : object_name(object_name_) {}
 
       void Print(std::ostream&) const;
 
@@ -334,7 +331,7 @@ struct Map
       std::list<Unit> units;
     };
 
-    using MergingUnitLookup = std::multimap<std::string, const MergingUnit&>;
+    using MergingUnitLookup = std::multimap<std::string_view, const MergingUnit&>;
 
     EPPC_PatternMatching() { SetMinVersion(Version::version_4_2_build_142); }
     virtual ~EPPC_PatternMatching() override = default;
