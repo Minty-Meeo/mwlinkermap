@@ -390,7 +390,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
   while (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
                            std::regex_constants::match_continuous))
   {
-    std::string_view section_name = util::to_string_view(match[1]);
+    const std::string_view section_name = util::to_string_view(match[1]);
     line_number += 1u;
     head += match.length();
     const SectionLayout::Kind section_kind = SectionLayout::ToSectionKind(section_name);
@@ -539,7 +539,7 @@ static const std::regex re_section_layout_4column_prologue_3{
 // clang-format on
 
 Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const tail,
-                                           std::size_t& line_number, std::string_view name)
+                                           std::size_t& line_number, const std::string_view name)
 {
   std::cmatch match;
   const SectionLayout::Kind section_kind = SectionLayout::ToSectionKind(name);
@@ -962,9 +962,9 @@ Map::Error Map::SymbolClosure::Scan(  //
         return Error::SymbolClosureInvalidSymbolType;
       if (!map_symbol_closure_st_bind.contains(bind))
         return Error::SymbolClosureInvalidSymbolBind;
-      std::string_view symbol_name = util::to_string_view(match[2]),
-                       module_name = util::to_string_view(match[5]),
-                       source_name = util::to_string_view(match[6]);
+      const std::string_view symbol_name = util::to_string_view(match[2]),
+                             module_name = util::to_string_view(match[5]),
+                             source_name = util::to_string_view(match[6]);
       const std::size_t line_number_backup = line_number;  // unfortunate
       line_number += 1u;
       head += match.length();
@@ -1299,7 +1299,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
   while (std::regex_search(head, tail, match, re_code_folding_header,
                            std::regex_constants::match_continuous))
   {
-    std::string_view object_name = util::to_string_view(match[1]);
+    const std::string_view object_name = util::to_string_view(match[1]);
     if (this->folding_lookup.contains(object_name))
       Warn::FoldingRepeatObject(line_number + 3u, object_name);
     FoldingUnit& folding_unit = this->folding_units.emplace_back(object_name);
@@ -1312,7 +1312,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
                             std::regex_constants::match_continuous))
       {
-        std::string_view first_name = util::to_string_view(match[1]);
+        const std::string_view first_name = util::to_string_view(match[1]);
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         line_number += 2u;
@@ -1326,7 +1326,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
                             std::regex_constants::match_continuous))
       {
-        std::string_view first_name = util::to_string_view(match[1]);
+        const std::string_view first_name = util::to_string_view(match[1]);
         // It is my assumption that these will always match.
         if (first_name != util::to_string_view(match[4]))
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
@@ -1833,10 +1833,10 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string_view symbol_name = util::to_string_view(match[4]),
-                       entry_parent_name = util::to_string_view(match[5]),
-                       module_name = util::to_string_view(match[6]),
-                       source_name = util::to_string_view(match[7]);
+      const std::string_view symbol_name = util::to_string_view(match[4]),
+                             entry_parent_name = util::to_string_view(match[5]),
+                             module_name = util::to_string_view(match[6]),
+                             source_name = util::to_string_view(match[7]);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
         if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
@@ -1927,10 +1927,10 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string_view symbol_name = util::to_string_view(match[5]),
-                       entry_parent_name = util::to_string_view(match[6]),
-                       module_name = util::to_string_view(match[7]),
-                       source_name = util::to_string_view(match[8]);
+      const std::string_view symbol_name = util::to_string_view(match[5]),
+                             entry_parent_name = util::to_string_view(match[6]),
+                             module_name = util::to_string_view(match[7]),
+                             source_name = util::to_string_view(match[8]);
       for (auto& parent_unit : std::ranges::reverse_view{this->units})
       {
         if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
