@@ -28,7 +28,7 @@
 using u32 = std::uint32_t;
 #endif
 
-#define xsvtoul(__s) util::svtoul(__s, nullptr, 16)
+#define xsvtoul(__sv) util::svtoul(__sv, nullptr, 16)
 
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
@@ -194,7 +194,7 @@ Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string_vie
 
 Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->Scan(string_view.data(), string_view.data() + string_view.size(), line_number);
+  return this->Scan(string_view.begin(), string_view.end(), line_number);
 }
 
 Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line_number)
@@ -213,7 +213,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 2u;
-    head += match.length();
+    head = match[0].second;
     const auto error =
         this->ScanPrologue_SectionLayout(head, tail, line_number, util::to_string_view(match[1]));
     if (error != Error::None)
@@ -230,7 +230,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     const auto error =
         this->ScanPrologue_SectionLayout(head, tail, line_number, util::to_string_view(match[1]));
     if (error != Error::None)
@@ -241,7 +241,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->entry_point_name = match.str(1);
   }
   else
@@ -294,7 +294,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 2u;
-    head += match.length();
+    head = match[0].second;
     auto portion = std::make_unique<MixedModeIslands>();
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
@@ -305,7 +305,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 2u;
-    head += match.length();
+    head = match[0].second;
     auto portion = std::make_unique<BranchIslands>();
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
@@ -316,7 +316,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 2u;
-    head += match.length();
+    head = match[0].second;
     auto portion = std::make_unique<LinktimeSizeDecreasingOptimizations>();
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
@@ -327,7 +327,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
                         std::regex_constants::match_continuous))
   {
     line_number += 2u;
-    head += match.length();
+    head = match[0].second;
     auto portion = std::make_unique<LinktimeSizeIncreasingOptimizations>();
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
@@ -339,7 +339,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
                            std::regex_constants::match_continuous))
   {
     line_number += 3u;
-    head += match.length();
+    head = match[0].second;
     const auto error =
         this->ScanPrologue_SectionLayout(head, tail, line_number, util::to_string_view(match[1]));
     if (error != Error::None)
@@ -349,7 +349,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
                         std::regex_constants::match_continuous))
   {
     line_number += 3u;
-    head += match.length();
+    head = match[0].second;
     const auto error = this->ScanPrologue_MemoryMap(head, tail, line_number);
     if (error != Error::None)
       return error;
@@ -358,7 +358,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
                         std::regex_constants::match_continuous))
   {
     line_number += 3u;
-    head += match.length();
+    head = match[0].second;
     auto portion = std::make_unique<LinkerGeneratedSymbols>();
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
@@ -370,7 +370,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
 
 Map::Error Map::ScanTLOZTP(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->ScanTLOZTP(string_view.data(), string_view.data() + string_view.size(), line_number);
+  return this->ScanTLOZTP(string_view.begin(), string_view.end(), line_number);
 }
 
 Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t& line_number)
@@ -392,9 +392,9 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
   {
     const std::string_view section_name = util::to_string_view(match[1]);
     line_number += 1u;
-    head += match.length();
-    const SectionLayout::Kind section_kind = SectionLayout::ToSectionKind(section_name);
-    auto portion = std::make_unique<SectionLayout>(section_kind, section_name);
+    head = match[0].second;
+    auto portion =
+        std::make_unique<SectionLayout>(SectionLayout::ToSectionKind(section_name), section_name);
     portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->ScanTLOZTP(head, tail, line_number);
     if (error != Error::None)
@@ -406,8 +406,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
 
 Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->ScanSMGalaxy(string_view.data(), string_view.data() + string_view.size(),
-                            line_number);
+  return this->ScanSMGalaxy(string_view.begin(), string_view.end(), line_number);
 }
 
 Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size_t& line_number)
@@ -423,7 +422,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
                         std::regex_constants::match_continuous))
   {
     line_number += 2u;
-    head += match.length();
+    head = match[0].second;
     // TODO: detect and split Section Layout subtext by observing the Starting Address
     auto portion = std::make_unique<SectionLayout>(SectionLayout::Kind::Normal,
                                                    util::to_string_view(match[1]));
@@ -542,24 +541,23 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
                                            std::size_t& line_number, const std::string_view name)
 {
   std::cmatch match;
-  const SectionLayout::Kind section_kind = SectionLayout::ToSectionKind(name);
 
   if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_1,
                         std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_3,
                             std::regex_constants::match_continuous))
       {
         line_number += 1u;
-        head += match.length();
-        auto portion = std::make_unique<SectionLayout>(section_kind, name);
+        head = match[0].second;
+        auto portion = std::make_unique<SectionLayout>(SectionLayout::ToSectionKind(name), name);
         const auto error = portion->Scan3Column(head, tail, line_number);
         if (error != Error::None)
           return error;
@@ -579,18 +577,18 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_section_layout_4column_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       if (std::regex_search(head, tail, match, re_section_layout_4column_prologue_3,
                             std::regex_constants::match_continuous))
       {
         line_number += 1u;
-        head += match.length();
-        auto portion = std::make_unique<SectionLayout>(section_kind, name);
+        head = match[0].second;
+        auto portion = std::make_unique<SectionLayout>(SectionLayout::ToSectionKind(name), name);
         portion->SetMinVersion(Version::version_3_0_4);
         const auto error = portion->Scan4Column(head, tail, line_number);
         if (error != Error::None)
@@ -686,12 +684,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                         std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_simple_prologue_2_old,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false);
       const auto error = portion->ScanSimple_old(head, tail, line_number);
       if (error != Error::None)
@@ -707,12 +705,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_romram_prologue_2_old,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true);
       const auto error = portion->ScanRomRam_old(head, tail, line_number);
       if (error != Error::None)
@@ -728,12 +726,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_simple_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false, false, false);
       const auto error = portion->ScanSimple(head, tail, line_number);
       if (error != Error::None)
@@ -749,12 +747,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_romram_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true, false, false);
       const auto error = portion->ScanRomRam(head, tail, line_number);
       if (error != Error::None)
@@ -770,12 +768,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_srecord_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false, true, false);
       const auto error = portion->ScanSRecord(head, tail, line_number);
       if (error != Error::None)
@@ -791,12 +789,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_binfile_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false, false, true);
       const auto error = portion->ScanBinFile(head, tail, line_number);
       if (error != Error::None)
@@ -812,12 +810,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true, true, false);
       const auto error = portion->ScanRomRamSRecord(head, tail, line_number);
       if (error != Error::None)
@@ -833,12 +831,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_romram_binfile_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true, false, true);
       const auto error = portion->ScanRomRamBinFile(head, tail, line_number);
       if (error != Error::None)
@@ -854,12 +852,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_srecord_binfile_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false, true, true);
       const auto error = portion->ScanSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
@@ -875,12 +873,12 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
                              std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     if (std::regex_search(head, tail, match, re_memory_map_romram_srecord_binfile_prologue_2,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true, true, true);
       const auto error = portion->ScanRomRamSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
@@ -967,7 +965,7 @@ Map::Error Map::SymbolClosure::Scan(  //
                              source_name = util::to_string_view(match[6]);
       const std::size_t line_number_backup = line_number;  // unfortunate
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
@@ -983,7 +981,7 @@ Map::Error Map::SymbolClosure::Scan(  //
         if (util::to_string_view(match[2]) != symbol_name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
         line_number += 1u;
-        head += match.length();
+        head = match[0].second;
         while (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                  std::regex_constants::match_continuous))
         {
@@ -999,7 +997,7 @@ Map::Error Map::SymbolClosure::Scan(  //
                                   map_symbol_closure_st_bind.at(unref_dup_bind),
                                   util::to_string_view(match[4]), util::to_string_view(match[5]));
           line_number += 1u;
-          head += match.length();
+          head = match[0].second;
         }
         if (unref_dups.empty())
           return Error::SymbolClosureUnrefDupsEmpty;
@@ -1051,7 +1049,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       // clang-format on
 
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       continue;
     }
     // Up until CodeWarrior for GCN 3.0a3 (at the earliest), unresolved symbols were printed as the
@@ -1070,7 +1068,7 @@ Map::Error Map::SymbolClosure::Scan(  //
     {
       unresolved_symbols.emplace_back(line_number, match.str(1));
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       continue;
     }
     break;
@@ -1230,7 +1228,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
                              second_name = util::to_string_view(match[2]);
       const u32 size = static_cast<u32>(util::svtoul(util::to_string_view(match[3])));
       line_number += 2u;
-      head += match.length();
+      head = match[0].second;
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
@@ -1239,7 +1237,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         if (util::to_string_view(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
         line_number += 3u;
-        head += match.length();
+        head = match[0].second;
         will_be_replaced = true;
       }
       const MergingUnit& unit = this->merging_units.emplace_back(
@@ -1257,7 +1255,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       const u32 size = static_cast<u32>(util::svtoul(util::to_string_view(match[3])));
       was_interchanged = true;
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
@@ -1267,7 +1265,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
 
         line_number += 3u;
-        head += match.length();
+        head = match[0].second;
         will_be_replaced = true;
       }
       if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
@@ -1280,7 +1278,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         if (util::svtoul(util::to_string_view(match[3])) != size)
           return Error::EPPC_PatternMatchingMergingSizeMismatch;
         line_number += 2u;
-        head += match.length();
+        head = match[0].second;
       }
       else
       {
@@ -1306,7 +1304,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
 
     FoldingUnit::UnitLookup& curr_unit_lookup = this->folding_lookup[folding_unit.object_name];
     line_number += 4u;
-    head += match.length();
+    head = match[0].second;
     while (true)
     {
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
@@ -1316,7 +1314,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         line_number += 2u;
-        head += match.length();
+        head = match[0].second;
         const FoldingUnit::Unit& unit =
             folding_unit.units.emplace_back(first_name, util::to_string_view(match[2]),
                                             util::svtoul(util::to_string_view(match[3])), false);
@@ -1333,7 +1331,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         line_number += 2u;
-        head += match.length();
+        head = match[0].second;
         const FoldingUnit::Unit& unit =
             folding_unit.units.emplace_back(first_name, util::to_string_view(match[2]),
                                             util::svtoul(util::to_string_view(match[3])), true);
@@ -1469,7 +1467,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       this->units.emplace_back(Unit::Kind::NotNear, util::to_string_view(match[1]),
                                util::to_string_view(match[2]), util::to_string_view(match[3]));
       continue;
@@ -1478,7 +1476,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]));
       continue;
     }
@@ -1486,7 +1484,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       this->units.emplace_back(Unit::Kind::NotComputed, util::to_string_view(match[1]),
                                util::to_string_view(match[2]), util::to_string_view(match[3]));
       continue;
@@ -1496,7 +1494,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       this->units.emplace_back(Unit::Kind::Optimized, util::to_string_view(match[1]),
                                util::to_string_view(match[2]), util::to_string_view(match[3]));
       continue;
@@ -1560,7 +1558,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
                                false);
       continue;
@@ -1569,7 +1567,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
                                true);
       continue;
@@ -1618,7 +1616,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
                                false);
       continue;
@@ -1627,7 +1625,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
                           std::regex_constants::match_continuous))
     {
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
                                true);
       continue;
@@ -1814,7 +1812,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
       curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
@@ -1827,7 +1825,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
           is_after_eti_init_info, line_number);
       curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
@@ -1859,7 +1857,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         curr_unit_lookup->emplace(unit.name, unit);
         parent_unit.entry_children.push_back(&unit);
         line_number += 1u;
-        head += match.length();
+        head = match[0].second;
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1908,7 +1906,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
           is_after_eti_init_info, line_number);
       curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
@@ -1921,7 +1919,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
           is_after_eti_init_info, line_number);
       curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
@@ -1953,7 +1951,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         curr_unit_lookup->emplace(unit.name, unit);
         parent_unit.entry_children.push_back(&unit);
         line_number += 1u;
-        head += match.length();
+        head = match[0].second;
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -1972,7 +1970,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
             xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
             util::svtoi(util::to_string_view(match[5])), Unit::Trait::Fill1);
         line_number += 1u;
-        head += match.length();
+        head = match[0].second;
         continue;
       }
       if (special_name == "**fill**")
@@ -1982,7 +1980,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
             xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
             util::svtoi(util::to_string_view(match[5])), Unit::Trait::Fill2);
         line_number += 1u;
-        head += match.length();
+        head = match[0].second;
         continue;
       }
       return Error::SectionLayoutSpecialNotFill;
@@ -2020,7 +2018,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
       curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
-      head += match.length();
+      head = match[0].second;
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
@@ -2052,7 +2050,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         curr_unit_lookup->emplace(unit.name, unit);
         parent_unit.entry_children.push_back(&unit);
         line_number += 1u;
-        head += match.length();
+        head = match[0].second;
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
       }
       return Error::SectionLayoutOrphanedEntry;
@@ -2067,7 +2065,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       if (special_name == "*fill*")
       {
         line_number += 1u;
-        head += match.length();
+        head = match[0].second;
         this->units.emplace_back(  //
             xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
             xsvtoul(util::to_string_view(match[3])), 0u,
@@ -2077,7 +2075,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       if (special_name == "**fill**")
       {
         line_number += 1u;
-        head += match.length();
+        head = match[0].second;
         this->units.emplace_back(  //
             xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
             xsvtoul(util::to_string_view(match[3])), 0u,
@@ -2207,7 +2205,7 @@ Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const t
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])));
@@ -2230,7 +2228,7 @@ Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const t
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
@@ -2255,7 +2253,7 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     std::string_view size = util::to_string_view(match[2]);
     if (size.length() == 8 && size.front() == '0')  // Make sure it's not just an overflowed value
       this->SetMinVersion(Version::version_3_0_4);
@@ -2280,7 +2278,7 @@ Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])));
@@ -2303,7 +2301,7 @@ Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
@@ -2327,7 +2325,7 @@ Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
@@ -2351,7 +2349,7 @@ Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
@@ -2375,7 +2373,7 @@ Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* cons
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
@@ -2400,7 +2398,7 @@ Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* cons
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
@@ -2425,7 +2423,7 @@ Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* con
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
@@ -2450,7 +2448,7 @@ Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const cha
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
         xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
@@ -2476,7 +2474,7 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->debug_units.emplace_back(util::to_string_view(match[1]),
                                    xsvtoul(util::to_string_view(match[2])),
                                    xsvtoul(util::to_string_view(match[3])));
@@ -2728,7 +2726,7 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
                            std::regex_constants::match_continuous))
   {
     line_number += 1u;
-    head += match.length();
+    head = match[0].second;
     this->units.emplace_back(util::to_string_view(match[1]),
                              xsvtoul(util::to_string_view(match[2])));
   }
