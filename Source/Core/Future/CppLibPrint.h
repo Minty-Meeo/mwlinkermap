@@ -23,7 +23,7 @@ template <class... Args>
 void println(::std::ostream& os, ::std::format_string<Args...> fmt, Args&&... args)
 {
   ::std::print(os, ::std::move(fmt), ::std::forward<Args>(args)...);
-  os.put('\n');
+  ::std::endl(os);
 }
 }  // namespace std
 #endif
