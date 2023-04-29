@@ -3,74 +3,59 @@
 #include <charconv>
 #include <concepts>
 #include <iterator>
+#include <string>
 #include <string_view>
 #include <utility>
 
 namespace util
 {
+// TODO: Make these constexpr after std::from_chars becomes constexpr in C++23.
+
+// Converts a valid std::csub_match to an Integral.
 template <std::integral T>
-inline T svto(const std::string_view sv, std::size_t* pos = nullptr, const int base = 10) noexcept
+inline T smto(const std::pair<const char*, const char*>& csm, std::size_t* pos = nullptr,
+              const int base = 10) noexcept
 {
   T value{};
-  const char* const head = sv.begin();
-  const char* const tail = sv.end();
-  const char* const ptr = std::from_chars(head, tail, value, base).ptr;
+  auto [ptr, ec] = std::from_chars(csm.first, csm.second, value, base);
   // Don't bother throwing std::invalid_argument or std::out_of_range.  I never write bad code :^)
   if (pos != nullptr)
-    *pos = std::distance(head, ptr);
+    *pos = std::distance(csm.first, ptr);
   return value;
 }
 
-inline long svtoi(const std::string_view sv, std::size_t* pos = nullptr,
-                  const int base = 10) noexcept
+// Converts a valid std::csub_match to an Integral (in base 16).
+template <std::integral T>
+inline T xsmto(const std::pair<const char*, const char*>& csm, std::size_t* pos = nullptr) noexcept
 {
-  return svto<int>(sv, pos, base);
-}
-inline long svtol(const std::string_view sv, std::size_t* pos = nullptr,
-                  const int base = 10) noexcept
-{
-  return svto<long>(sv, pos, base);
-}
-inline long svtoll(const std::string_view sv, std::size_t* pos = nullptr,
-                   const int base = 10) noexcept
-{
-  return svto<long long>(sv, pos, base);
-}
-inline long svtoul(const std::string_view sv, std::size_t* pos = nullptr,
-                   const int base = 10) noexcept
-{
-  return svto<unsigned long>(sv, pos, base);
-}
-inline long svtoull(const std::string_view sv, std::size_t* pos = nullptr,
-                    const int base = 10) noexcept
-{
-  return svto<unsigned long long>(sv, pos, base);
+  return smto<T>(csm, pos, 16);
 }
 
+// Ideally the following is replaced by this some day:
 // https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
 
-// This code assumes you are passing in a valid std::csub_match from a std::cmatch_results.
+// Converts a valid std::csub_match to a std::string_view.
 constexpr static std::string_view
-to_string_view(const std::pair<const char*, const char*>& pair) noexcept
+to_string_view(const std::pair<const char*, const char*>& csm) noexcept
 {
-  return {pair.first, pair.second};
+  return {csm.first, csm.second};
 }
-// This code assumes you are passing in a valid std::ssub_match from a std::smatch_results.
+// Converts a valid std::ssub_match to a std::string_view.
 constexpr static std::string_view to_string_view(
-    const std::pair<std::string::const_iterator, std::string::const_iterator>& pair) noexcept
+    const std::pair<std::string::const_iterator, std::string::const_iterator>& ssm) noexcept
 {
-  return {pair.first, pair.second};
+  return {ssm.first, ssm.second};
 }
-// This code assumes you are passing in a valid std::wcsub_match from a std::wcmatch_results.
+// Converts a valid std::wcsub_match to a std::wstring_view.
 constexpr static std::wstring_view
-to_wstring_view(const std::pair<const wchar_t*, const wchar_t*>& pair) noexcept
+to_wstring_view(const std::pair<const wchar_t*, const wchar_t*>& wcsm) noexcept
 {
-  return {pair.first, pair.second};
+  return {wcsm.first, wcsm.second};
 }
-// This code assumes you are passing in a valid std::wssub_match from a std::wsmatch_results.
+// Converts a valid std::wssub_match to a std::wstring_view.
 constexpr static std::wstring_view to_wstring_view(
-    const std::pair<std::wstring::const_iterator, std::wstring::const_iterator>& pair) noexcept
+    const std::pair<std::wstring::const_iterator, std::wstring::const_iterator>& wssm) noexcept
 {
-  return {pair.first, pair.second};
+  return {wssm.first, wssm.second};
 }
 }  // namespace util

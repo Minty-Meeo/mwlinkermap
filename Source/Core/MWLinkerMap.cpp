@@ -1,6 +1,8 @@
 #include "MWLinkerMap.h"
 
+#include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <istream>
@@ -18,23 +20,11 @@
 
 #include "Future/CppLibPrint.h"
 
-#ifdef DOLPHIN  // Dolphin Emulator
-#include "Common/Assert.h"
-#include "Common/CommonTypes.h"
-#else  // mwlinkermap-temp
-#include <cassert>
-#define ASSERT assert
-#define DEBUG_ASSERT assert
-using u32 = std::uint32_t;
-#endif
-
-#define xsvtoul(__sv) util::svtoul(__sv, nullptr, 16)
-
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
 
-// This code uses std::regex in ECMAScript mode, which never matches '\r' or '\n' with the '.'
-// metacharacter. If you want to try adapting this code to a different regular expression flavor,
+// This program uses std::regex in ECMAScript mode, which never matches '\r' or '\n' with the '.'
+// metacharacter. If you want to try adapting this program to a different regular expression flavor,
 // make sure it still follows that rule.
 
 namespace MWLinker
@@ -953,7 +943,7 @@ Map::Error Map::SymbolClosure::Scan(  //
     if (std::regex_search(head, tail, match, re_symbol_closure_node_normal,
                           std::regex_constants::match_continuous))
     {
-      const int next_hierarchy_level = util::svtoi(util::to_string_view(match[1]));
+      const int next_hierarchy_level = util::smto<int>(match[1]);
       if (next_hierarchy_level <= 0)
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
@@ -980,7 +970,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
                             std::regex_constants::match_continuous))
       {
-        if (util::svtoi(util::to_string_view(match[1])) != curr_hierarchy_level)
+        if (util::smto<int>(match[1]) != curr_hierarchy_level)
           return Error::SymbolClosureUnrefDupsHierarchyMismatch;
         if (util::to_string_view(match[2]) != symbol_name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
@@ -989,7 +979,7 @@ Map::Error Map::SymbolClosure::Scan(  //
         while (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                  std::regex_constants::match_continuous))
         {
-          if (util::svtoi(util::to_string_view(match[1])) != curr_hierarchy_level)
+          if (util::smto<int>(match[1]) != curr_hierarchy_level)
             return Error::SymbolClosureUnrefDupsHierarchyMismatch;
           const std::string_view unref_dup_type = util::to_string_view(match[2]),
                                  unref_dup_bind = util::to_string_view(match[3]);
@@ -1038,7 +1028,7 @@ Map::Error Map::SymbolClosure::Scan(  //
     if (std::regex_search(head, tail, match, re_symbol_closure_node_linker_generated,
                           std::regex_constants::match_continuous))
     {
-      const int next_hierarchy_level = util::svtoi(util::to_string_view(match[1]));
+      const int next_hierarchy_level = util::smto<int>(match[1]);
       if (next_hierarchy_level <= 0)
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
@@ -1230,7 +1220,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     {
       const std::string_view first_name = util::to_string_view(match[1]),
                              second_name = util::to_string_view(match[2]);
-      const u32 size = static_cast<u32>(util::svtoul(util::to_string_view(match[3])));
+      const Elf32_Word size = util::smto<Elf32_Word>(match[3]);
       line_number += 2u;
       head = match[0].second;
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
@@ -1256,7 +1246,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     {
       const std::string_view first_name = util::to_string_view(match[1]),
                              second_name = util::to_string_view(match[2]);
-      const u32 size = static_cast<u32>(util::svtoul(util::to_string_view(match[3])));
+      const Elf32_Word size = util::smto<Elf32_Word>(match[3]);
       was_interchanged = true;
       line_number += 1u;
       head = match[0].second;
@@ -1279,7 +1269,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
         if (util::to_string_view(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
-        if (util::svtoul(util::to_string_view(match[3])) != size)
+        if (util::smto<Elf32_Word>(match[3]) != size)
           return Error::EPPC_PatternMatchingMergingSizeMismatch;
         line_number += 2u;
         head = match[0].second;
@@ -1319,9 +1309,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         line_number += 2u;
         head = match[0].second;
-        const FoldingUnit::Unit& unit =
-            folding_unit.units.emplace_back(first_name, util::to_string_view(match[2]),
-                                            util::svtoul(util::to_string_view(match[3])), false);
+        const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
+            first_name, util::to_string_view(match[2]), util::smto<Elf32_Word>(match[3]), false);
         curr_unit_lookup.emplace(unit.first_name, unit);
         continue;
       }
@@ -1336,9 +1325,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         line_number += 2u;
         head = match[0].second;
-        const FoldingUnit::Unit& unit =
-            folding_unit.units.emplace_back(first_name, util::to_string_view(match[2]),
-                                            util::svtoul(util::to_string_view(match[3])), true);
+        const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
+            first_name, util::to_string_view(match[2]), util::smto<Elf32_Word>(match[3]), true);
         curr_unit_lookup.emplace(unit.first_name, unit);
         continue;
       }
@@ -1809,8 +1797,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = this->units.emplace_back(
-          xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-          xsvtoul(util::to_string_view(match[3])), util::svtoi(util::to_string_view(match[4])),
+          util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+          util::xsmto<Elf32_Addr>(match[3]), util::smto<int>(match[4]),
           util::to_string_view(match[5]), util::to_string_view(match[6]),
           util::to_string_view(match[7]), *this, curr_module_name, curr_source_name,
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
@@ -1823,7 +1811,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = this->units.emplace_back(
-          xsvtoul(util::to_string_view(match[1])), util::to_string_view(match[2]),
+          util::xsmto<Elf32_Word>(match[1]), util::to_string_view(match[2]),
           util::to_string_view(match[3]), util::to_string_view(match[4]), *this, curr_module_name,
           curr_source_name, curr_unit_lookup, is_in_lcomm, is_multi_stt_section,
           is_after_eti_init_info, line_number);
@@ -1855,9 +1843,9 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                                            this->name);
         }
         const Unit& unit = this->units.emplace_back(
-            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-            xsvtoul(util::to_string_view(match[3])), symbol_name, &parent_unit, module_name,
-            source_name, Unit::Trait::None);
+            util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+            util::xsmto<Elf32_Addr>(match[3]), symbol_name, &parent_unit, module_name, source_name,
+            Unit::Trait::None);
         curr_unit_lookup->emplace(unit.name, unit);
         parent_unit.entry_children.push_back(&unit);
         line_number += 1u;
@@ -1902,12 +1890,11 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = this->units.emplace_back(
-          xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-          xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-          util::svtoi(util::to_string_view(match[5])), util::to_string_view(match[6]),
-          util::to_string_view(match[7]), util::to_string_view(match[8]), *this, curr_module_name,
-          curr_source_name, curr_unit_lookup, is_in_lcomm, is_multi_stt_section,
-          is_after_eti_init_info, line_number);
+          util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+          util::xsmto<Elf32_Addr>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+          util::smto<int>(match[5]), util::to_string_view(match[6]), util::to_string_view(match[7]),
+          util::to_string_view(match[8]), *this, curr_module_name, curr_source_name,
+          curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
       curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -1917,7 +1904,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = this->units.emplace_back(
-          xsvtoul(util::to_string_view(match[1])), util::to_string_view(match[2]),
+          util::xsmto<Elf32_Word>(match[1]), util::to_string_view(match[2]),
           util::to_string_view(match[3]), util::to_string_view(match[4]), *this, curr_module_name,
           curr_source_name, curr_unit_lookup, is_in_lcomm, is_multi_stt_section,
           is_after_eti_init_info, line_number);
@@ -1949,9 +1936,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                                            this->name);
         }
         const Unit& unit = this->units.emplace_back(
-            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-            xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-            symbol_name, &parent_unit, module_name, source_name, Unit::Trait::None);
+            util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+            util::xsmto<Elf32_Addr>(match[3]), util::xsmto<std::uint32_t>(match[4]), symbol_name,
+            &parent_unit, module_name, source_name, Unit::Trait::None);
         curr_unit_lookup->emplace(unit.name, unit);
         parent_unit.entry_children.push_back(&unit);
         line_number += 1u;
@@ -1970,9 +1957,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
       if (special_name == "*fill*")
       {
         this->units.emplace_back(
-            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-            xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-            util::svtoi(util::to_string_view(match[5])), Unit::Trait::Fill1);
+            util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+            util::xsmto<Elf32_Addr>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+            util::smto<int>(match[5]), Unit::Trait::Fill1);
         line_number += 1u;
         head = match[0].second;
         continue;
@@ -1980,9 +1967,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
       if (special_name == "**fill**")
       {
         this->units.emplace_back(
-            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-            xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-            util::svtoi(util::to_string_view(match[5])), Unit::Trait::Fill2);
+            util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+            util::xsmto<Elf32_Addr>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+            util::smto<int>(match[5]), Unit::Trait::Fill2);
         line_number += 1u;
         head = match[0].second;
         continue;
@@ -2015,8 +2002,8 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = this->units.emplace_back(
-          xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-          xsvtoul(util::to_string_view(match[3])), 0u, util::svtoi(util::to_string_view(match[4])),
+          util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+          util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, util::smto<int>(match[4]),
           util::to_string_view(match[5]), util::to_string_view(match[6]),
           util::to_string_view(match[7]), *this, curr_module_name, curr_source_name,
           curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
@@ -2048,9 +2035,9 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                                            this->name);
         }
         const Unit& unit = this->units.emplace_back(
-            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-            xsvtoul(util::to_string_view(match[3])), 0u, symbol_name, &parent_unit, module_name,
-            source_name, Unit::Trait::None);
+            util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+            util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name, &parent_unit,
+            module_name, source_name, Unit::Trait::None);
         curr_unit_lookup->emplace(unit.name, unit);
         parent_unit.entry_children.push_back(&unit);
         line_number += 1u;
@@ -2071,9 +2058,9 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         line_number += 1u;
         head = match[0].second;
         this->units.emplace_back(  //
-            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-            xsvtoul(util::to_string_view(match[3])), 0u,
-            util::svtoi(util::to_string_view(match[4])), Unit::Trait::Fill1);
+            util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+            util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, util::smto<int>(match[4]),
+            Unit::Trait::Fill1);
         continue;
       }
       if (special_name == "**fill**")
@@ -2081,9 +2068,9 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         line_number += 1u;
         head = match[0].second;
         this->units.emplace_back(  //
-            xsvtoul(util::to_string_view(match[1])), xsvtoul(util::to_string_view(match[2])),
-            xsvtoul(util::to_string_view(match[3])), 0u,
-            util::svtoi(util::to_string_view(match[4])), Unit::Trait::Fill2);
+            util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
+            util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, util::smto<int>(match[4]),
+            Unit::Trait::Fill2);
         continue;
       }
       return Error::SectionLayoutSpecialNotFill;
@@ -2136,7 +2123,7 @@ void Map::SectionLayout::Unit::Print3Column(std::ostream& stream) const
                source_name);
     return;
   case Kind::Special:
-    ASSERT(false);
+    assert(false);
     return;
   }
 }
@@ -2169,17 +2156,14 @@ void Map::SectionLayout::Unit::Print4Column(std::ostream& stream) const
   }
 }
 
-std::string_view Map::SectionLayout::Unit::ToSpecialName(const Trait unit_trait)
+constexpr std::string_view Map::SectionLayout::Unit::ToSpecialName(const Trait unit_trait)
 {
-  static constexpr std::string_view fill1 = "*fill*";
-  static constexpr std::string_view fill2 = "**fill**";
-
   if (unit_trait == Unit::Trait::Fill1)
-    return fill1;
+    return "*fill*";
   if (unit_trait == Unit::Trait::Fill2)
-    return fill2;
-  ASSERT(false);
-  return fill1;
+    return "**fill**";
+  assert(false);
+  return "";
 }
 
 // void Map::SectionLayout::Export(Report& report) const noexcept
@@ -2211,8 +2195,8 @@ Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const t
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])));
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]));
   }
   return ScanDebug_old(head, tail, line_number);
 }
@@ -2234,9 +2218,9 @@ Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const t
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])));
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+        util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]));
   }
   return ScanDebug_old(head, tail, line_number);
 }
@@ -2258,11 +2242,11 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
   {
     line_number += 1u;
     head = match[0].second;
-    std::string_view size = util::to_string_view(match[2]);
-    if (size.length() == 8 && size.front() == '0')  // Make sure it's not just an overflowed value
+    const std::csub_match& size = match[2];
+    if (size.length() == 8 && *size.first == '0')  // Make sure it's not just an overflowed value
       this->SetMinVersion(Version::version_3_0_4);
-    this->debug_units.emplace_back(util::to_string_view(match[1]), xsvtoul(size),
-                                   xsvtoul(util::to_string_view(match[3])));
+    this->debug_units.emplace_back(util::to_string_view(match[1]), util::xsmto<Elf32_Word>(size),
+                                   util::xsmto<std::uint32_t>(match[3]));
   }
   return Error::None;
 }
@@ -2284,8 +2268,8 @@ Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])));
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2307,9 +2291,9 @@ Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])));
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+        util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2331,9 +2315,9 @@ Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-        util::svtoi(util::to_string_view(match[5])));
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+        util::smto<int>(match[5]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2355,9 +2339,9 @@ Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-        xsvtoul(util::to_string_view(match[5])), util::to_string_view(match[6]));
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+        util::xsmto<std::uint32_t>(match[5]), util::to_string_view(match[6]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2379,10 +2363,10 @@ Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* cons
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
-        util::svtoi(util::to_string_view(match[7])));
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+        util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]),
+        util::smto<int>(match[7]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2404,10 +2388,10 @@ Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* cons
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
-        xsvtoul(util::to_string_view(match[7])), util::to_string_view(match[8]));
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+        util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]),
+        util::xsmto<std::uint32_t>(match[7]), util::to_string_view(match[8]));
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2429,9 +2413,9 @@ Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* con
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-        util::svtoi(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+        util::smto<int>(match[5]), util::xsmto<std::uint32_t>(match[6]),
         util::to_string_view(match[7]));
   }
   return ScanDebug(head, tail, line_number);
@@ -2454,10 +2438,10 @@ Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const cha
     line_number += 1u;
     head = match[0].second;
     this->normal_units.emplace_back(
-        util::to_string_view(match[1]), xsvtoul(util::to_string_view(match[2])),
-        xsvtoul(util::to_string_view(match[3])), xsvtoul(util::to_string_view(match[4])),
-        xsvtoul(util::to_string_view(match[5])), xsvtoul(util::to_string_view(match[6])),
-        util::svtoi(util::to_string_view(match[7])), xsvtoul(util::to_string_view(match[8])),
+        util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
+        util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
+        util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]),
+        util::smto<int>(match[7]), util::xsmto<std::uint32_t>(match[8]),
         util::to_string_view(match[9]));
   }
   return ScanDebug(head, tail, line_number);
@@ -2480,8 +2464,8 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
     line_number += 1u;
     head = match[0].second;
     this->debug_units.emplace_back(util::to_string_view(match[1]),
-                                   xsvtoul(util::to_string_view(match[2])),
-                                   xsvtoul(util::to_string_view(match[3])));
+                                   util::xsmto<Elf32_Word>(match[2]),
+                                   util::xsmto<std::uint32_t>(match[3]));
   }
   return Error::None;
 }
@@ -2731,8 +2715,7 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
   {
     line_number += 1u;
     head = match[0].second;
-    this->units.emplace_back(util::to_string_view(match[1]),
-                             xsvtoul(util::to_string_view(match[2])));
+    this->units.emplace_back(util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]));
   }
   return Error::None;
 }

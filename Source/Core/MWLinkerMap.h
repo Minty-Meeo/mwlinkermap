@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <istream>
 #include <list>
 #include <map>
@@ -15,16 +16,11 @@
 #include <utility>
 #include <vector>
 
-// #define DOLPHIN
-
-#ifdef DOLPHIN  // Dolphin Emulator
-#include "Common/CommonTypes.h"
-#else  // mwlinkermap-temp
-using u32 = std::uint32_t;
-#endif
-
 namespace MWLinker
 {
+using Elf32_Word = std::uint32_t;
+using Elf32_Addr = std::uint32_t;
+
 enum class Version
 {
   Unknown,
@@ -176,7 +172,7 @@ struct Map
       NodeBase(NodeBase* parent_) : parent(parent_) {}
       virtual ~NodeBase() = default;
 
-      virtual void Print(std::ostream&, int) const;  // Necessary for root and fake _dtor$99 node
+      virtual void Print(std::ostream&, int) const;  // Necessary for root and fake _dtor$99 child
       static void PrintPrefix(std::ostream&, int);
       static constexpr std::string_view ToName(Type) noexcept;
       static constexpr std::string_view ToName(Bind) noexcept;
@@ -277,7 +273,7 @@ struct Map
 
     struct MergingUnit
     {
-      MergingUnit(std::string_view first_name_, std::string_view second_name_, u32 size_,
+      MergingUnit(std::string_view first_name_, std::string_view second_name_, Elf32_Word size_,
                   bool will_be_replaced_, bool was_interchanged_)
           : first_name(first_name_), second_name(second_name_), size(size_),
             will_be_replaced(will_be_replaced_), was_interchanged(was_interchanged_)
@@ -288,7 +284,7 @@ struct Map
 
       std::string first_name;
       std::string second_name;
-      u32 size;
+      Elf32_Word size;
       // If the conditions are right (e.g. the function is more than just a BLR instruction), then
       // one function is replaced with a branch to the other function, saving space at the cost of a
       // tiny amount of overhead. This is by far the more common code merging technique.
@@ -303,7 +299,7 @@ struct Map
     {
       struct Unit
       {
-        Unit(std::string_view first_name_, std::string_view second_name_, u32 size_,
+        Unit(std::string_view first_name_, std::string_view second_name_, Elf32_Word size_,
              bool new_branch_function_)
             : first_name(first_name_), second_name(second_name_), size(size_),
               new_branch_function(new_branch_function_)
@@ -314,7 +310,7 @@ struct Map
 
         std::string first_name;
         std::string second_name;
-        u32 size;
+        Elf32_Word size;
         bool new_branch_function;
       };
 
@@ -536,7 +532,7 @@ struct Map
       };
 
       // UNUSED symbols
-      Unit(u32 size_, std::string_view name_, std::string_view module_name_,
+      Unit(Elf32_Word size_, std::string_view name_, std::string_view module_name_,
            std::string_view source_name_, SectionLayout& section_layout,
            std::string_view& curr_module_name, std::string_view& curr_source_name,
            UnitLookup*& curr_unit_lookup, bool& is_in_lcomm, bool& is_after_eti_init_info,
@@ -549,11 +545,12 @@ struct Map
       {
       }
       // 3-column normal symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, int alignment_,
-           std::string_view name_, std::string_view module_name_, std::string_view source_name_,
-           SectionLayout& section_layout, std::string_view& curr_module_name,
-           std::string_view& curr_source_name, UnitLookup*& curr_unit_lookup, bool& is_in_lcomm,
-           bool& is_after_eti_init_info, bool& is_multi_stt_section, std::size_t line_number)
+      Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
+           int alignment_, std::string_view name_, std::string_view module_name_,
+           std::string_view source_name_, SectionLayout& section_layout,
+           std::string_view& curr_module_name, std::string_view& curr_source_name,
+           UnitLookup*& curr_unit_lookup, bool& is_in_lcomm, bool& is_after_eti_init_info,
+           bool& is_multi_stt_section, std::size_t line_number)
           : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), alignment(alignment_), name(name_),
             module_name(module_name_), source_name(source_name_),
@@ -563,8 +560,9 @@ struct Map
       {
       }
       // 4-column normal symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
-           std::string_view name_, std::string_view module_name_, std::string_view source_name_,
+      Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
+           std::uint32_t file_offset_, int alignment_, std::string_view name_,
+           std::string_view module_name_, std::string_view source_name_,
            SectionLayout& section_layout, std::string_view& curr_module_name,
            std::string_view& curr_source_name, UnitLookup*& curr_unit_lookup, bool& is_in_lcomm,
            bool& is_after_eti_init_info, bool& is_multi_stt_section, std::size_t line_number)
@@ -577,18 +575,18 @@ struct Map
       {
       }
       // 3-column entry symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, std::string_view name_,
-           const Unit* entry_parent_, std::string_view module_name_, std::string_view source_name_,
-           Trait unit_trait_)
+      Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
+           std::string_view name_, const Unit* entry_parent_, std::string_view module_name_,
+           std::string_view source_name_, Trait unit_trait_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), name(name_), entry_parent(entry_parent_),
             module_name(module_name_), source_name(source_name_), unit_trait(unit_trait_)
       {
       }
       // 4-column entry symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_,
-           std::string_view name_, const Unit* entry_parent_, std::string_view module_name_,
-           std::string_view source_name_, Trait unit_trait_)
+      Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
+           std::uint32_t file_offset_, std::string_view name_, const Unit* entry_parent_,
+           std::string_view module_name_, std::string_view source_name_, Trait unit_trait_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), name(name_),
             entry_parent(entry_parent_), module_name(module_name_), source_name(source_name_),
@@ -596,8 +594,8 @@ struct Map
       {
       }
       // 4-column special symbols
-      Unit(u32 starting_address_, u32 size_, u32 virtual_address_, u32 file_offset_, int alignment_,
-           Trait unit_trait_)
+      Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
+           std::uint32_t file_offset_, int alignment_, Trait unit_trait_)
           : unit_kind(Kind::Special), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
             unit_trait(unit_trait_)
@@ -608,14 +606,14 @@ struct Map
       void Print4Column(std::ostream&) const;
       Unit::Trait DeduceUsualSubtext(SectionLayout&, std::string_view&, std::string_view&,
                                      UnitLookup*&, bool&, bool&, bool&, std::size_t);
-      static std::string_view ToSpecialName(Trait);
+      static constexpr std::string_view ToSpecialName(Trait);
       void Export(DebugInfo&) const noexcept;
 
       const Kind unit_kind;
-      u32 starting_address;
-      u32 size;
-      u32 virtual_address;
-      u32 file_offset;
+      std::uint32_t starting_address;
+      Elf32_Word size;
+      Elf32_Addr virtual_address;
+      std::uint32_t file_offset;
       int alignment;
       std::string name;
       // Doubly-linked relationship between entry symbols and their host.
@@ -677,46 +675,52 @@ struct Map
   {
     struct UnitNormal
     {
-      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_)
+      UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
+                 std::uint32_t file_offset_)
           : name(name_), starting_address(starting_address_), size(size_), file_offset(file_offset_)
       {
       }
-      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
-                 int s_record_line_)
+      UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
+                 std::uint32_t file_offset_, int s_record_line_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), s_record_line(s_record_line_)
       {
       }
-      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
-                 u32 rom_address_, u32 ram_buffer_address_)
+      UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
+                 std::uint32_t file_offset_, std::uint32_t rom_address_,
+                 std::uint32_t ram_buffer_address_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_)
       {
       }
-      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
-                 u32 rom_address_, u32 ram_buffer_address_, int s_record_line_)
+      UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
+                 std::uint32_t file_offset_, std::uint32_t rom_address_,
+                 std::uint32_t ram_buffer_address_, int s_record_line_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_)
       {
       }
-      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
-                 u32 bin_file_offset_, std::string_view bin_file_name_)
+      UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
+                 std::uint32_t file_offset_, std::uint32_t bin_file_offset_,
+                 std::string_view bin_file_name_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), bin_file_offset(bin_file_offset_),
             bin_file_name(bin_file_name_)
       {
       }
-      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
-                 int s_record_line_, u32 bin_file_offset_, std::string_view bin_file_name_)
+      UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
+                 std::uint32_t file_offset_, int s_record_line_, std::uint32_t bin_file_offset_,
+                 std::string_view bin_file_name_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), s_record_line(s_record_line_),
             bin_file_offset(bin_file_offset_), bin_file_name(bin_file_name_)
       {
       }
-      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
-                 u32 rom_address_, u32 ram_buffer_address_, u32 bin_file_offset_,
+      UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
+                 std::uint32_t file_offset_, std::uint32_t rom_address_,
+                 std::uint32_t ram_buffer_address_, std::uint32_t bin_file_offset_,
                  std::string_view bin_file_name_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
@@ -724,9 +728,10 @@ struct Map
             bin_file_name(bin_file_name_)
       {
       }
-      UnitNormal(std::string_view name_, u32 starting_address_, u32 size_, u32 file_offset_,
-                 u32 rom_address_, u32 ram_buffer_address_, int s_record_line_,
-                 u32 bin_file_offset_, std::string_view bin_file_name_)
+      UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
+                 std::uint32_t file_offset_, std::uint32_t rom_address_,
+                 std::uint32_t ram_buffer_address_, int s_record_line_,
+                 std::uint32_t bin_file_offset_, std::string_view bin_file_name_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
             ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_),
@@ -746,13 +751,13 @@ struct Map
       void PrintRomRamSRecordBinFile(std::ostream&) const;
 
       std::string name;
-      u32 starting_address;
-      u32 size;
-      u32 file_offset;
-      u32 rom_address;
-      u32 ram_buffer_address;
+      Elf32_Addr starting_address;
+      Elf32_Word size;
+      std::uint32_t file_offset;
+      std::uint32_t rom_address;
+      std::uint32_t ram_buffer_address;
       int s_record_line;
-      u32 bin_file_offset;
+      std::uint32_t bin_file_offset;
       std::string bin_file_name;
     };
 
@@ -760,7 +765,7 @@ struct Map
     // names, but I couldn't be bothered to look into it.
     struct UnitDebug
     {
-      UnitDebug(std::string_view name_, u32 size_, u32 file_offset_)
+      UnitDebug(std::string_view name_, Elf32_Word size_, std::uint32_t file_offset_)
           : name(name_), size(size_), file_offset(file_offset_)
       {
       }
@@ -770,8 +775,8 @@ struct Map
       void Print(std::ostream&) const;
 
       std::string name;
-      u32 size;
-      u32 file_offset;
+      Elf32_Word size;
+      std::uint32_t file_offset;
     };
 
     MemoryMap(bool has_rom_ram_)  // ctor for old memory map
@@ -826,12 +831,12 @@ struct Map
   {
     struct Unit
     {
-      Unit(std::string_view name_, u32 value_) : name(name_), value(value_) {}
+      Unit(std::string_view name_, Elf32_Addr value_) : name(name_), value(value_) {}
 
       void Print(std::ostream&) const;
 
       std::string name;
-      u32 value;
+      Elf32_Addr value;
     };
 
     LinkerGeneratedSymbols() = default;
