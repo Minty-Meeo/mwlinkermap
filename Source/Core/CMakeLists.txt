@@ -10,7 +10,7 @@ add_executable(mwlinkermap-example
   main.cpp
   MWLinkerMap.cpp
   MWLinkerMap.h
-  Util.h
+  RegexUtil.h
 )
 
 target_link_libraries(mwlinkermap-example fmt::fmt)
