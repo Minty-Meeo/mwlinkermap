@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iterator>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -13,8 +14,9 @@ namespace util
 template <class... Args>
 void print(std::ostream& os, fmt::format_string<Args...> fmt, Args&&... args)
 {
-  const std::string s = fmt::format(std::move(fmt), std::forward<Args>(args)...);
-  os.write(s.data(), std::ssize(s));
+  fmt::memory_buffer buffer;
+  fmt::format_to(std::back_inserter(buffer), std::move(fmt), std::forward<Args>(args)...);
+  os.write(buffer.data(), std::ssize(buffer));
 }
 template <class... Args>
 void println(std::ostream& os, fmt::format_string<Args...> fmt, Args&&... args)
