@@ -139,7 +139,9 @@ struct Map
 
     struct NodeBase
     {
-      explicit NodeBase() = default;  // Necessary for root node
+      friend SymbolClosure;
+
+      explicit NodeBase() : parent(nullptr) {}  // Necessary for root node
       explicit NodeBase(NodeBase* parent_) : parent(parent_) {}
       virtual ~NodeBase() = default;
 
@@ -148,6 +150,10 @@ struct Map
       static constexpr std::string_view ToName(Type) noexcept;
       static constexpr std::string_view ToName(Bind) noexcept;
 
+      const NodeBase* GetParent() { return parent; }
+      const std::list<std::unique_ptr<NodeBase>>& GetChildren() { return children; }
+
+    private:
       NodeBase* parent;
       std::list<std::unique_ptr<NodeBase>> children;
     };
@@ -164,10 +170,10 @@ struct Map
 
         void Print(std::ostream&, int) const;
 
-        Type type;
-        Bind bind;
-        std::string module_name;
-        std::string source_name;
+        const Type type;
+        const Bind bind;
+        const std::string module_name;
+        const std::string source_name;
       };
 
       explicit NodeReal(NodeBase* parent_, std::string_view name_, Type type_, Bind bind_,
@@ -181,16 +187,16 @@ struct Map
 
       virtual void Print(std::ostream&, int) const override;
 
-      std::string name;
-      Type type;
-      Bind bind;
+      const std::string name;
+      const Type type;
+      const Bind bind;
       // Static library or object name
-      std::string module_name;
+      const std::string module_name;
       // When linking a static library, this is either:
       // A) The name of the STT_FILE symbol from the relevant object in the static library.
       // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
-      std::string source_name;
-      std::list<UnreferencedDuplicate> unref_dups;
+      const std::string source_name;
+      const std::list<UnreferencedDuplicate> unref_dups;
     };
 
     struct NodeLinkerGenerated final : NodeBase
@@ -203,7 +209,7 @@ struct Map
 
       virtual void Print(std::ostream&, int) const override;
 
-      std::string name;
+      const std::string name;
     };
 
     using NodeLookup = std::unordered_multimap<std::string_view, const NodeReal&>;
@@ -217,8 +223,7 @@ struct Map
     virtual void Print(std::ostream&) const override;
     virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
 
-    NodeBase root;
-    ModuleLookup lookup;
+    const ModuleLookup& GetModuleLookup() { return lookup; }
 
     struct Warn
     {
@@ -231,6 +236,10 @@ struct Map
 
       friend SymbolClosure;
     };
+
+  private:
+    NodeBase root;
+    ModuleLookup lookup;
   };
 
   struct EPPC_PatternMatching final : PortionBase
@@ -249,21 +258,23 @@ struct Map
 
       void Print(std::ostream&) const;
 
-      std::string first_name;
-      std::string second_name;
-      Elf32_Word size;
+      const std::string first_name;
+      const std::string second_name;
+      const Elf32_Word size;
       // If the conditions are right (e.g. the function is more than just a BLR instruction), then
       // one function is replaced with a branch to the other function, saving space at the cost of a
       // tiny amount of overhead. This is by far the more common code merging technique.
-      bool will_be_replaced;
+      const bool will_be_replaced;
       // Rarely, a function can be marked for removal when a duplicate of it is elsewhere in the
       // binary. All references to it are then redirected to the duplicate. Even rarer than that,
       // sometimes the linker can change its mind and replace it with a branch instead.
-      bool was_interchanged;
+      const bool was_interchanged;
     };
 
     struct FoldingUnit
     {
+      friend EPPC_PatternMatching;
+
       struct Unit
       {
         explicit Unit(std::string_view first_name_, std::string_view second_name_, Elf32_Word size_,
@@ -275,10 +286,10 @@ struct Map
 
         void Print(std::ostream&) const;
 
-        std::string first_name;
-        std::string second_name;
-        Elf32_Word size;
-        bool new_branch_function;
+        const std::string first_name;
+        const std::string second_name;
+        const Elf32_Word size;
+        const bool new_branch_function;
       };
 
       using UnitLookup = std::unordered_multimap<std::string_view, const Unit&>;
@@ -288,7 +299,11 @@ struct Map
 
       void Print(std::ostream&) const;
 
-      std::string object_name;
+      const std::list<Unit>& GetUnits() { return units; }
+
+      const std::string object_name;
+
+    private:
       std::list<Unit> units;
     };
 
@@ -304,10 +319,10 @@ struct Map
       return merging_units.empty() || folding_units.empty();
     }
 
-    std::list<MergingUnit> merging_units;
-    std::list<FoldingUnit> folding_units;
-    MergingUnitLookup merging_lookup;
-    FoldingUnit::ModuleLookup folding_lookup;
+    const std::list<MergingUnit>& GetMergingUnits() { return merging_units; }
+    const std::list<FoldingUnit>& GetFoldingUnits() { return folding_units; }
+    const MergingUnitLookup& GetMergingLookup() { return merging_lookup; }
+    const FoldingUnit::ModuleLookup& GetFoldingModuleLookup() { return folding_lookup; }
 
     struct Warn
     {
@@ -323,6 +338,12 @@ struct Map
 
       friend EPPC_PatternMatching;
     };
+
+  private:
+    std::list<MergingUnit> merging_units;
+    std::list<FoldingUnit> folding_units;
+    MergingUnitLookup merging_lookup;
+    FoldingUnit::ModuleLookup folding_lookup;
   };
 
   struct LinkerOpts final : PortionBase
@@ -354,9 +375,9 @@ struct Map
       void Print(std::ostream&) const;
 
       const Kind unit_kind;
-      std::string module_name;
-      std::string name;
-      std::string reference_name;
+      const std::string module_name;
+      const std::string name;
+      const std::string reference_name;
     };
 
     explicit LinkerOpts() { SetMinVersion(Version::version_4_2_build_142); }
@@ -366,6 +387,9 @@ struct Map
     virtual void Print(std::ostream&) const override;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
+    const std::list<Unit>& GetUnits() { return units; }
+
+  private:
     std::list<Unit> units;
   };
 
@@ -383,9 +407,9 @@ struct Map
 
       void Print(std::ostream&) const;
 
-      std::string first_name;
-      std::string second_name;
-      bool is_safe;
+      const std::string first_name;
+      const std::string second_name;
+      const bool is_safe;
     };
 
     explicit BranchIslands() { SetMinVersion(Version::version_4_1_build_51213); }
@@ -395,6 +419,9 @@ struct Map
     virtual void Print(std::ostream&) const override;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
+    const std::list<Unit>& GetUnits() { return units; }
+
+  private:
     std::list<Unit> units;
   };
 
@@ -412,9 +439,9 @@ struct Map
 
       void Print(std::ostream&) const;
 
-      std::string first_name;
-      std::string second_name;
-      bool is_safe;
+      const std::string first_name;
+      const std::string second_name;
+      const bool is_safe;
     };
 
     explicit MixedModeIslands() { SetMinVersion(Version::version_4_1_build_51213); }
@@ -424,6 +451,9 @@ struct Map
     virtual void Print(std::ostream&) const override;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
+    const std::list<Unit>& GetUnits() { return units; }
+
+  private:
     std::list<Unit> units;
   };
 
@@ -470,6 +500,8 @@ struct Map
 
     struct Unit
     {
+      friend SectionLayout;
+
       enum class Kind
       {
         Normal,
@@ -504,8 +536,9 @@ struct Map
                     std::string_view& curr_module_name, std::string_view& curr_source_name,
                     UnitLookup*& curr_unit_lookup, bool& is_in_lcomm, bool& is_after_eti_init_info,
                     bool& is_multi_stt_section, std::size_t line_number)
-          : unit_kind(Kind::Unused), size(size_), name(name_), module_name(module_name_),
-            source_name(source_name_),
+          : unit_kind(Kind::Unused), starting_address{},
+            size(size_), virtual_address{}, file_offset{}, alignment{}, name(name_),
+            entry_parent(nullptr), module_name(module_name_), source_name(source_name_),
             unit_trait(DeduceUsualSubtext(section_layout, curr_module_name, curr_source_name,
                                           curr_unit_lookup, is_in_lcomm, is_after_eti_init_info,
                                           is_multi_stt_section, line_number))
@@ -519,8 +552,8 @@ struct Map
                     UnitLookup*& curr_unit_lookup, bool& is_in_lcomm, bool& is_after_eti_init_info,
                     bool& is_multi_stt_section, std::size_t line_number)
           : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), alignment(alignment_), name(name_),
-            module_name(module_name_), source_name(source_name_),
+            virtual_address(virtual_address_), file_offset{}, alignment(alignment_), name(name_),
+            entry_parent(nullptr), module_name(module_name_), source_name(source_name_),
             unit_trait(DeduceUsualSubtext(section_layout, curr_module_name, curr_source_name,
                                           curr_unit_lookup, is_in_lcomm, is_after_eti_init_info,
                                           is_multi_stt_section, line_number))
@@ -536,7 +569,8 @@ struct Map
                     std::size_t line_number)
           : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            name(name_), module_name(module_name_), source_name(source_name_),
+            name(name_), entry_parent(nullptr), module_name(module_name_),
+            source_name(source_name_),
             unit_trait(DeduceUsualSubtext(section_layout, curr_module_name, curr_source_name,
                                           curr_unit_lookup, is_in_lcomm, is_after_eti_init_info,
                                           is_multi_stt_section, line_number))
@@ -547,8 +581,9 @@ struct Map
                     std::string_view name_, const Unit* entry_parent_,
                     std::string_view module_name_, std::string_view source_name_, Trait unit_trait_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), name(name_), entry_parent(entry_parent_),
-            module_name(module_name_), source_name(source_name_), unit_trait(unit_trait_)
+            virtual_address(virtual_address_), file_offset{}, alignment{}, name(name_),
+            entry_parent(entry_parent_), module_name(module_name_), source_name(source_name_),
+            unit_trait(unit_trait_)
       {
       }
       // 4-column entry symbols
@@ -556,7 +591,7 @@ struct Map
                     std::uint32_t file_offset_, std::string_view name_, const Unit* entry_parent_,
                     std::string_view module_name_, std::string_view source_name_, Trait unit_trait_)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset(file_offset_), name(name_),
+            virtual_address(virtual_address_), file_offset(file_offset_), alignment{}, name(name_),
             entry_parent(entry_parent_), module_name(module_name_), source_name(source_name_),
             unit_trait(unit_trait_)
       {
@@ -566,34 +601,43 @@ struct Map
                     std::uint32_t file_offset_, int alignment_, Trait unit_trait_)
           : unit_kind(Kind::Special), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            unit_trait(unit_trait_)
+            entry_parent(nullptr), unit_trait(unit_trait_)
       {
       }
 
       void Print3Column(std::ostream&) const;
       void Print4Column(std::ostream&) const;
-      Unit::Trait DeduceUsualSubtext(SectionLayout&, std::string_view&, std::string_view&,
-                                     UnitLookup*&, bool&, bool&, bool&, std::size_t);
       static constexpr std::string_view ToSpecialName(Trait);
 
+      const Unit* GetEntryParent() { return entry_parent; }
+      const std::list<const Unit*>& GetEntryChildren() { return entry_children; }
+
       const Kind unit_kind;
-      std::uint32_t starting_address;
-      Elf32_Word size;
-      Elf32_Addr virtual_address;
-      std::uint32_t file_offset;
-      int alignment;
-      std::string name;
+      const std::uint32_t starting_address;
+      const Elf32_Word size;
+      const Elf32_Addr virtual_address;
+      const std::uint32_t file_offset;
+      const int alignment;
+      const std::string name;
+
+    private:
       // Doubly-linked relationship between entry symbols and their host.
-      const Unit* entry_parent;
+      const Unit* const entry_parent;
       // Doubly-linked relationship between entry symbols and their host.
       std::list<const Unit*> entry_children;
+
+    public:
       // Static library or object name
-      std::string module_name;
+      const std::string module_name;
       // When linking a static library, this is either:
       // A) The name of the STT_FILE symbol from the relevant object in the static library.
       // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
-      std::string source_name;
+      const std::string source_name;
       const Trait unit_trait;
+
+    private:
+      Unit::Trait DeduceUsualSubtext(SectionLayout&, std::string_view&, std::string_view&,
+                                     UnitLookup*&, bool&, bool&, bool&, std::size_t);
     };
 
     explicit SectionLayout(Kind section_kind_, std::string_view name_)
@@ -607,13 +651,13 @@ struct Map
     Error ScanTLOZTP(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
-
     static Kind ToSectionKind(std::string_view);
 
+    const std::list<Unit>& GetUnits() const noexcept { return units; }
+    const ModuleLookup& GetModuleLookup() const noexcept { return lookup; }
+
     const Kind section_kind;
-    std::string name;
-    std::list<Unit> units;
-    ModuleLookup lookup;
+    const std::string name;
 
     struct Warn
     {
@@ -631,6 +675,10 @@ struct Map
 
       friend SectionLayout;
     };
+
+  private:
+    std::list<Unit> units;
+    ModuleLookup lookup;
   };
 
   // CodeWarrior for GCN 2.7
@@ -643,13 +691,16 @@ struct Map
     {
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_)
-          : name(name_), starting_address(starting_address_), size(size_), file_offset(file_offset_)
+          : name(name_), starting_address(starting_address_), size(size_),
+            file_offset(file_offset_), rom_address{}, ram_buffer_address{}, s_record_line{},
+            bin_file_offset{}
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, int s_record_line_)
           : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), s_record_line(s_record_line_)
+            file_offset(file_offset_), rom_address{}, ram_buffer_address{},
+            s_record_line(s_record_line_), bin_file_offset{}
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
@@ -657,7 +708,7 @@ struct Map
                           std::uint32_t ram_buffer_address_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
-            ram_buffer_address(ram_buffer_address_)
+            ram_buffer_address(ram_buffer_address_), s_record_line{}, bin_file_offset{}
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
@@ -665,23 +716,25 @@ struct Map
                           std::uint32_t ram_buffer_address_, int s_record_line_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
-            ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_)
+            ram_buffer_address(ram_buffer_address_),
+            s_record_line(s_record_line_), bin_file_offset{}
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, std::uint32_t bin_file_offset_,
                           std::string_view bin_file_name_)
           : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), bin_file_offset(bin_file_offset_),
-            bin_file_name(bin_file_name_)
+            file_offset(file_offset_), rom_address{}, ram_buffer_address{}, s_record_line{},
+            bin_file_offset(bin_file_offset_), bin_file_name(bin_file_name_)
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, int s_record_line_,
                           std::uint32_t bin_file_offset_, std::string_view bin_file_name_)
           : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), s_record_line(s_record_line_),
-            bin_file_offset(bin_file_offset_), bin_file_name(bin_file_name_)
+            file_offset(file_offset_), rom_address{}, ram_buffer_address{},
+            s_record_line(s_record_line_), bin_file_offset(bin_file_offset_),
+            bin_file_name(bin_file_name_)
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
@@ -690,8 +743,8 @@ struct Map
                           std::string_view bin_file_name_)
           : name(name_), starting_address(starting_address_), size(size_),
             file_offset(file_offset_), rom_address(rom_address_),
-            ram_buffer_address(ram_buffer_address_), bin_file_offset(bin_file_offset_),
-            bin_file_name(bin_file_name_)
+            ram_buffer_address(ram_buffer_address_), s_record_line{},
+            bin_file_offset(bin_file_offset_), bin_file_name(bin_file_name_)
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
@@ -716,15 +769,15 @@ struct Map
       void PrintSRecordBinFile(std::ostream&) const;
       void PrintRomRamSRecordBinFile(std::ostream&) const;
 
-      std::string name;
-      Elf32_Addr starting_address;
-      Elf32_Word size;
-      std::uint32_t file_offset;
-      std::uint32_t rom_address;
-      std::uint32_t ram_buffer_address;
-      int s_record_line;
-      std::uint32_t bin_file_offset;
-      std::string bin_file_name;
+      const std::string name;
+      const Elf32_Addr starting_address;
+      const Elf32_Word size;
+      const std::uint32_t file_offset;
+      const std::uint32_t rom_address;
+      const std::uint32_t ram_buffer_address;
+      const int s_record_line;
+      const std::uint32_t bin_file_offset;
+      const std::string bin_file_name;
     };
 
     // TODO: There is an opportunity for detecting the min version from the normal and debug section
@@ -740,9 +793,9 @@ struct Map
       void Print_old(std::ostream&) const;
       void Print(std::ostream&) const;
 
-      std::string name;
-      Elf32_Word size;
-      std::uint32_t file_offset;
+      const std::string name;
+      const Elf32_Word size;
+      const std::uint32_t file_offset;
     };
 
     explicit MemoryMap(bool has_rom_ram_)  // ctor for old memory map
@@ -786,11 +839,16 @@ struct Map
       return normal_units.empty() || debug_units.empty();
     }
 
+    const std::list<UnitNormal>& GetNormalUnits() const noexcept { return normal_units; }
+    const std::list<UnitDebug>& GetDebugUnits() const noexcept { return debug_units; }
+
+    const bool has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
+    const bool has_s_record;  // Enabled by '-srec [filename]' option
+    const bool has_bin_file;  // Enabled by '-genbinary keyword' option
+
+  private:
     std::list<UnitNormal> normal_units;
     std::list<UnitDebug> debug_units;
-    bool has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
-    bool has_s_record;  // Enabled by '-srec [filename]' option
-    bool has_bin_file;  // Enabled by '-genbinary keyword' option
   };
 
   struct LinkerGeneratedSymbols final : PortionBase
@@ -801,8 +859,8 @@ struct Map
 
       void Print(std::ostream&) const;
 
-      std::string name;
-      Elf32_Addr value;
+      const std::string name;
+      const Elf32_Addr value;
     };
 
     explicit LinkerGeneratedSymbols() = default;
@@ -812,6 +870,9 @@ struct Map
     virtual void Print(std::ostream&) const override;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
+    const std::list<Unit>& GetUnits() const noexcept { return units; }
+
+  private:
     std::list<Unit> units;
   };
 
@@ -821,13 +882,43 @@ struct Map
   Error ScanTLOZTP(const char*, const char*, std::size_t&);
   Error ScanSMGalaxy(std::string_view, std::size_t&);
   Error ScanSMGalaxy(const char*, const char*, std::size_t&);
+  void Print(std::ostream&) const;
+  Version GetMinVersion() const noexcept;
 
+  const std::string& GetEntryPointName() const noexcept { return entry_point_name; }
+  const std::unique_ptr<SymbolClosure>& GetNormalSymbolClosure() const noexcept
+  {
+    return normal_symbol_closure;
+  }
+  const std::unique_ptr<EPPC_PatternMatching>& GetEPPC_PatternMatching() const noexcept
+  {
+    return eppc_pattern_matching;
+  }
+  const std::unique_ptr<SymbolClosure>& GetDwarfSymbolClosure() const noexcept
+  {
+    return dwarf_symbol_closure;
+  }
+  const std::list<std::pair<std::size_t, std::string>>& GetUnresolvedSymbols() const noexcept
+  {
+    return unresolved_symbols;
+  }
+  const std::list<std::unique_ptr<SectionLayout>>& GetSectionLayouts() const noexcept
+  {
+    return section_layouts;
+  }
+  const std::unique_ptr<MemoryMap>& GetMemoryMap() const noexcept  //
+  {
+    return memory_map;
+  }
+  const std::unique_ptr<LinkerGeneratedSymbols>& GetLinkerGeneratedSymbols() const noexcept
+  {
+    return linker_generated_symbols;
+  }
+
+private:
   Error ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string_view);
   Error ScanPrologue_MemoryMap(const char*&, const char*, std::size_t&);
   Error ScanForGarbage(const char*, const char*);
-
-  void Print(std::ostream&) const;
-  Version GetMinVersion() const noexcept;
 
   std::string entry_point_name;
   std::unique_ptr<SymbolClosure> normal_symbol_closure;
