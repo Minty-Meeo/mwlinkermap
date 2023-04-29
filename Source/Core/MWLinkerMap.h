@@ -4,11 +4,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <list>
-#include <map>
 #include <memory>
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 namespace MWLinker
@@ -206,8 +206,8 @@ struct Map
       std::string name;
     };
 
-    using NodeLookup = std::multimap<std::string_view, const NodeReal&>;
-    using ModuleLookup = std::map<std::string_view, NodeLookup>;
+    using NodeLookup = std::unordered_multimap<std::string_view, const NodeReal&>;
+    using ModuleLookup = std::unordered_map<std::string_view, NodeLookup>;
 
     SymbolClosure() = default;
     virtual ~SymbolClosure() override = default;
@@ -281,8 +281,8 @@ struct Map
         bool new_branch_function;
       };
 
-      using UnitLookup = std::multimap<std::string_view, const Unit&>;
-      using ModuleLookup = std::map<std::string_view, UnitLookup>;
+      using UnitLookup = std::unordered_multimap<std::string_view, const Unit&>;
+      using ModuleLookup = std::unordered_map<std::string_view, UnitLookup>;
 
       FoldingUnit(std::string_view object_name_) : object_name(object_name_) {}
 
@@ -292,7 +292,7 @@ struct Map
       std::list<Unit> units;
     };
 
-    using MergingUnitLookup = std::multimap<std::string_view, const MergingUnit&>;
+    using MergingUnitLookup = std::unordered_multimap<std::string_view, const MergingUnit&>;
 
     EPPC_PatternMatching() { SetMinVersion(Version::version_4_2_build_142); }
     virtual ~EPPC_PatternMatching() override = default;
@@ -465,8 +465,8 @@ struct Map
 
     struct Unit;
 
-    using UnitLookup = std::multimap<std::string_view, const Unit&>;
-    using ModuleLookup = std::map<std::string_view, UnitLookup>;
+    using UnitLookup = std::unordered_multimap<std::string_view, const Unit&>;
+    using ModuleLookup = std::unordered_map<std::string_view, UnitLookup>;
 
     struct Unit
     {

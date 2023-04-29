@@ -164,7 +164,7 @@ static const std::regex re_linker_generated_symbols_header{
 // "<<< Failure in %s: GetFilePos is %x, sect->calc_offset is %x\r\n"
 // "<<< Failure in %s: GetFilePos is %x, sect->bin_offset is %x\r\n"
 
-static const std::map<std::string_view, Map::SectionLayout::Kind> map_section_layout_kind{
+static const std::unordered_map<std::string_view, Map::SectionLayout::Kind> map_section_layout_kind{
     {".bss", Map::SectionLayout::Kind::BSS},
     {".sbss", Map::SectionLayout::Kind::BSS},
     {".sbss2", Map::SectionLayout::Kind::BSS},
@@ -902,11 +902,11 @@ static const std::regex re_symbol_closure_node_linker_generated{
     "   *(\\d+)\\] (.*) found as linker generated symbol\r?\n"};
 // clang-format on
 
-static const std::map<std::string_view, Type> map_symbol_closure_st_type{
+static const std::unordered_map<std::string_view, Type> map_symbol_closure_st_type{
     {"notype", Type::notype},   {"object", Type::object}, {"func", Type::func},
     {"section", Type::section}, {"file", Type::file},     {"unknown", Type::unknown},
 };
-static const std::map<std::string_view, Bind> map_symbol_closure_st_bind{
+static const std::unordered_map<std::string_view, Bind> map_symbol_closure_st_bind{
     {"local", Bind::local},       {"global", Bind::global},     {"weak", Bind::weak},
     {"multidef", Bind::multidef}, {"overload", Bind::overload}, {"unknown", Bind::unknown},
 };
