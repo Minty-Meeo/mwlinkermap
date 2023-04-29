@@ -10,20 +10,19 @@
 #include <sstream>
 #include <string>
 
-#include "Future/CppLibPrint.h"
-
 #include "MWLinkerMap.h"
+#include "PrintUtil.h"
 
 #define TIME_ATTACK_COUNT 20
 
 static void tempfunc(const char* name, int choice)
 {
-  std::println(std::cout, "{:s}", name);
+  util::println(std::cout, "{:s}", name);
 
   std::ifstream infile(name);
   if (!infile.is_open())
   {
-    std::println(std::cerr, "Could not open!");
+    util::println(std::cerr, "Could not open!");
     return;
   }
   std::stringstream sstream;
@@ -60,7 +59,7 @@ static void tempfunc(const char* name, int choice)
       error = linker_map.ScanSMGalaxy(temp, line_number);
       break;
     default:
-      std::println(std::cerr, "bad choice");
+      util::println(std::cerr, "bad choice");
       return;
     }
     const auto time_end = std::chrono::high_resolution_clock::now();
@@ -79,9 +78,9 @@ static void tempfunc(const char* name, int choice)
   // by reference in the map.
   std::fill(temp.begin(), temp.end(), '\0');
   const MWLinker::Version min_version = linker_map.GetMinVersion();
-  std::print(std::cout,
-             "line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}   time: ", line_number,
-             static_cast<int>(error), matches, static_cast<int>(min_version));
+  util::print(std::cout,
+              "line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}   time: ", line_number,
+              static_cast<int>(error), matches, static_cast<int>(min_version));
   // clang-format off
   std::cout << std::accumulate(time_attack.begin(), time_attack.end(), std::chrono::milliseconds{}) / time_attack.size() << std::endl;
   // clang-format on
@@ -91,7 +90,7 @@ int main(const int argc, const char** argv)
 {
   if (argc < 2)
   {
-    std::println(std::cerr, "Provide the name");
+    util::println(std::cerr, "Provide the name");
     return EXIT_FAILURE;
   }
   if (argc < 3)
