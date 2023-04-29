@@ -986,7 +986,7 @@ Map::Error Map::SymbolClosure::Scan(  //
           if (!map_symbol_closure_st_type.contains(unref_dup_type))
             return Error::SymbolClosureInvalidSymbolType;
           if (!map_symbol_closure_st_bind.contains(unref_dup_bind))
-            return Error::SymbolClosureInvalidSymbolType;
+            return Error::SymbolClosureInvalidSymbolBind;
           unref_dups.emplace_back(map_symbol_closure_st_type.at(unref_dup_type),
                                   map_symbol_closure_st_bind.at(unref_dup_bind),
                                   util::to_string_view(match[4]), util::to_string_view(match[5]));
