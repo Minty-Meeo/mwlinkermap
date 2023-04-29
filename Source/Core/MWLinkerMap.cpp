@@ -1755,11 +1755,13 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                              entry_parent_name = util::to_string_view(match[5]),
                              module_name = util::to_string_view(match[6]),
                              source_name = util::to_string_view(match[7]);
-      for (auto& parent_unit : std::ranges::reverse_view{this->units})
+      // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
+      for (auto parent_unit = this->units.rbegin(); parent_unit != this->units.rend();
+           ++parent_unit)
       {
-        if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
+        if (source_name != parent_unit->source_name || module_name != parent_unit->module_name)
           return Error::SectionLayoutOrphanedEntry;
-        if (entry_parent_name != parent_unit.name)
+        if (entry_parent_name != parent_unit->name)
           continue;
         // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
         // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
@@ -1772,10 +1774,10 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         }
         const Unit& unit = this->units.emplace_back(
             util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
-            util::xsmto<Elf32_Addr>(match[3]), symbol_name, &parent_unit, module_name, source_name,
-            Unit::Trait::None);
+            util::xsmto<Elf32_Addr>(match[3]), symbol_name, &parent_unit.operator*(), module_name,
+            source_name, Unit::Trait::None);
         curr_unit_lookup->emplace(unit.name, unit);
-        parent_unit.entry_children.push_back(&unit);
+        parent_unit->entry_children.push_back(&unit);
         line_number += 1u;
         head = match[0].second;
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
@@ -1848,11 +1850,13 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                              entry_parent_name = util::to_string_view(match[6]),
                              module_name = util::to_string_view(match[7]),
                              source_name = util::to_string_view(match[8]);
-      for (auto& parent_unit : std::ranges::reverse_view{this->units})
+      // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
+      for (auto parent_unit = this->units.rbegin(); parent_unit != this->units.rend();
+           ++parent_unit)
       {
-        if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
+        if (source_name != parent_unit->source_name || module_name != parent_unit->module_name)
           return Error::SectionLayoutOrphanedEntry;
-        if (entry_parent_name != parent_unit.name)
+        if (entry_parent_name != parent_unit->name)
           continue;
         // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
         // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
@@ -1866,9 +1870,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         const Unit& unit = this->units.emplace_back(
             util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
             util::xsmto<Elf32_Addr>(match[3]), util::xsmto<std::uint32_t>(match[4]), symbol_name,
-            &parent_unit, module_name, source_name, Unit::Trait::None);
+            &parent_unit.operator*(), module_name, source_name, Unit::Trait::None);
         curr_unit_lookup->emplace(unit.name, unit);
-        parent_unit.entry_children.push_back(&unit);
+        parent_unit->entry_children.push_back(&unit);
         line_number += 1u;
         head = match[0].second;
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
@@ -1947,11 +1951,13 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                        entry_parent_name = util::to_string_view(match[5]),
                        module_name = util::to_string_view(match[6]),
                        source_name = util::to_string_view(match[7]);
-      for (auto& parent_unit : std::ranges::reverse_view{this->units})
+      // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
+      for (auto parent_unit = this->units.rbegin(); parent_unit != this->units.rend();
+           ++parent_unit)
       {
-        if (source_name != parent_unit.source_name || module_name != parent_unit.module_name)
+        if (source_name != parent_unit->source_name || module_name != parent_unit->module_name)
           return Error::SectionLayoutOrphanedEntry;
-        if (entry_parent_name != parent_unit.name)
+        if (entry_parent_name != parent_unit->name)
           continue;
         // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
         // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
@@ -1964,10 +1970,10 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         }
         const Unit& unit = this->units.emplace_back(
             util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
-            util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name, &parent_unit,
-            module_name, source_name, Unit::Trait::None);
+            util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name,
+            &parent_unit.operator*(), module_name, source_name, Unit::Trait::None);
         curr_unit_lookup->emplace(unit.name, unit);
-        parent_unit.entry_children.push_back(&unit);
+        parent_unit->entry_children.push_back(&unit);
         line_number += 1u;
         head = match[0].second;
         goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
