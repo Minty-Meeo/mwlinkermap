@@ -1,16 +1,20 @@
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <sstream>
 #include <string>
 
 #include "Future/CppLibPrint.h"
 
 #include "MWLinkerMap.h"
+
+#define TIME_ATTACK_COUNT 20
 
 static void tempfunc(const char* name, int choice)
 {
@@ -39,23 +43,29 @@ static void tempfunc(const char* name, int choice)
 
   std::size_t line_number;
   MWLinker::Map::Error error;
-  const auto time_start = std::chrono::high_resolution_clock::now();
-  switch (choice)
+  std::array<std::chrono::milliseconds, TIME_ATTACK_COUNT> time_attack;
+  for (std::size_t i = 0; i < TIME_ATTACK_COUNT; ++i)
   {
-  case 0:
-    error = linker_map.Scan(temp, line_number);
-    break;
-  case 1:
-    error = linker_map.ScanTLOZTP(temp, line_number);
-    break;
-  case 2:
-    error = linker_map.ScanSMGalaxy(temp, line_number);
-    break;
-  default:
-    std::println(std::cerr, "bad choice");
-    return;
+    linker_map = MWLinker::Map{};  // Reset linker map
+    const auto time_start = std::chrono::high_resolution_clock::now();
+    switch (choice)
+    {
+    case 0:
+      error = linker_map.Scan(temp, line_number);
+      break;
+    case 1:
+      error = linker_map.ScanTLOZTP(temp, line_number);
+      break;
+    case 2:
+      error = linker_map.ScanSMGalaxy(temp, line_number);
+      break;
+    default:
+      std::println(std::cerr, "bad choice");
+      return;
+    }
+    const auto time_end = std::chrono::high_resolution_clock::now();
+    time_attack[i] = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
   }
-  const auto time_end = std::chrono::high_resolution_clock::now();
 
   while (temp.back() == '\0')
     temp.pop_back();
@@ -72,8 +82,9 @@ static void tempfunc(const char* name, int choice)
   std::print(std::cout,
              "line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}   time: ", line_number,
              static_cast<int>(error), matches, static_cast<int>(min_version));
-  std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start)
-            << std::endl;
+  // clang-format off
+  std::cout << std::accumulate(time_attack.begin(), time_attack.end(), std::chrono::milliseconds{}) / time_attack.size() << std::endl;
+  // clang-format on
 }
 
 int main(const int argc, const char** argv)
