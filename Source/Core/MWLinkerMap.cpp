@@ -3,22 +3,18 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <iostream>
-#include <istream>
 #include <map>
 #include <ostream>
 #include <ranges>
 #include <regex>
-#include <sstream>
 #include <string>
 #include <string_view>
-#include <typeinfo>
 #include <utility>
 
-#include "Util.h"
-
 #include "Future/CppLibPrint.h"
+
+#include "Util.h"
 
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
@@ -474,20 +470,6 @@ void Map::Print(std::ostream& stream) const
   if (linker_generated_symbols)
     linker_generated_symbols->Print(stream);
 }
-
-// void Map::Export(Report& report) const noexcept
-// {
-//   if (normal_symbol_closure)
-//     normal_symbol_closure->Export(report);
-//   if (dwarf_symbol_closure)
-//     dwarf_symbol_closure->Export(report);
-//   if (eppc_pattern_matching)
-//     eppc_pattern_matching->Export(report);
-//   for (const auto& section_layout : section_layouts)
-//     section_layout->Export(report);
-//   if (linker_generated_symbols)
-//     linker_generated_symbols->Export(report);
-// }
 
 Version Map::GetMinVersion() const noexcept
 {
@@ -1164,26 +1146,6 @@ void Map::SymbolClosure::NodeReal::UnreferencedDuplicate::Print(std::ostream& st
              module_name, source_name);
 }
 
-// void Map::SymbolClosure::Export(Report& report) const noexcept
-// {
-//   this->root.Export(report);
-// }
-
-// void Map::SymbolClosure::NodeBase::Export(Report& report) const noexcept
-// {
-//   for (const auto& node : this->children)
-//     node->Export(report);
-// }
-
-// void Map::SymbolClosure::NodeReal::Export(Report& report) const noexcept
-// {
-//   auto& debug_info = report[source_name.empty() ? module_name : source_name][name];
-//   debug_info.symbol_closure_unit = this;
-
-//   for (const auto& node : this->children)
-//     node->Export(report);
-// }
-
 // clang-format off
 static const std::regex re_code_merging_is_duplicated{
 //  "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
@@ -1397,40 +1359,6 @@ void Map::EPPC_PatternMatching::FoldingUnit::Unit::Print(std::ostream& stream) c
     std::print(stream, "--> {:s} is duplicated by {:s}, size = {:d} \r\n\r\n", first_name,
                second_name, size);
 }
-
-// void Map::EPPC_PatternMatching::Export(Report& report) const noexcept
-// {
-//   auto GenerateLookup = [this]() {
-//     std::map<std::string, const MergingUnit&> lookup;
-//     for (const auto& merging_unit : merging_units)
-//       // TODO: make sure there are no repeats while in the Scan method.
-//       lookup.insert({merging_unit.first_name, merging_unit});
-//     return lookup;
-//   };
-//   auto ObjName = [&report](std::string s) -> std::string {
-//     std::size_t dir_sep_off = s.rfind('\\');
-//     if (dir_sep_off != std::string::npos && ++dir_sep_off < s.length())
-//     {
-//       std::string s2 = s.substr(dir_sep_off);
-//       if (report.contains(s2))
-//         return s2;
-//     }
-//     return s;
-//   };
-//   const auto lookup = GenerateLookup();  // O(n) becomes O(log n)
-
-//   for (const auto& folding_unit : folding_units)
-//   {
-//     auto& subreport = report[ObjName(folding_unit.object_name)];
-//     for (const auto& unit : folding_unit.units)
-//     {
-//       auto& debug_info = subreport[unit.first_name];
-//       // TODO: You had better hope this doesn't throw
-//       debug_info.eppc_pattern_matching_merging_unit = &lookup.at(unit.first_name);
-//       debug_info.eppc_pattern_matching_folding_unit_unit = &unit;
-//     }
-//   }
-// }
 
 // clang-format off
 static const std::regex re_linker_opts_unit_not_near{
@@ -2166,18 +2094,6 @@ constexpr std::string_view Map::SectionLayout::Unit::ToSpecialName(const Trait u
   return "";
 }
 
-// void Map::SectionLayout::Export(Report& report) const noexcept
-// {
-//   for (const auto& unit : this->units)
-//     unit.Export(report);
-// }
-
-// void Map::SectionLayout::Unit::Export(Report& report) const noexcept
-// {
-//   auto& debug_info = report[source_name.empty() ? module_name : source_name][name];
-//   debug_info.section_layout_unit = this;
-// }
-
 // clang-format off
 static const std::regex re_memory_map_unit_normal_simple_old{
 //  "  %15s  %08x %08x %08x\r\n"
@@ -2732,15 +2648,4 @@ void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream) const
   // "%25s %08x\r\n"
   std::print(stream, "{:>25s} {:08x}\r\n", name, value);
 }
-
-// void Map::LinkerGeneratedSymbols::Export(Report& report) const noexcept
-// {
-//   auto& subreport = report[""];
-//   for (const auto& unit : units)
-//     subreport[unit.name].linker_generated_symbol_unit = &unit;
-// }
 }  // namespace MWLinker
-
-namespace Common
-{
-};  // namespace Common

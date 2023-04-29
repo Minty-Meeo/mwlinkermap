@@ -3,18 +3,13 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <istream>
 #include <list>
 #include <map>
 #include <memory>
-#include <optional>
 #include <ostream>
-#include <sstream>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
-#include <vector>
 
 namespace MWLinker
 {
@@ -94,7 +89,6 @@ struct Map
     Fail,
     Unimplemented,
     GarbageFound,
-    Warning,
 
     EntryPointNameMissing,
     SMGalaxyYouHadOneJob,
@@ -106,9 +100,6 @@ struct Map
     SymbolClosureUnrefDupsHierarchyMismatch,
     SymbolClosureUnrefDupsNameMismatch,
     SymbolClosureUnrefDupsEmpty,
-
-    // TODO: remove
-    EPPC_PatterMatchingIndistinctObjectName,
 
     EPPC_PatternMatchingMergingFirstNameMismatch,
     EPPC_PatternMatchingMergingSecondNameMismatch,
@@ -122,26 +113,6 @@ struct Map
 
     MemoryMapBadPrologue,
   };
-
-  enum class Warning
-  {
-    // Either your linker map violates the One Definition Rule, or you have found multiple
-    // compilation units with identical names! Either way, the previous definition of this
-    // symbol in its section layout's lookup will be discarded.
-    // https://en.cppreference.com/w/cpp/language/definition#One_Definition_Rule
-    SectionLayoutOneDefinitionRuleViolated,
-    // A less critical variant of the ODR violation. Before CW for GCN 2.7, compiling with the '-sym
-    // on' flag
-    // TODO: finish explaining
-    // This is for symbols with the same name as the
-    // More than one symbol named things like ".text" or ".bss" has been found. This is like a
-    // finer-toothed version of the SectionLayoutOneDefinitionRuleViolated warning that can help to
-    // identify same-name compilation units.
-    SectionLayoutMultipleSectionTypeSymbols,
-  };
-
-  struct UnitDebugInfo;
-  using DebugInfo = std::map<std::string, std::map<std::string, UnitDebugInfo>>;
 
   struct PortionBase
   {
@@ -176,7 +147,6 @@ struct Map
       static void PrintPrefix(std::ostream&, int);
       static constexpr std::string_view ToName(Type) noexcept;
       static constexpr std::string_view ToName(Bind) noexcept;
-      // virtual void Export(DebugInfo&) const noexcept;
 
       NodeBase* parent;
       std::list<std::unique_ptr<NodeBase>> children;
@@ -210,7 +180,6 @@ struct Map
       virtual ~NodeReal() override = default;
 
       virtual void Print(std::ostream&, int) const override;
-      // virtual void Export(DebugInfo&) const noexcept override;
 
       std::string name;
       Type type;
@@ -233,7 +202,6 @@ struct Map
       virtual ~NodeLinkerGenerated() override = default;
 
       virtual void Print(std::ostream&, int) const override;
-      // virtual void Export(DebugInfo&) const noexcept override;
 
       std::string name;
     };
@@ -247,7 +215,6 @@ struct Map
     Error Scan(const char*&, const char*, std::size_t&,
                std::list<std::pair<std::size_t, std::string>>&);
     virtual void Print(std::ostream&) const override;
-    void Export(DebugInfo&) const noexcept;
     virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
 
     NodeBase root;
@@ -607,7 +574,6 @@ struct Map
       Unit::Trait DeduceUsualSubtext(SectionLayout&, std::string_view&, std::string_view&,
                                      UnitLookup*&, bool&, bool&, bool&, std::size_t);
       static constexpr std::string_view ToSpecialName(Trait);
-      void Export(DebugInfo&) const noexcept;
 
       const Kind unit_kind;
       std::uint32_t starting_address;
@@ -639,7 +605,6 @@ struct Map
     Error Scan4Column(const char*&, const char*, std::size_t&);
     Error ScanTLOZTP(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    void Export(DebugInfo&) const noexcept;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     static Kind ToSectionKind(std::string_view);
@@ -844,7 +809,6 @@ struct Map
 
     Error Scan(const char*&, const char*, std::size_t&);
     virtual void Print(std::ostream&) const override;
-    void Export(DebugInfo&) const noexcept;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     std::list<Unit> units;
@@ -862,7 +826,6 @@ struct Map
   Error ScanForGarbage(const char*, const char*);
 
   void Print(std::ostream&) const;
-  void Export(DebugInfo&) const noexcept;
   Version GetMinVersion() const noexcept;
 
   std::string entry_point_name;
@@ -878,16 +841,5 @@ struct Map
   std::list<std::unique_ptr<SectionLayout>> section_layouts;
   std::unique_ptr<MemoryMap> memory_map;
   std::unique_ptr<LinkerGeneratedSymbols> linker_generated_symbols;
-
-  struct UnitDebugInfo
-  {
-    const SymbolClosure::NodeReal* symbol_closure_unit = nullptr;
-    const EPPC_PatternMatching::MergingUnit* eppc_pattern_matching_merging_unit = nullptr;
-    const EPPC_PatternMatching::FoldingUnit::Unit* eppc_pattern_matching_folding_unit_unit =
-        nullptr;
-    const SectionLayout::Unit* section_layout_unit = nullptr;
-    const LinkerGeneratedSymbols::Unit* linker_generated_symbol_unit = nullptr;
-  };
-  DebugInfo debug_info;
 };
 }  // namespace MWLinker
