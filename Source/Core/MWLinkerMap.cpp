@@ -33,6 +33,10 @@ using u32 = std::uint32_t;
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
 // To account for outside factors, though, this program can support both CRLF and LF line endings.
 
+// This code uses std::regex in ECMAScript mode, which never matches '\r' or '\n' with the '.'
+// metacharacter. If you want to try adapting this code to a different regular expression flavor,
+// make sure it still follows that rule.
+
 namespace MWLinker
 {
 void Map::EPPC_PatternMatching::Warn::MergingOneDefinitionRuleViolation(
