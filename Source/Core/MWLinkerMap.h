@@ -227,14 +227,14 @@ struct Map
 
     struct Warn
     {
+      friend SymbolClosure;
+
       static inline bool do_warn_odr_violation = true;
       static inline bool do_warn_sym_on_flag_detected = true;
 
     private:
       static void OneDefinitionRuleViolation(std::size_t, std::string_view, std::string_view);
       static void SymOnFlagDetected(std::size_t, std::string_view);
-
-      friend SymbolClosure;
     };
 
   private:
@@ -326,6 +326,8 @@ struct Map
 
     struct Warn
     {
+      friend EPPC_PatternMatching;
+
       static inline bool do_warn_merging_odr_violation = true;
       static inline bool do_warn_folding_repeat_object = true;
       static inline bool do_warn_folding_odr_violation = true;
@@ -335,8 +337,6 @@ struct Map
       static void FoldingRepeatObject(std::size_t, std::string_view);
       static void FoldingOneDefinitionRuleViolation(std::size_t, std::string_view,
                                                     std::string_view);
-
-      friend EPPC_PatternMatching;
     };
 
   private:
@@ -661,6 +661,8 @@ struct Map
 
     struct Warn
     {
+      friend SectionLayout;
+
       static inline bool do_warn_repeat_compilation_unit = true;
       static inline bool do_warn_odr_violation = true;
       static inline bool do_warn_sym_on_flag_detected = true;
@@ -672,8 +674,6 @@ struct Map
                                              std::string_view);
       static void SymOnFlagDetected(std::size_t, std::string_view, std::string_view);
       static void CommAfterLComm(std::size_t);
-
-      friend SectionLayout;
     };
 
   private:
