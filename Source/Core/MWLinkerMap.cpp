@@ -912,7 +912,14 @@ static const std::unordered_map<std::string_view, Bind> map_symbol_closure_st_bi
 
 Map::Error Map::SymbolClosure::Scan(  //
     const char*& head, const char* const tail, std::size_t& line_number,
+#if defined(__clang__)         // Why am I getting a -Wshadow warning about
+#pragma clang diagnostic push  // a member from an entirely different class
+#pragma clang diagnostic ignored "-Wshadow"
+#endif
     std::list<std::pair<std::size_t, std::string>>& unresolved_symbols)
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 {
   std::cmatch match;
 

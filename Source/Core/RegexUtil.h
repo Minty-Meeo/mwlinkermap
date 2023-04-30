@@ -20,7 +20,7 @@ inline T smto(const std::pair<const char*, const char*>& csm, std::size_t* pos =
   auto [ptr, ec] = std::from_chars(csm.first, csm.second, value, base);
   // Don't bother throwing std::invalid_argument or std::out_of_range.  I never write bad code :^)
   if (pos != nullptr)
-    *pos = std::distance(csm.first, ptr);
+    *pos = static_cast<std::size_t>(std::distance(csm.first, ptr));
   return value;
 }
 

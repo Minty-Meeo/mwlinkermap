@@ -40,9 +40,9 @@ static void tempfunc(const char* name, int choice)
   MWLinker::Map::SectionLayout::Warn::do_warn_repeat_compilation_unit = false;
   MWLinker::Map::SectionLayout::Warn::do_warn_sym_on_flag_detected = false;
 
-  std::size_t line_number;
-  MWLinker::Map::Error error;
-  std::array<std::chrono::milliseconds, TIME_ATTACK_COUNT> time_attack;
+  std::size_t line_number = 0;
+  MWLinker::Map::Error error = MWLinker::Map::Error::None;
+  std::array<std::chrono::milliseconds, TIME_ATTACK_COUNT> time_attack{};
   for (std::size_t i = 0; i < TIME_ATTACK_COUNT; ++i)
   {
     linker_map = MWLinker::Map{};  // Reset linker map
