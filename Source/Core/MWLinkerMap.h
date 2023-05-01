@@ -114,6 +114,8 @@ struct Map
     MemoryMapBadPrologue,
   };
 
+  using UnresolvedSymbols = std::list<std::pair<std::size_t, std::string>>;
+
   struct PortionBase
   {
     virtual ~PortionBase() = default;
@@ -122,7 +124,6 @@ struct Map
     {
       min_version = std::max(min_version, version);
     }
-    virtual void Print(std::ostream&) const = 0;
     virtual bool IsEmpty() const noexcept = 0;
 
     Version min_version = Version::Unknown;
@@ -145,7 +146,9 @@ struct Map
       explicit NodeBase(NodeBase* parent_) : parent(parent_) {}
       virtual ~NodeBase() = default;
 
-      virtual void Print(std::ostream&, int) const;  // Necessary for root and fake _dtor$99 child
+      // Necessary for root and fake _dtor$99 child
+      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
+                         UnresolvedSymbols::const_iterator, std::size_t&) const;
       static void PrintPrefix(std::ostream&, int);
       static constexpr std::string_view ToName(Type) noexcept;
       static constexpr std::string_view ToName(Bind) noexcept;
@@ -168,7 +171,7 @@ struct Map
         {
         }
 
-        void Print(std::ostream&, int) const;
+        void Print(std::ostream&, int, std::size_t&) const;
 
         const Type type;
         const Bind bind;
@@ -185,7 +188,8 @@ struct Map
       }
       virtual ~NodeReal() override = default;
 
-      virtual void Print(std::ostream&, int) const override;
+      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
+                         UnresolvedSymbols::const_iterator, std::size_t&) const override;
 
       const std::string name;
       const Type type;
@@ -207,7 +211,8 @@ struct Map
       }
       virtual ~NodeLinkerGenerated() override = default;
 
-      virtual void Print(std::ostream&, int) const override;
+      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
+                         UnresolvedSymbols::const_iterator, std::size_t&) const override;
 
       const std::string name;
     };
@@ -218,9 +223,9 @@ struct Map
     explicit SymbolClosure() = default;
     virtual ~SymbolClosure() override = default;
 
-    Error Scan(const char*&, const char*, std::size_t&,
-               std::list<std::pair<std::size_t, std::string>>&);
-    virtual void Print(std::ostream&) const override;
+    Error Scan(const char*&, const char*, std::size_t&, UnresolvedSymbols&);
+    void Print(std::ostream&, UnresolvedSymbols::const_iterator&, UnresolvedSymbols::const_iterator,
+               std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
 
     const ModuleLookup& GetModuleLookup() { return lookup; }
@@ -256,7 +261,7 @@ struct Map
       {
       }
 
-      void Print(std::ostream&) const;
+      void Print(std::ostream&, std::size_t&) const;
 
       const std::string first_name;
       const std::string second_name;
@@ -284,7 +289,7 @@ struct Map
         {
         }
 
-        void Print(std::ostream&) const;
+        void Print(std::ostream&, std::size_t&) const;
 
         const std::string first_name;
         const std::string second_name;
@@ -297,7 +302,7 @@ struct Map
 
       explicit FoldingUnit(std::string_view object_name_) : object_name(object_name_) {}
 
-      void Print(std::ostream&) const;
+      void Print(std::ostream&, std::size_t&) const;
 
       const std::list<Unit>& GetUnits() { return units; }
 
@@ -313,7 +318,7 @@ struct Map
     virtual ~EPPC_PatternMatching() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
-    virtual void Print(std::ostream&) const override;
+    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override
     {
       return merging_units.empty() || folding_units.empty();
@@ -372,7 +377,7 @@ struct Map
       {
       }
 
-      void Print(std::ostream&) const;
+      void Print(std::ostream&, std::size_t&) const;
 
       const Kind unit_kind;
       const std::string module_name;
@@ -384,7 +389,7 @@ struct Map
     virtual ~LinkerOpts() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
-    virtual void Print(std::ostream&) const override;
+    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     const std::list<Unit>& GetUnits() { return units; }
@@ -405,7 +410,7 @@ struct Map
       {
       }
 
-      void Print(std::ostream&) const;
+      void Print(std::ostream&, std::size_t&) const;
 
       const std::string first_name;
       const std::string second_name;
@@ -416,7 +421,7 @@ struct Map
     virtual ~BranchIslands() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
-    virtual void Print(std::ostream&) const override;
+    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     const std::list<Unit>& GetUnits() { return units; }
@@ -437,7 +442,7 @@ struct Map
       {
       }
 
-      void Print(std::ostream&) const;
+      void Print(std::ostream&, std::size_t&) const;
 
       const std::string first_name;
       const std::string second_name;
@@ -448,7 +453,7 @@ struct Map
     virtual ~MixedModeIslands() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
-    virtual void Print(std::ostream&) const override;
+    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     const std::list<Unit>& GetUnits() { return units; }
@@ -463,7 +468,7 @@ struct Map
     virtual ~LinktimeSizeDecreasingOptimizations() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
-    virtual void Print(std::ostream&) const override;
+    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return true; }
   };
 
@@ -473,7 +478,7 @@ struct Map
     virtual ~LinktimeSizeIncreasingOptimizations() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
-    virtual void Print(std::ostream&) const override;
+    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return true; }
   };
 
@@ -605,8 +610,8 @@ struct Map
       {
       }
 
-      void Print3Column(std::ostream&) const;
-      void Print4Column(std::ostream&) const;
+      void Print3Column(std::ostream&, std::size_t&) const;
+      void Print4Column(std::ostream&, std::size_t&) const;
       static constexpr std::string_view ToSpecialName(Trait);
 
       const Unit* GetEntryParent() { return entry_parent; }
@@ -649,7 +654,7 @@ struct Map
     Error Scan3Column(const char*&, const char*, std::size_t&);
     Error Scan4Column(const char*&, const char*, std::size_t&);
     Error ScanTLOZTP(const char*&, const char*, std::size_t&);
-    virtual void Print(std::ostream&) const override;
+    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
     static Kind ToSectionKind(std::string_view);
 
@@ -758,16 +763,16 @@ struct Map
       {
       }
 
-      void PrintSimple_old(std::ostream&) const;
-      void PrintRomRam_old(std::ostream&) const;
-      void PrintSimple(std::ostream&) const;
-      void PrintRomRam(std::ostream&) const;
-      void PrintSRecord(std::ostream&) const;
-      void PrintBinFile(std::ostream&) const;
-      void PrintRomRamSRecord(std::ostream&) const;
-      void PrintRomRamBinFile(std::ostream&) const;
-      void PrintSRecordBinFile(std::ostream&) const;
-      void PrintRomRamSRecordBinFile(std::ostream&) const;
+      void PrintSimple_old(std::ostream&, std::size_t&) const;
+      void PrintRomRam_old(std::ostream&, std::size_t&) const;
+      void PrintSimple(std::ostream&, std::size_t&) const;
+      void PrintRomRam(std::ostream&, std::size_t&) const;
+      void PrintSRecord(std::ostream&, std::size_t&) const;
+      void PrintBinFile(std::ostream&, std::size_t&) const;
+      void PrintRomRamSRecord(std::ostream&, std::size_t&) const;
+      void PrintRomRamBinFile(std::ostream&, std::size_t&) const;
+      void PrintSRecordBinFile(std::ostream&, std::size_t&) const;
+      void PrintRomRamSRecordBinFile(std::ostream&, std::size_t&) const;
 
       const std::string name;
       const Elf32_Addr starting_address;
@@ -789,9 +794,9 @@ struct Map
       {
       }
 
-      void Print_older(std::ostream&) const;
-      void Print_old(std::ostream&) const;
-      void Print(std::ostream&) const;
+      void Print_older(std::ostream&, std::size_t&) const;
+      void Print_old(std::ostream&, std::size_t&) const;
+      void Print(std::ostream&, std::size_t&) const;
 
       const std::string name;
       const Elf32_Word size;
@@ -821,19 +826,19 @@ struct Map
     Error ScanSRecordBinFile(const char*&, const char*, std::size_t&);
     Error ScanRomRamSRecordBinFile(const char*&, const char*, std::size_t&);
     Error ScanDebug(const char*&, const char*, std::size_t&);
-    virtual void Print(std::ostream&) const override;
-    void PrintSimple_old(std::ostream&) const;
-    void PrintRomRam_old(std::ostream&) const;
-    void PrintDebug_old(std::ostream&) const;
-    void PrintSimple(std::ostream&) const;
-    void PrintRomRam(std::ostream&) const;
-    void PrintSRecord(std::ostream&) const;
-    void PrintBinFile(std::ostream&) const;
-    void PrintRomRamSRecord(std::ostream&) const;
-    void PrintRomRamBinFile(std::ostream&) const;
-    void PrintSRecordBinFile(std::ostream&) const;
-    void PrintRomRamSRecordBinFile(std::ostream&) const;
-    void PrintDebug(std::ostream&) const;
+    void Print(std::ostream&, std::size_t&) const;
+    void PrintSimple_old(std::ostream&, std::size_t&) const;
+    void PrintRomRam_old(std::ostream&, std::size_t&) const;
+    void PrintDebug_old(std::ostream&, std::size_t&) const;
+    void PrintSimple(std::ostream&, std::size_t&) const;
+    void PrintRomRam(std::ostream&, std::size_t&) const;
+    void PrintSRecord(std::ostream&, std::size_t&) const;
+    void PrintBinFile(std::ostream&, std::size_t&) const;
+    void PrintRomRamSRecord(std::ostream&, std::size_t&) const;
+    void PrintRomRamBinFile(std::ostream&, std::size_t&) const;
+    void PrintSRecordBinFile(std::ostream&, std::size_t&) const;
+    void PrintRomRamSRecordBinFile(std::ostream&, std::size_t&) const;
+    void PrintDebug(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override
     {
       return normal_units.empty() || debug_units.empty();
@@ -857,7 +862,7 @@ struct Map
     {
       explicit Unit(std::string_view name_, Elf32_Addr value_) : name(name_), value(value_) {}
 
-      void Print(std::ostream&) const;
+      void Print(std::ostream&, std::size_t&) const;
 
       const std::string name;
       const Elf32_Addr value;
@@ -867,7 +872,7 @@ struct Map
     virtual ~LinkerGeneratedSymbols() override = default;
 
     Error Scan(const char*&, const char*, std::size_t&);
-    virtual void Print(std::ostream&) const override;
+    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
 
     const std::list<Unit>& GetUnits() const noexcept { return units; }
@@ -882,7 +887,7 @@ struct Map
   Error ScanTLOZTP(const char*, const char*, std::size_t&);
   Error ScanSMGalaxy(std::string_view, std::size_t&);
   Error ScanSMGalaxy(const char*, const char*, std::size_t&);
-  void Print(std::ostream&) const;
+  void Print(std::ostream&, std::size_t&) const;
   Version GetMinVersion() const noexcept;
 
   const std::string& GetEntryPointName() const noexcept { return entry_point_name; }
@@ -924,7 +929,7 @@ private:
   std::unique_ptr<SymbolClosure> normal_symbol_closure;
   std::unique_ptr<EPPC_PatternMatching> eppc_pattern_matching;
   std::unique_ptr<SymbolClosure> dwarf_symbol_closure;
-  std::list<std::pair<std::size_t, std::string>> unresolved_symbols;
+  UnresolvedSymbols unresolved_symbols;
   std::unique_ptr<LinkerOpts> linker_opts;
   std::unique_ptr<MixedModeIslands> mixed_mode_islands;
   std::unique_ptr<BranchIslands> branch_islands;

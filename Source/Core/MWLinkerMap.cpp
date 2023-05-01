@@ -243,8 +243,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number, this->unresolved_symbols);
     if (error != Error::None)
       return error;
-    if (!portion->IsEmpty())
-      this->normal_symbol_closure = std::move(portion);
+    this->normal_symbol_closure = std::move(portion);
   }
   {
     auto portion = std::make_unique<EPPC_PatternMatching>();
@@ -264,10 +263,8 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-    {
       portion->SetMinVersion(Version::version_3_0_4);
-      this->dwarf_symbol_closure = std::move(portion);
-    }
+    this->dwarf_symbol_closure = std::move(portion);
   }
   // Unresolved symbol post-prints probably belong here (I have not confirmed if they preceed
   // LinkerOpts), but the Symbol Closure scanning code that just happened handles them well enough.
@@ -438,36 +435,35 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
   return this->ScanForGarbage(head, tail);
 }
 
-void Map::Print(std::ostream& stream) const
+void Map::Print(std::ostream& stream, std::size_t& line_number) const
 {
+  auto unresolved_head = this->unresolved_symbols.cbegin(),
+       unresolved_tail = this->unresolved_symbols.cend();
   // "Link map of %s\r\n"
   util::print(stream, "Link map of {:s}\r\n", entry_point_name);
+  line_number = 2;
   if (normal_symbol_closure)
-    normal_symbol_closure->Print(stream);
+    normal_symbol_closure->Print(stream, unresolved_head, unresolved_tail, line_number);
   if (eppc_pattern_matching)
-    eppc_pattern_matching->Print(stream);
+    eppc_pattern_matching->Print(stream, line_number);
   if (dwarf_symbol_closure)
-    dwarf_symbol_closure->Print(stream);
-  // TODO: move this into symbol closure printing now that line numbers are stored.
-  for (const auto& [line_number, name] : unresolved_symbols)
-    // ">>> SYMBOL NOT FOUND: %s\r\n"
-    util::print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", name);
+    dwarf_symbol_closure->Print(stream, unresolved_head, unresolved_tail, line_number);
   if (linker_opts)
-    linker_opts->Print(stream);
+    linker_opts->Print(stream, line_number);
   if (mixed_mode_islands)
-    mixed_mode_islands->Print(stream);
+    mixed_mode_islands->Print(stream, line_number);
   if (branch_islands)
-    branch_islands->Print(stream);
+    branch_islands->Print(stream, line_number);
   if (linktime_size_decreasing_optimizations)
-    linktime_size_decreasing_optimizations->Print(stream);
+    linktime_size_decreasing_optimizations->Print(stream, line_number);
   if (linktime_size_increasing_optimizations)
-    linktime_size_increasing_optimizations->Print(stream);
+    linktime_size_increasing_optimizations->Print(stream, line_number);
   for (const auto& section_layout : section_layouts)
-    section_layout->Print(stream);
+    section_layout->Print(stream, line_number);
   if (memory_map)
-    memory_map->Print(stream);
+    memory_map->Print(stream, line_number);
   if (linker_generated_symbols)
-    linker_generated_symbols->Print(stream);
+    linker_generated_symbols->Print(stream, line_number);
 }
 
 Version Map::GetMinVersion() const noexcept
@@ -916,7 +912,7 @@ Map::Error Map::SymbolClosure::Scan(  //
 #pragma clang diagnostic push  // a member from an entirely different class
 #pragma clang diagnostic ignored "-Wshadow"
 #endif
-    std::list<std::pair<std::size_t, std::string>>& unresolved_symbols)
+    UnresolvedSymbols& unresolved_symbols)
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
@@ -1058,9 +1054,12 @@ Map::Error Map::SymbolClosure::Scan(  //
   return Error::None;
 }
 
-void Map::SymbolClosure::Print(std::ostream& stream) const
+void Map::SymbolClosure::Print(std::ostream& stream,
+                               UnresolvedSymbols::const_iterator& unresolved_head,
+                               const UnresolvedSymbols::const_iterator unresolved_tail,
+                               std::size_t& line_number) const
 {
-  this->root.Print(stream, 0);
+  this->root.Print(stream, 0, unresolved_head, unresolved_tail, line_number);
 }
 
 void Map::SymbolClosure::NodeBase::PrintPrefix(std::ostream& stream, const int hierarchy_level)
@@ -1110,46 +1109,63 @@ constexpr std::string_view Map::SymbolClosure::NodeBase::ToName(const Bind st_bi
   }
 }
 
-void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarchy_level) const
+void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarchy_level,
+                                         UnresolvedSymbols::const_iterator& unresolved_head,
+                                         const UnresolvedSymbols::const_iterator unresolved_tail,
+                                         std::size_t& line_number) const
 {
+  while (unresolved_head != unresolved_tail && unresolved_head->first == line_number)
+  {
+    // ">>> SYMBOL NOT FOUND: %s\r\n"
+    util::print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", (unresolved_head++)->second);
+    line_number += 1;
+  }
   for (const auto& node : this->children)
-    node->Print(stream, hierarchy_level + 1);
+    node->Print(stream, hierarchy_level + 1, unresolved_head, unresolved_tail, line_number);
 }
 
-void Map::SymbolClosure::NodeReal::Print(std::ostream& stream, const int hierarchy_level) const
+void Map::SymbolClosure::NodeReal::Print(std::ostream& stream, const int hierarchy_level,
+                                         UnresolvedSymbols::const_iterator& unresolved_head,
+                                         const UnresolvedSymbols::const_iterator unresolved_tail,
+                                         std::size_t& line_number) const
 {
   PrintPrefix(stream, hierarchy_level);
   // "%s (%s,%s) found in %s %s\r\n"
   util::print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", name, ToName(type), ToName(bind),
               module_name, source_name);
+  line_number += 1u;
   if (!this->unref_dups.empty())
   {
     PrintPrefix(stream, hierarchy_level);
     // ">>> UNREFERENCED DUPLICATE %s\r\n"
     util::print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", name);
+    line_number += 1u;
     for (const auto& unref_dup : unref_dups)
-      unref_dup.Print(stream, hierarchy_level);
+      unref_dup.Print(stream, hierarchy_level, line_number);
   }
-  NodeBase::Print(stream, hierarchy_level);
+  NodeBase::Print(stream, hierarchy_level, unresolved_head, unresolved_tail, line_number);
 }
 
-void Map::SymbolClosure::NodeLinkerGenerated::Print(std::ostream& stream,
-                                                    const int hierarchy_level) const
+void Map::SymbolClosure::NodeLinkerGenerated::Print(
+    std::ostream& stream, const int hierarchy_level,
+    UnresolvedSymbols::const_iterator& unresolved_head,
+    const UnresolvedSymbols::const_iterator unresolved_tail, std::size_t& line_number) const
 {
   PrintPrefix(stream, hierarchy_level);
   // "%s found as linker generated symbol\r\n"
   util::print(stream, "{:s} found as linker generated symbol\r\n", name);
-  // Linker generated symbols should have no children but we'll check anyway.
-  NodeBase::Print(stream, hierarchy_level);
+  line_number += 1u;
+  NodeBase::Print(stream, hierarchy_level, unresolved_head, unresolved_tail, line_number);
 }
 
-void Map::SymbolClosure::NodeReal::UnreferencedDuplicate::Print(std::ostream& stream,
-                                                                const int hierarchy_level) const
+void Map::SymbolClosure::NodeReal::UnreferencedDuplicate::Print(  //
+    std::ostream& stream, const int hierarchy_level, std::size_t& line_number) const
 {
   PrintPrefix(stream, hierarchy_level);
   // ">>> (%s,%s) found in %s %s\r\n"
   util::print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", ToName(type), ToName(bind),
               module_name, source_name);
+  line_number += 1u;
 }
 
 // clang-format off
@@ -1304,31 +1320,35 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
   return Error::None;
 }
 
-void Map::EPPC_PatternMatching::Print(std::ostream& stream) const
+void Map::EPPC_PatternMatching::Print(std::ostream& stream, std::size_t& line_number) const
 {
   for (const auto& unit : merging_units)
-    unit.Print(stream);
+    unit.Print(stream, line_number);
   for (const auto& unit : folding_units)
-    unit.Print(stream);
+    unit.Print(stream, line_number);
 }
 
-void Map::EPPC_PatternMatching::MergingUnit::Print(std::ostream& stream) const
+void Map::EPPC_PatternMatching::MergingUnit::Print(std::ostream& stream,
+                                                   std::size_t& line_number) const
 {
   if (was_interchanged)
   {
     // "--> the function %s was interchanged with %s, size=%d \r\n"
     util::print(stream, "--> the function {:s} was interchanged with {:s}, size={:d} \r\n",
                 first_name, second_name, size);
+    line_number += 1u;
     if (will_be_replaced)
     {
       // "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
       util::print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
                   first_name, second_name);
+      line_number += 3u;
     }
     // "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
     util::print(stream,
                 "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
                 first_name, second_name, size);
+    line_number += 2u;
   }
   else
   {
@@ -1336,34 +1356,45 @@ void Map::EPPC_PatternMatching::MergingUnit::Print(std::ostream& stream) const
     util::print(stream,
                 "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
                 first_name, second_name, size);
+    line_number += 2u;
     if (will_be_replaced)
     {
       // "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
       util::print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
                   first_name, second_name);
+      line_number += 3u;
     }
   }
 }
 
-void Map::EPPC_PatternMatching::FoldingUnit::Print(std::ostream& stream) const
+void Map::EPPC_PatternMatching::FoldingUnit::Print(std::ostream& stream,
+                                                   std::size_t& line_number) const
 {
   // "\r\n\r\n\r\nCode folded in file: %s \r\n"
   util::print(stream, "\r\n\r\n\r\nCode folded in file: {:s} \r\n", object_name);
+  line_number += 4u;
   for (const auto& unit : units)
-    unit.Print(stream);
+    unit.Print(stream, line_number);
 }
 
-void Map::EPPC_PatternMatching::FoldingUnit::Unit::Print(std::ostream& stream) const
+void Map::EPPC_PatternMatching::FoldingUnit::Unit::Print(std::ostream& stream,
+                                                         std::size_t& line_number) const
 {
   if (new_branch_function)
+  {
     // "--> %s is duplicated by %s, size = %d, new branch function %s \r\n\r\n"
     util::print(stream,
                 "--> {:s} is duplicated by {:s}, size = {:d}, new branch function {:s} \r\n\r\n",
                 first_name, second_name, size, first_name);
+    line_number += 2u;
+  }
   else
+  {
     // "--> %s is duplicated by %s, size = %d \r\n\r\n"
     util::print(stream, "--> {:s} is duplicated by {:s}, size = {:d} \r\n\r\n", first_name,
                 second_name, size);
+    line_number += 2u;
+  }
 }
 
 // clang-format off
@@ -1430,13 +1461,13 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
   return Error::None;
 }
 
-void Map::LinkerOpts::Print(std::ostream& stream) const
+void Map::LinkerOpts::Print(std::ostream& stream, std::size_t& line_number) const
 {
   for (const auto& unit : units)
-    unit.Print(stream);
+    unit.Print(stream, line_number);
 }
 
-void Map::LinkerOpts::Unit::Print(std::ostream& stream) const
+void Map::LinkerOpts::Unit::Print(std::ostream& stream, std::size_t& line_number) const
 {
   switch (this->unit_kind)
   {
@@ -1444,20 +1475,24 @@ void Map::LinkerOpts::Unit::Print(std::ostream& stream) const
     // "  %s/ %s()/ %s - address not in near addressing range \r\n"
     util::print(stream, "  {:s}/ {:s}()/ {:s} - address not in near addressing range \r\n",
                 module_name, name, reference_name);
+    line_number += 1u;
     return;
   case Kind::NotComputed:
     // "  %s/ %s()/ %s - final address not yet computed \r\n"
     util::print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", module_name,
                 name, reference_name);
+    line_number += 1u;
     return;
   case Kind::Optimized:
     // "! %s/ %s()/ %s - optimized addressing \r\n"
     util::print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", module_name, name,
                 reference_name);
+    line_number += 1u;
     return;
   case Kind::DisassembleError:
     // "  %s/ %s() - error disassembling function \r\n"
     util::print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", module_name, name);
+    line_number += 1u;
     return;
   }
 }
@@ -1503,21 +1538,28 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
   return Error::None;
 }
 
-void Map::MixedModeIslands::Print(std::ostream& stream) const
+void Map::MixedModeIslands::Print(std::ostream& stream, std::size_t& line_number) const
 {
   util::print(stream, "\r\nMixed Mode Islands\r\n");
+  line_number += 2u;
   for (const auto& unit : units)
-    unit.Print(stream);
+    unit.Print(stream, line_number);
 }
-void Map::MixedModeIslands::Unit::Print(std::ostream& stream) const
+void Map::MixedModeIslands::Unit::Print(std::ostream& stream, std::size_t& line_number) const
 {
   if (is_safe)
+  {
     // "  safe mixed mode island %s created for %s\r\n"
     util::print(stream, "  safe mixed mode island {:s} created for {:s}\r\n", first_name,
                 second_name);
+    line_number += 1u;
+  }
   else
+  {
     // "  mixed mode island %s created for %s\r\n"
     util::print(stream, "  mixed mode island {:s} created for {:s}\r\n", first_name, second_name);
+    line_number += 1u;
+  }
 }
 
 // clang-format off
@@ -1561,20 +1603,27 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
   return Error::None;
 }
 
-void Map::BranchIslands::Print(std::ostream& stream) const
+void Map::BranchIslands::Print(std::ostream& stream, std::size_t& line_number) const
 {
   util::print(stream, "\r\nBranch Islands\r\n");
+  line_number += 2u;
   for (const auto& unit : units)
-    unit.Print(stream);
+    unit.Print(stream, line_number);
 }
-void Map::BranchIslands::Unit::Print(std::ostream& stream) const
+void Map::BranchIslands::Unit::Print(std::ostream& stream, std::size_t& line_number) const
 {
   if (is_safe)
+  {
     //  "  safe branch island %s created for %s\r\n"
     util::print(stream, "  safe branch island {:s} created for {:s}\r\n", first_name, second_name);
+    line_number += 1u;
+  }
   else
+  {
     //  "  branch island %s created for %s\r\n"
     util::print(stream, "  branch island {:s} created for {:s}\r\n", first_name, second_name);
+    line_number += 1u;
+  }
 }
 
 Map::Error Map::LinktimeSizeDecreasingOptimizations::Scan(const char*&, const char* const,
@@ -1584,9 +1633,11 @@ Map::Error Map::LinktimeSizeDecreasingOptimizations::Scan(const char*&, const ch
   return Error::None;
 }
 
-void Map::LinktimeSizeDecreasingOptimizations::Print(std::ostream& stream) const
+void Map::LinktimeSizeDecreasingOptimizations::Print(std::ostream& stream,
+                                                     std::size_t& line_number) const
 {
   util::print(stream, "\r\nLinktime size-decreasing optimizations\r\n");
+  line_number += 2u;
 }
 
 Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(const char*&, const char* const,
@@ -1596,9 +1647,11 @@ Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(const char*&, const ch
   return Error::None;
 }
 
-void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream) const
+void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream,
+                                                     std::size_t& line_number) const
 {
   util::print(stream, "\r\nLinktime size-increasing optimizations\r\n");
+  line_number += 2u;
 }
 
 Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(
@@ -2020,29 +2073,31 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
   return Error::None;
 }
 
-void Map::SectionLayout::Print(std::ostream& stream) const
+void Map::SectionLayout::Print(std::ostream& stream, std::size_t& line_number) const
 {
   // "\r\n\r\n%s section layout\r\n"
   util::print(stream, "\r\n\r\n{:s} section layout\r\n", name);
   if (min_version < Version::version_3_0_4)
   {
-    util::print(stream, "  Starting        Virtual\r\n");
-    util::print(stream, "  address  Size   address\r\n");
-    util::print(stream, "  -----------------------\r\n");
+    util::print(stream, "  Starting        Virtual\r\n"
+                        "  address  Size   address\r\n"
+                        "  -----------------------\r\n");
+    line_number += 6u;
     for (const auto& unit : this->units)
-      unit.Print3Column(stream);
+      unit.Print3Column(stream, line_number);
   }
   else
   {
-    util::print(stream, "  Starting        Virtual  File\r\n");
-    util::print(stream, "  address  Size   address  offset\r\n");
-    util::print(stream, "  ---------------------------------\r\n");
+    util::print(stream, "  Starting        Virtual  File\r\n"
+                        "  address  Size   address  offset\r\n"
+                        "  ---------------------------------\r\n");
+    line_number += 6u;
     for (const auto& unit : this->units)
-      unit.Print4Column(stream);
+      unit.Print4Column(stream, line_number);
   }
 }
 
-void Map::SectionLayout::Unit::Print3Column(std::ostream& stream) const
+void Map::SectionLayout::Unit::Print3Column(std::ostream& stream, std::size_t& line_number) const
 {
   switch (this->unit_kind)
   {
@@ -2050,17 +2105,20 @@ void Map::SectionLayout::Unit::Print3Column(std::ostream& stream) const
     // "  %08x %06x %08x %2i %s \t%s %s\r\n"
     util::print(stream, "  {:08x} {:06x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n", starting_address, size,
                 virtual_address, alignment, name, module_name, source_name);
+    line_number += 1u;
     return;
   case Kind::Unused:
     // "  UNUSED   %06x ........ %s %s %s\r\n"
     util::print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", size, name, module_name,
                 source_name);
+    line_number += 1u;
     return;
   case Kind::Entry:
     // "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
     util::print(stream, "  {:08x} {:06x} {:08x} {:s} (entry of {:s}) \t{:s} {:s}\r\n",
                 starting_address, size, virtual_address, name, entry_parent->name, module_name,
                 source_name);
+    line_number += 1u;
     return;
   case Kind::Special:
     assert(false);
@@ -2068,7 +2126,7 @@ void Map::SectionLayout::Unit::Print3Column(std::ostream& stream) const
   }
 }
 
-void Map::SectionLayout::Unit::Print4Column(std::ostream& stream) const
+void Map::SectionLayout::Unit::Print4Column(std::ostream& stream, std::size_t& line_number) const
 {
   switch (this->unit_kind)
   {
@@ -2077,22 +2135,26 @@ void Map::SectionLayout::Unit::Print4Column(std::ostream& stream) const
     util::print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n",
                 starting_address, size, virtual_address, file_offset, alignment, name, module_name,
                 source_name);
+    line_number += 1u;
     return;
   case Kind::Unused:
     // "  UNUSED   %06x ........ ........    %s %s %s\r\n"
     util::print(stream, "  UNUSED   {:06x} ........ ........    {:s} {:s} {:s}\r\n", size, name,
                 module_name, source_name);
+    line_number += 1u;
     return;
   case Kind::Entry:
     // "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
     util::print(stream, "  {:08x} {:06x} {:08x} {:08x}    {:s} (entry of {:s}) \t{:s} {:s}\r\n",
                 starting_address, size, virtual_address, file_offset, name, entry_parent->name,
                 module_name, source_name);
+    line_number += 1u;
     return;
   case Kind::Special:
     // "  %08x %06x %08x %08x %2i %s\r\n"
     util::print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s}\r\n", starting_address, size,
                 virtual_address, file_offset, alignment, ToSpecialName(unit_trait));
+    line_number += 1u;
     return;
   }
 }
@@ -2399,233 +2461,263 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
   return Error::None;
 }
 
-void Map::MemoryMap::Print(std::ostream& stream) const
+void Map::MemoryMap::Print(std::ostream& stream, std::size_t& line_number) const
 {
   util::print(stream, "\r\n\r\nMemory map:\r\n");
+  line_number += 3u;
   if (min_version < Version::version_4_2_build_142)
   {
     if (has_rom_ram)
-      PrintRomRam_old(stream);
+      PrintRomRam_old(stream, line_number);
     else
-      PrintSimple_old(stream);
-    PrintDebug_old(stream);
+      PrintSimple_old(stream, line_number);
+    PrintDebug_old(stream, line_number);
   }
   else
   {
     if (has_rom_ram)
       if (has_s_record)
         if (has_bin_file)
-          PrintRomRamSRecordBinFile(stream);
+          PrintRomRamSRecordBinFile(stream, line_number);
         else
-          PrintRomRamSRecord(stream);
+          PrintRomRamSRecord(stream, line_number);
       else if (has_bin_file)
-        PrintRomRamBinFile(stream);
+        PrintRomRamBinFile(stream, line_number);
       else
-        PrintRomRam(stream);
+        PrintRomRam(stream, line_number);
     else if (has_s_record)
       if (has_bin_file)
-        PrintSRecordBinFile(stream);
+        PrintSRecordBinFile(stream, line_number);
       else
-        PrintSRecord(stream);
+        PrintSRecord(stream, line_number);
     else if (has_bin_file)
-      PrintBinFile(stream);
+      PrintBinFile(stream, line_number);
     else
-      PrintSimple(stream);
-    PrintDebug(stream);
+      PrintSimple(stream, line_number);
+    PrintDebug(stream, line_number);
   }
 }
 
-void Map::MemoryMap::PrintSimple_old(std::ostream& stream) const
+void Map::MemoryMap::PrintSimple_old(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                   Starting Size     File\r\n");
-  util::print(stream, "                   address           Offset\r\n");
+  util::print(stream, "                   Starting Size     File\r\n"
+                      "                   address           Offset\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintSimple_old(stream);
+    unit.PrintSimple_old(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintSimple_old(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintSimple_old(std::ostream& stream,
+                                                 std::size_t& line_number) const
 {
   // "  %15s  %08x %08x %08x\r\n"
   util::print(stream, "  {:>15s}  {:08x} {:08x} {:08x}\r\n", name, starting_address, size,
               file_offset);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintRomRam_old(std::ostream& stream) const
+void Map::MemoryMap::PrintRomRam_old(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                   Starting Size     File     ROM      RAM Buffer\r\n");
-  util::print(stream, "                   address           Offset   Address  Address\r\n");
+  util::print(stream, "                   Starting Size     File     ROM      RAM Buffer\r\n"
+                      "                   address           Offset   Address  Address\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintRomRam_old(stream);
+    unit.PrintRomRam_old(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintRomRam_old(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintRomRam_old(std::ostream& stream,
+                                                 std::size_t& line_number) const
 {
   // "  %15s  %08x %08x %08x %08x %08x\r\n"
   util::print(stream, "  {:>15s}  {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", name, starting_address,
               size, file_offset, rom_address, ram_buffer_address);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintDebug_old(std::ostream& stream) const
+void Map::MemoryMap::PrintDebug_old(std::ostream& stream, std::size_t& line_number) const
 {
   if (min_version < Version::version_3_0_4)
     for (const auto& unit : debug_units)
-      unit.Print_older(stream);
+      unit.Print_older(stream, line_number);
   else
     for (const auto& unit : debug_units)
-      unit.Print_old(stream);
+      unit.Print_old(stream, line_number);
 }
-void Map::MemoryMap::UnitDebug::Print_older(std::ostream& stream) const
+void Map::MemoryMap::UnitDebug::Print_older(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %15s           %06x %08x\r\n"
   util::print(stream, "  {:>15s}           {:06x} {:08x}\r\n", name, size, file_offset);
+  line_number += 1u;
 }
-void Map::MemoryMap::UnitDebug::Print_old(std::ostream& stream) const
+void Map::MemoryMap::UnitDebug::Print_old(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %15s           %08x %08x\r\n"
   util::print(stream, "  {:>15s}           {:08x} {:08x}\r\n", name, size, file_offset);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintSimple(std::ostream& stream) const
+void Map::MemoryMap::PrintSimple(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                       Starting Size     File\r\n");
-  util::print(stream, "                       address           Offset\r\n");
+  util::print(stream, "                       Starting Size     File\r\n"
+                      "                       address           Offset\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintSimple(stream);
+    unit.PrintSimple(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintSimple(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintSimple(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x\r\n"
   util::print(stream, "  {:>20s} {:08x} {:08x} {:08x}\r\n", name, starting_address, size,
               file_offset);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintRomRam(std::ostream& stream) const
+void Map::MemoryMap::PrintRomRam(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                       Starting Size     File     ROM      RAM Buffer\r\n");
-  util::print(stream, "                       address           Offset   Address  Address\r\n");
+  util::print(stream, "                       Starting Size     File     ROM      RAM Buffer\r\n"
+                      "                       address           Offset   Address  Address\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintRomRam(stream);
+    unit.PrintRomRam(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintRomRam(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintRomRam(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x\r\n"
   util::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", name, starting_address,
               size, file_offset, rom_address, ram_buffer_address);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintSRecord(std::ostream& stream) const
+void Map::MemoryMap::PrintSRecord(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                       Starting Size     File       S-Record\r\n");
-  util::print(stream, "                       address           Offset     Line\r\n");
+  util::print(stream, "                       Starting Size     File       S-Record\r\n"
+                      "                       address           Offset     Line\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintSRecord(stream);
+    unit.PrintSRecord(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintSRecord(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintSRecord(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %10i\r\n"
   util::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:10d}\r\n", name, starting_address, size,
               file_offset, s_record_line);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintBinFile(std::ostream& stream) const
+void Map::MemoryMap::PrintBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                       Starting Size     File     Bin File Bin File\r\n");
-  util::print(stream, "                       address           Offset   Offset   Name\r\n");
+  util::print(stream, "                       Starting Size     File     Bin File Bin File\r\n"
+                      "                       address           Offset   Offset   Name\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintBinFile(stream);
+    unit.PrintBinFile(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintBinFile(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %s\r\n"
   util::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:s}\r\n", name, starting_address,
               size, file_offset, bin_file_offset, bin_file_name);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintRomRamSRecord(std::ostream& stream) const
+void Map::MemoryMap::PrintRomRamSRecord(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n");
-  util::print(stream, "                       address           Offset   Address  Address     Line\r\n");
+  util::print(stream, "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n"
+                      "                       address           Offset   Address  Address     Line\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintRomRamSRecord(stream);
+    unit.PrintRomRamSRecord(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintRomRamSRecord(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintRomRamSRecord(std::ostream& stream,
+                                                    std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x %10i\r\n"
   util::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x} {:10d}\r\n", name,
               starting_address, size, file_offset, rom_address, ram_buffer_address, s_record_line);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintRomRamBinFile(std::ostream& stream) const
+void Map::MemoryMap::PrintRomRamBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n");
-  util::print(stream, "                       address           Offset   Address  Address    Offset   Name\r\n");
+  util::print(stream, "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n"
+                      "                       address           Offset   Address  Address    Offset   Name\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintRomRamBinFile(stream);
+    unit.PrintRomRamBinFile(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintRomRamBinFile(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintRomRamBinFile(std::ostream& stream,
+                                                    std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x   %08x %s\r\n"
   util::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}   {:08x} {:s}\r\n", name,
               starting_address, size, file_offset, rom_address, ram_buffer_address, bin_file_offset,
               bin_file_name);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintSRecordBinFile(std::ostream& stream) const
+void Map::MemoryMap::PrintSRecordBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                       Starting Size     File        S-Record Bin File Bin File\r\n");
-  util::print(stream, "                       address           Offset      Line     Offset   Name\r\n");
+  util::print(stream, "                       Starting Size     File        S-Record Bin File Bin File\r\n"
+                      "                       address           Offset      Line     Offset   Name\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintSRecordBinFile(stream);
+    unit.PrintSRecordBinFile(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintSRecordBinFile(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintSRecordBinFile(std::ostream& stream,
+                                                     std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x  %10i %08x %s\r\n"
   util::print(stream, "  {:>20s} {:08x} {:08x} {:08x}  {:10d} {:08x} {:s}\r\n", name,
               starting_address, size, file_offset, s_record_line, bin_file_offset, bin_file_name);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintRomRamSRecordBinFile(std::ostream& stream) const
+void Map::MemoryMap::PrintRomRamSRecordBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  util::print(stream, "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n");
-  util::print(stream, "                       address           Offset   Address  Address       Line     Offset   Name\r\n");
+  util::print(stream, "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n"
+                      "                       address           Offset   Address  Address       Line     Offset   Name\r\n");
   // clang-format on
+  line_number += 2u;
   for (const auto& unit : normal_units)
-    unit.PrintRomRamSRecordBinFile(stream);
+    unit.PrintRomRamSRecordBinFile(stream, line_number);
 }
-void Map::MemoryMap::UnitNormal::PrintRomRamSRecordBinFile(std::ostream& stream) const
+void Map::MemoryMap::UnitNormal::PrintRomRamSRecordBinFile(std::ostream& stream,
+                                                           std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x    %10i %08x %s\r\n"
   util::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}    {:10d} {:08x} {:s}\r\n",
               name, starting_address, size, file_offset, rom_address, ram_buffer_address,
               s_record_line, bin_file_offset, bin_file_name);
+  line_number += 1u;
 }
 
-void Map::MemoryMap::PrintDebug(std::ostream& stream) const
+void Map::MemoryMap::PrintDebug(std::ostream& stream, std::size_t& line_number) const
 {
   for (const auto& unit : debug_units)
-    unit.Print(stream);
+    unit.Print(stream, line_number);
 }
-void Map::MemoryMap::UnitDebug::Print(std::ostream& stream) const
+void Map::MemoryMap::UnitDebug::Print(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s          %08x %08x\r\n"
   util::print(stream, "  {:>20s}          {:08x} {:08x}\r\n", name, size, file_offset);
+  line_number += 1u;
 }
 
 // clang-format off
@@ -2649,16 +2741,18 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
   return Error::None;
 }
 
-void Map::LinkerGeneratedSymbols::Print(std::ostream& stream) const
+void Map::LinkerGeneratedSymbols::Print(std::ostream& stream, std::size_t& line_number) const
 {
   util::print(stream, "\r\n\r\nLinker generated symbols:\r\n");
+  line_number += 3u;
   for (const auto& unit : units)
-    unit.Print(stream);
+    unit.Print(stream, line_number);
 }
 
-void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream) const
+void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream, std::size_t& line_number) const
 {
   // "%25s %08x\r\n"
   util::print(stream, "{:>25s} {:08x}\r\n", name, value);
+  line_number += 1u;
 }
 }  // namespace MWLinker

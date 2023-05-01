@@ -40,7 +40,7 @@ static void tempfunc(const char* name, int choice)
   MWLinker::Map::SectionLayout::Warn::do_warn_repeat_compilation_unit = false;
   MWLinker::Map::SectionLayout::Warn::do_warn_sym_on_flag_detected = false;
 
-  std::size_t line_number = 0;
+  std::size_t scan_line_number = 0;
   MWLinker::Map::Error error = MWLinker::Map::Error::None;
   std::array<std::chrono::milliseconds, TIME_ATTACK_COUNT> time_attack{};
   for (std::size_t i = 0; i < TIME_ATTACK_COUNT; ++i)
@@ -50,13 +50,13 @@ static void tempfunc(const char* name, int choice)
     switch (choice)
     {
     case 0:
-      error = linker_map.Scan(temp, line_number);
+      error = linker_map.Scan(temp, scan_line_number);
       break;
     case 1:
-      error = linker_map.ScanTLOZTP(temp, line_number);
+      error = linker_map.ScanTLOZTP(temp, scan_line_number);
       break;
     case 2:
-      error = linker_map.ScanSMGalaxy(temp, line_number);
+      error = linker_map.ScanSMGalaxy(temp, scan_line_number);
       break;
     default:
       util::println(std::cerr, "bad choice");
@@ -68,7 +68,14 @@ static void tempfunc(const char* name, int choice)
 
   while (temp.back() == '\0')
     temp.pop_back();
-  linker_map.Print(sstream);
+
+  std::size_t print_line_number = 0;
+  linker_map.Print(sstream, print_line_number);
+
+  // std::ofstream outfile{std::string{name} + "_NEW", std::ios_base::binary};
+  // outfile << sstream.rdbuf();
+  // outfile.close();
+
   std::string temp2 = std::move(sstream).str();
 
   const bool matches = (temp == temp2);
@@ -78,12 +85,15 @@ static void tempfunc(const char* name, int choice)
   // by reference in the map.
   std::fill(temp.begin(), temp.end(), '\0');
   const MWLinker::Version min_version = linker_map.GetMinVersion();
-  util::print(std::cout,
-              "line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}   time: ", line_number,
-              static_cast<int>(error), matches, static_cast<int>(min_version));
-  // clang-format off
-  std::cout << std::accumulate(time_attack.begin(), time_attack.end(), std::chrono::milliseconds{}) / time_attack.size() << std::endl;
-  // clang-format on
+  util::println(
+      std::cout,
+      "scan line: {:d}   print line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}  "
+      " time: {:d}ms",
+      scan_line_number, print_line_number, static_cast<int>(error), matches,
+      static_cast<int>(min_version),
+      (std::accumulate(time_attack.begin(), time_attack.end(), std::chrono::milliseconds{}) /
+       time_attack.size())
+          .count());
 }
 
 int main(const int argc, const char** argv)
