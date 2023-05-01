@@ -150,19 +150,6 @@ static const std::regex re_linker_generated_symbols_header{
     "\r?\n\r?\nLinker generated symbols:\r?\n"};
 // clang-format on
 
-// Other linker map prints are known to exist, but have never been seen. These include:
-// ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s\r\n"
-// ">>> %s wasn't passed a section\r\n"
-// ">>> DYNAMIC SYMBOL: %s referenced\r\n"
-// ">>> MODULE SYMBOL NAME TOO LARGE: %s\r\n"
-// ">>> NONMODULE SYMBOL NAME TOO LARGE: %s\r\n"
-// "<<< Failure in ComputeSizeETI: section->Header->sh_size was %x, rel_size should be %x\r\n"
-// "<<< Failure in ComputeSizeETI: st_size was %x, st_size should be %x\r\n"
-// "<<< Failure in PreCalculateETI: section->Header->sh_size was %x, rel_size should be %x\r\n"
-// "<<< Failure in PreCalculateETI: st_size was %x, st_size should be %x\r\n"
-// "<<< Failure in %s: GetFilePos is %x, sect->calc_offset is %x\r\n"
-// "<<< Failure in %s: GetFilePos is %x, sect->bin_offset is %x\r\n"
-
 static const std::unordered_map<std::string_view, Map::SectionLayout::Kind> map_section_layout_kind{
     {".bss", Map::SectionLayout::Kind::BSS},
     {".sbss", Map::SectionLayout::Kind::BSS},
@@ -868,10 +855,83 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
   return Error::None;
 }
 
+// clang-format off
+static const std::regex re_excluded_symbol{
+//  ">>> EXCLUDED SYMBOL %s (%s,%s) found in %s %s\r\n"
+    ">>> EXCLUDED SYMBOL (.*) \\((.*),(.*)\\) found in (.*) (.*)\r\n"};
+static const std::regex re_wasnt_passed_section{
+//  ">>> %s wasn't passed a section\r\n"
+    ">>> (.*) wasn't passed a section\r\n"};
+static const std::regex re_dynamic_symbol_referenced{
+//  ">>> DYNAMIC SYMBOL: %s referenced\r\n"
+    ">>> DYNAMIC SYMBOL: (.*) referenced\r\n"};
+static const std::regex re_module_symbol_name_too_large{
+//  ">>> MODULE SYMBOL NAME TOO LARGE: %s\r\n"
+    ">>> MODULE SYMBOL NAME TOO LARGE: (.*)\r\n"};
+static const std::regex re_nonmodule_symbol_name_too_large{
+//  ">>> NONMODULE SYMBOL NAME TOO LARGE: %s\r\n"
+    ">>> NONMODULE SYMBOL NAME TOO LARGE: (.*)\r\n"};
+static const std::regex re_ComputeSizeETI_section_header_size_failure{
+//  "<<< Failure in ComputeSizeETI: section->Header->sh_size was %x, rel_size should be %x\r\n"
+    "<<< Failure in ComputeSizeETI: section->Header->sh_size was ([0-9a-f]+), rel_size should be ([0-9a-f]+)\r\n"};
+static const std::regex re_ComputeSizeETI_st_size_failure{
+//  "<<< Failure in ComputeSizeETI: st_size was %x, st_size should be %x\r\n"
+    "<<< Failure in ComputeSizeETI: st_size was ([0-9a-f]+), st_size should be ([0-9a-f]+)\r\n"};
+static const std::regex re_PreCalculateETI_section_header_size_failure{
+//  "<<< Failure in PreCalculateETI: section->Header->sh_size was %x, rel_size should be %x\r\n"
+    "<<< Failure in PreCalculateETI: section->Header->sh_size was ([0-9a-f]+), rel_size should be ([0-9a-f]+)\r\n"};
+static const std::regex re_PreCalculateETI_st_size_failure{
+//  "<<< Failure in PreCalculateETI: st_size was %x, st_size should be %x\r\n"
+    "<<< Failure in PreCalculateETI: st_size was ([0-9a-f]+), st_size should be ([0-9a-f]+)\r\n"};
+static const std::regex re_GetFilePos_calc_offset_failure{
+//  "<<< Failure in %s: GetFilePos is %x, sect->calc_offset is %x\r\n"
+    "<<< Failure in (.*): GetFilePos is ([0-9a-f]+), sect->calc_offset is ([0-9a-f]+)\r\n"};
+static const std::regex re_GetFilePos_bin_offset_failure{
+//  "<<< Failure in %s: GetFilePos is %x, sect->bin_offset is %x\r\n"
+    "<<< Failure in (.*): GetFilePos is ([0-9a-f]+), sect->bin_offset is ([0-9a-f]+)\r\n"};
+// clang-format on
+
 Map::Error Map::ScanForGarbage(const char* const head, const char* const tail)
 {
   if (head < tail)
   {
+    std::cmatch match;
+
+    // These linker map prints are known to exist, but I have never seen them.
+    if (std::regex_search(head, tail, match, re_excluded_symbol,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_wasnt_passed_section,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_dynamic_symbol_referenced,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_module_symbol_name_too_large,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_nonmodule_symbol_name_too_large,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_ComputeSizeETI_section_header_size_failure,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_ComputeSizeETI_st_size_failure,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_PreCalculateETI_section_header_size_failure,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_PreCalculateETI_st_size_failure,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_GetFilePos_calc_offset_failure,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+    if (std::regex_search(head, tail, match, re_GetFilePos_bin_offset_failure,
+                          std::regex_constants::match_continuous))
+      return Error::Unimplemented;
+
     // Gamecube ISO Tool (http://www.wiibackupmanager.co.uk/gcit.html) has a bug that appends null
     // byte padding to the next multiple of 32 bytes at the end of any file it extracts. During my
     // research, I ran into a lot of linker maps afflicted by this bug, enough to justify a special
