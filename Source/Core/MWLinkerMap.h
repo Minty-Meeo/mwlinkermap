@@ -131,6 +131,8 @@ struct Map
 
   struct SymbolClosure final : PortionBase
   {
+    friend Map;
+
     // CodeWarrior for GCN 1.1
     //  - Added UNREFERENCED DUPLICATE info.
     // CodeWarrior for GCN 2.7
@@ -146,17 +148,16 @@ struct Map
       explicit NodeBase(NodeBase* parent_) : parent(parent_) {}
       virtual ~NodeBase() = default;
 
-      // Necessary for root and fake _dtor$99 child
-      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
-                         UnresolvedSymbols::const_iterator, std::size_t&) const;
-      static void PrintPrefix(std::ostream&, int);
+      const NodeBase* GetParent() { return parent; }
+      const std::list<std::unique_ptr<NodeBase>>& GetChildren() { return children; }
       static constexpr std::string_view ToName(Type) noexcept;
       static constexpr std::string_view ToName(Bind) noexcept;
 
-      const NodeBase* GetParent() { return parent; }
-      const std::list<std::unique_ptr<NodeBase>>& GetChildren() { return children; }
-
     private:
+      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
+                         UnresolvedSymbols::const_iterator, std::size_t&) const;
+      static void PrintPrefix(std::ostream&, int);
+
       NodeBase* parent;
       std::list<std::unique_ptr<NodeBase>> children;
     };
@@ -165,18 +166,21 @@ struct Map
     {
       struct UnreferencedDuplicate
       {
+        friend NodeReal;
+
         explicit UnreferencedDuplicate(Type type_, Bind bind_, std::string_view module_name_,
                                        std::string_view source_name_)
             : type(type_), bind(bind_), module_name(module_name_), source_name(source_name_)
         {
         }
 
-        void Print(std::ostream&, int, std::size_t&) const;
-
         const Type type;
         const Bind bind;
         const std::string module_name;
         const std::string source_name;
+
+      private:
+        void Print(std::ostream&, int, std::size_t&) const;
       };
 
       explicit NodeReal(NodeBase* parent_, std::string_view name_, Type type_, Bind bind_,
@@ -188,9 +192,6 @@ struct Map
       }
       virtual ~NodeReal() override = default;
 
-      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
-                         UnresolvedSymbols::const_iterator, std::size_t&) const override;
-
       const std::string name;
       const Type type;
       const Bind bind;
@@ -201,6 +202,10 @@ struct Map
       // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
       const std::string source_name;
       const std::list<UnreferencedDuplicate> unref_dups;
+
+    private:
+      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
+                         UnresolvedSymbols::const_iterator, std::size_t&) const override;
     };
 
     struct NodeLinkerGenerated final : NodeBase
@@ -211,10 +216,11 @@ struct Map
       }
       virtual ~NodeLinkerGenerated() override = default;
 
+      const std::string name;
+
+    private:
       virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
                          UnresolvedSymbols::const_iterator, std::size_t&) const override;
-
-      const std::string name;
     };
 
     using NodeLookup = std::unordered_multimap<std::string_view, const NodeReal&>;
@@ -223,11 +229,7 @@ struct Map
     explicit SymbolClosure() = default;
     virtual ~SymbolClosure() override = default;
 
-    Error Scan(const char*&, const char*, std::size_t&, UnresolvedSymbols&);
-    void Print(std::ostream&, UnresolvedSymbols::const_iterator&, UnresolvedSymbols::const_iterator,
-               std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
-
     const ModuleLookup& GetModuleLookup() { return lookup; }
 
     struct Warn
@@ -243,25 +245,31 @@ struct Map
     };
 
   private:
+    Error Scan(const char*&, const char*, std::size_t&, UnresolvedSymbols&);
+    void Print(std::ostream&, UnresolvedSymbols::const_iterator&, UnresolvedSymbols::const_iterator,
+               std::size_t&) const;
+
     NodeBase root;
     ModuleLookup lookup;
   };
 
   struct EPPC_PatternMatching final : PortionBase
   {
+    friend Map;
+
     // CodeWarrior for Wii 1.0
     //  - Added EPPC_PatternMatching
 
     struct MergingUnit
     {
+      friend EPPC_PatternMatching;
+
       explicit MergingUnit(std::string_view first_name_, std::string_view second_name_,
                            Elf32_Word size_, bool will_be_replaced_, bool was_interchanged_)
           : first_name(first_name_), second_name(second_name_), size(size_),
             will_be_replaced(will_be_replaced_), was_interchanged(was_interchanged_)
       {
       }
-
-      void Print(std::ostream&, std::size_t&) const;
 
       const std::string first_name;
       const std::string second_name;
@@ -274,6 +282,9 @@ struct Map
       // binary. All references to it are then redirected to the duplicate. Even rarer than that,
       // sometimes the linker can change its mind and replace it with a branch instead.
       const bool was_interchanged;
+
+    private:
+      void Print(std::ostream&, std::size_t&) const;
     };
 
     struct FoldingUnit
@@ -282,6 +293,8 @@ struct Map
 
       struct Unit
       {
+        friend FoldingUnit;
+
         explicit Unit(std::string_view first_name_, std::string_view second_name_, Elf32_Word size_,
                       bool new_branch_function_)
             : first_name(first_name_), second_name(second_name_), size(size_),
@@ -289,12 +302,13 @@ struct Map
         {
         }
 
-        void Print(std::ostream&, std::size_t&) const;
-
         const std::string first_name;
         const std::string second_name;
         const Elf32_Word size;
         const bool new_branch_function;
+
+      private:
+        void Print(std::ostream&, std::size_t&) const;
       };
 
       using UnitLookup = std::unordered_multimap<std::string_view, const Unit&>;
@@ -302,13 +316,13 @@ struct Map
 
       explicit FoldingUnit(std::string_view object_name_) : object_name(object_name_) {}
 
-      void Print(std::ostream&, std::size_t&) const;
-
       const std::list<Unit>& GetUnits() { return units; }
 
       const std::string object_name;
 
     private:
+      void Print(std::ostream&, std::size_t&) const;
+
       std::list<Unit> units;
     };
 
@@ -317,13 +331,10 @@ struct Map
     explicit EPPC_PatternMatching() { SetMinVersion(Version::version_4_2_build_142); }
     virtual ~EPPC_PatternMatching() override = default;
 
-    Error Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override
     {
       return merging_units.empty() || folding_units.empty();
     }
-
     const std::list<MergingUnit>& GetMergingUnits() { return merging_units; }
     const std::list<FoldingUnit>& GetFoldingUnits() { return folding_units; }
     const MergingUnitLookup& GetMergingLookup() { return merging_lookup; }
@@ -345,6 +356,9 @@ struct Map
     };
 
   private:
+    Error Scan(const char*&, const char*, std::size_t&);
+    void Print(std::ostream&, std::size_t&) const;
+
     std::list<MergingUnit> merging_units;
     std::list<FoldingUnit> folding_units;
     MergingUnitLookup merging_lookup;
@@ -353,11 +367,15 @@ struct Map
 
   struct LinkerOpts final : PortionBase
   {
+    friend Map;
+
     // CodeWarrior for Wii 1.0
     //  - Added LinkerOpts
 
     struct Unit
     {
+      friend LinkerOpts;
+
       enum class Kind
       {
         NotNear,
@@ -377,113 +395,134 @@ struct Map
       {
       }
 
-      void Print(std::ostream&, std::size_t&) const;
-
       const Kind unit_kind;
       const std::string module_name;
       const std::string name;
       const std::string reference_name;
+
+    private:
+      void Print(std::ostream&, std::size_t&) const;
     };
 
     explicit LinkerOpts() { SetMinVersion(Version::version_4_2_build_142); }
     virtual ~LinkerOpts() override = default;
 
-    Error Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
-
     const std::list<Unit>& GetUnits() { return units; }
 
   private:
+    Error Scan(const char*&, const char*, std::size_t&);
+    void Print(std::ostream&, std::size_t&) const;
+
     std::list<Unit> units;
   };
 
   struct BranchIslands final : PortionBase
   {
+    friend Map;
+
     // CodeWarror for GCN 3.0a3 (at the earliest)
     //  - Added Branch Islands.
 
     struct Unit
     {
+      friend BranchIslands;
+
       explicit Unit(std::string_view first_name_, std::string_view second_name_, bool is_safe_)
           : first_name(first_name_), second_name(second_name_), is_safe(is_safe_)
       {
       }
 
-      void Print(std::ostream&, std::size_t&) const;
-
       const std::string first_name;
       const std::string second_name;
       const bool is_safe;
+
+    private:
+      void Print(std::ostream&, std::size_t&) const;
     };
 
     explicit BranchIslands() { SetMinVersion(Version::version_4_1_build_51213); }
     virtual ~BranchIslands() override = default;
 
-    Error Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
-
     const std::list<Unit>& GetUnits() { return units; }
 
   private:
+    Error Scan(const char*&, const char*, std::size_t&);
+    void Print(std::ostream&, std::size_t&) const;
+
     std::list<Unit> units;
   };
 
   struct MixedModeIslands final : PortionBase
   {
+    friend Map;
+
     // CodeWarror for GCN 3.0a3 (at the earliest)
     //  - Added Mixed Mode Islands.
 
     struct Unit
     {
+      friend MixedModeIslands;
+
       explicit Unit(std::string_view first_name_, std::string_view second_name_, bool is_safe_)
           : first_name(first_name_), second_name(second_name_), is_safe(is_safe_)
       {
       }
 
-      void Print(std::ostream&, std::size_t&) const;
-
       const std::string first_name;
       const std::string second_name;
       const bool is_safe;
+
+    private:
+      void Print(std::ostream&, std::size_t&) const;
     };
 
     explicit MixedModeIslands() { SetMinVersion(Version::version_4_1_build_51213); }
     virtual ~MixedModeIslands() override = default;
 
-    Error Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
-
     const std::list<Unit>& GetUnits() { return units; }
 
   private:
+    Error Scan(const char*&, const char*, std::size_t&);
+    void Print(std::ostream&, std::size_t&) const;
+
     std::list<Unit> units;
   };
 
   struct LinktimeSizeDecreasingOptimizations final : PortionBase
   {
+    friend Map;
+
     explicit LinktimeSizeDecreasingOptimizations() = default;
     virtual ~LinktimeSizeDecreasingOptimizations() override = default;
 
+    virtual bool IsEmpty() const noexcept override { return true; }
+
+  private:
     Error Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
-    virtual bool IsEmpty() const noexcept override { return true; }
   };
 
   struct LinktimeSizeIncreasingOptimizations final : PortionBase
   {
+    friend Map;
+
     explicit LinktimeSizeIncreasingOptimizations() = default;
     virtual ~LinktimeSizeIncreasingOptimizations() override = default;
 
+    virtual bool IsEmpty() const noexcept override { return true; }
+
+  private:
     Error Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
-    virtual bool IsEmpty() const noexcept override { return true; }
   };
 
   struct SectionLayout final : PortionBase
   {
+    friend Map;
+
     // CodeWarrior for GCN 2.7
     //  - Changed to four column info, added *fill* symbols.
     //  - Changed the behavior of the source name when linking static libs
@@ -610,12 +649,9 @@ struct Map
       {
       }
 
-      void Print3Column(std::ostream&, std::size_t&) const;
-      void Print4Column(std::ostream&, std::size_t&) const;
-      static constexpr std::string_view ToSpecialName(Trait);
-
       const Unit* GetEntryParent() { return entry_parent; }
       const std::list<const Unit*>& GetEntryChildren() { return entry_children; }
+      static constexpr std::string_view ToSpecialName(Trait);
 
       const Kind unit_kind;
       const std::uint32_t starting_address;
@@ -641,6 +677,8 @@ struct Map
       const Trait unit_trait;
 
     private:
+      void Print3Column(std::ostream&, std::size_t&) const;
+      void Print4Column(std::ostream&, std::size_t&) const;
       Unit::Trait DeduceUsualSubtext(SectionLayout&, std::string_view&, std::string_view&,
                                      UnitLookup*&, bool&, bool&, bool&, std::size_t);
     };
@@ -651,15 +689,10 @@ struct Map
     }
     virtual ~SectionLayout() override = default;
 
-    Error Scan3Column(const char*&, const char*, std::size_t&);
-    Error Scan4Column(const char*&, const char*, std::size_t&);
-    Error ScanTLOZTP(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
-    static Kind ToSectionKind(std::string_view);
-
     const std::list<Unit>& GetUnits() const noexcept { return units; }
     const ModuleLookup& GetModuleLookup() const noexcept { return lookup; }
+    static Kind ToSectionKind(std::string_view);
 
     const Kind section_kind;
     const std::string name;
@@ -682,18 +715,28 @@ struct Map
     };
 
   private:
+    Error Scan3Column(const char*&, const char*, std::size_t&);
+    Error Scan4Column(const char*&, const char*, std::size_t&);
+    Error ScanTLOZTP(const char*&, const char*, std::size_t&);
+    void Print(std::ostream&, std::size_t&) const;
+
     std::list<Unit> units;
     ModuleLookup lookup;
   };
 
-  // CodeWarrior for GCN 2.7
-  //  - Changed size column for debug sections from "%06x" to "%08x".
-  // CodeWarrior for Wii 1.0
-  //  - Expanded Memory Map variants, slightly tweaked existing printfs.
   struct MemoryMap final : PortionBase
   {
+    friend Map;
+
+    // CodeWarrior for GCN 2.7
+    //  - Changed size column for debug sections from "%06x" to "%08x".
+    // CodeWarrior for Wii 1.0
+    //  - Expanded Memory Map variants, slightly tweaked existing printfs.
+
     struct UnitNormal
     {
+      friend MemoryMap;
+
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_)
           : name(name_), starting_address(starting_address_), size(size_),
@@ -763,6 +806,17 @@ struct Map
       {
       }
 
+      const std::string name;
+      const Elf32_Addr starting_address;
+      const Elf32_Word size;
+      const std::uint32_t file_offset;
+      const std::uint32_t rom_address;
+      const std::uint32_t ram_buffer_address;
+      const int s_record_line;
+      const std::uint32_t bin_file_offset;
+      const std::string bin_file_name;
+
+    private:
       void PrintSimple_old(std::ostream&, std::size_t&) const;
       void PrintRomRam_old(std::ostream&, std::size_t&) const;
       void PrintSimple(std::ostream&, std::size_t&) const;
@@ -773,34 +827,28 @@ struct Map
       void PrintRomRamBinFile(std::ostream&, std::size_t&) const;
       void PrintSRecordBinFile(std::ostream&, std::size_t&) const;
       void PrintRomRamSRecordBinFile(std::ostream&, std::size_t&) const;
-
-      const std::string name;
-      const Elf32_Addr starting_address;
-      const Elf32_Word size;
-      const std::uint32_t file_offset;
-      const std::uint32_t rom_address;
-      const std::uint32_t ram_buffer_address;
-      const int s_record_line;
-      const std::uint32_t bin_file_offset;
-      const std::string bin_file_name;
     };
 
     // TODO: There is an opportunity for detecting the min version from the normal and debug section
     // names, but I couldn't be bothered to look into it.
+
     struct UnitDebug
     {
+      friend MemoryMap;
+
       explicit UnitDebug(std::string_view name_, Elf32_Word size_, std::uint32_t file_offset_)
           : name(name_), size(size_), file_offset(file_offset_)
       {
       }
 
-      void Print_older(std::ostream&, std::size_t&) const;
-      void Print_old(std::ostream&, std::size_t&) const;
-      void Print(std::ostream&, std::size_t&) const;
-
       const std::string name;
       const Elf32_Word size;
       const std::uint32_t file_offset;
+
+    private:
+      void Print_older(std::ostream&, std::size_t&) const;
+      void Print_old(std::ostream&, std::size_t&) const;
+      void Print(std::ostream&, std::size_t&) const;
     };
 
     explicit MemoryMap(bool has_rom_ram_)  // ctor for old memory map
@@ -814,6 +862,18 @@ struct Map
     }
     virtual ~MemoryMap() override = default;
 
+    virtual bool IsEmpty() const noexcept override
+    {
+      return normal_units.empty() || debug_units.empty();
+    }
+    const std::list<UnitNormal>& GetNormalUnits() const noexcept { return normal_units; }
+    const std::list<UnitDebug>& GetDebugUnits() const noexcept { return debug_units; }
+
+    const bool has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
+    const bool has_s_record;  // Enabled by '-srec [filename]' option
+    const bool has_bin_file;  // Enabled by '-genbinary keyword' option
+
+  private:
     Error ScanSimple_old(const char*&, const char*, std::size_t&);
     Error ScanRomRam_old(const char*&, const char*, std::size_t&);
     Error ScanDebug_old(const char*&, const char*, std::size_t&);
@@ -839,45 +899,38 @@ struct Map
     void PrintSRecordBinFile(std::ostream&, std::size_t&) const;
     void PrintRomRamSRecordBinFile(std::ostream&, std::size_t&) const;
     void PrintDebug(std::ostream&, std::size_t&) const;
-    virtual bool IsEmpty() const noexcept override
-    {
-      return normal_units.empty() || debug_units.empty();
-    }
 
-    const std::list<UnitNormal>& GetNormalUnits() const noexcept { return normal_units; }
-    const std::list<UnitDebug>& GetDebugUnits() const noexcept { return debug_units; }
-
-    const bool has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
-    const bool has_s_record;  // Enabled by '-srec [filename]' option
-    const bool has_bin_file;  // Enabled by '-genbinary keyword' option
-
-  private:
     std::list<UnitNormal> normal_units;
     std::list<UnitDebug> debug_units;
   };
 
   struct LinkerGeneratedSymbols final : PortionBase
   {
+    friend Map;
+
     struct Unit
     {
-      explicit Unit(std::string_view name_, Elf32_Addr value_) : name(name_), value(value_) {}
+      friend LinkerGeneratedSymbols;
 
-      void Print(std::ostream&, std::size_t&) const;
+      explicit Unit(std::string_view name_, Elf32_Addr value_) : name(name_), value(value_) {}
 
       const std::string name;
       const Elf32_Addr value;
+
+    private:
+      void Print(std::ostream&, std::size_t&) const;
     };
 
     explicit LinkerGeneratedSymbols() = default;
     virtual ~LinkerGeneratedSymbols() override = default;
 
-    Error Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
-
     const std::list<Unit>& GetUnits() const noexcept { return units; }
 
   private:
+    Error Scan(const char*&, const char*, std::size_t&);
+    void Print(std::ostream&, std::size_t&) const;
+
     std::list<Unit> units;
   };
 
@@ -903,10 +956,7 @@ struct Map
   {
     return dwarf_symbol_closure;
   }
-  const std::list<std::pair<std::size_t, std::string>>& GetUnresolvedSymbols() const noexcept
-  {
-    return unresolved_symbols;
-  }
+  const UnresolvedSymbols& GetUnresolvedSymbols() const noexcept { return unresolved_symbols; }
   const std::list<std::unique_ptr<SectionLayout>>& GetSectionLayouts() const noexcept
   {
     return section_layouts;
