@@ -732,6 +732,8 @@ struct Map
     //  - Changed size column for debug sections from "%06x" to "%08x".
     // CodeWarrior for Wii 1.0
     //  - Expanded Memory Map variants, slightly tweaked existing printfs.
+    // TODO: There is an opportunity for detecting the min version from the normal and debug section
+    // names, but I couldn't be bothered to look into it.
 
     struct UnitNormal
     {
@@ -828,9 +830,6 @@ struct Map
       void PrintSRecordBinFile(std::ostream&, std::size_t&) const;
       void PrintRomRamSRecordBinFile(std::ostream&, std::size_t&) const;
     };
-
-    // TODO: There is an opportunity for detecting the min version from the normal and debug section
-    // names, but I couldn't be bothered to look into it.
 
     struct UnitDebug
     {
