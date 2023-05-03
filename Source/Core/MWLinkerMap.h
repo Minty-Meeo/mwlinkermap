@@ -542,6 +542,20 @@ struct Map
     using UnitLookup = std::unordered_multimap<std::string_view, const Unit&>;
     using ModuleLookup = std::unordered_map<std::string_view, UnitLookup>;
 
+  private:
+    struct ScanningContext
+    {
+      SectionLayout& m_section_layout;
+      std::size_t& m_line_number;
+      bool m_is_second_lap;  // BSS '-common on'
+      bool m_is_after_eti_init_info;
+      bool m_is_multi_stt_section;
+      UnitLookup* m_curr_unit_lookup;
+      std::string_view m_curr_module_name;
+      std::string_view m_curr_source_name;
+    };
+
+  public:
     struct Unit
     {
       friend SectionLayout;
@@ -562,10 +576,11 @@ struct Map
         // unit with the '-sym on' option. The size of a section symbol is the total of all symbols,
         // both used and unused, that one is meant to encompass.
         Section,
-        // BSS .comm symbols. Printed first.
-        Common,
-        // BSS .lcomm symbols. Printed later.
+        // BSS local common symbols.
         LCommon,
+        // BSS common symbols.
+        // '-common on' moves these into a common section.
+        Common,
         // Native to the extabindex section.
         ExTabIndex,
         // *fill*
@@ -576,48 +591,32 @@ struct Map
 
       // UNUSED symbols
       explicit Unit(Elf32_Word size_, std::string_view name_, std::string_view module_name_,
-                    std::string_view source_name_, SectionLayout& section_layout,
-                    std::string_view& curr_module_name, std::string_view& curr_source_name,
-                    UnitLookup*& curr_unit_lookup, bool& is_in_lcomm, bool& is_after_eti_init_info,
-                    bool& is_multi_stt_section, std::size_t line_number)
+                    std::string_view source_name_, ScanningContext& scanning_context)
           : unit_kind(Kind::Unused), starting_address{},
             size(size_), virtual_address{}, file_offset{}, alignment{}, name(name_),
             entry_parent(nullptr), module_name(module_name_), source_name(source_name_),
-            unit_trait(DeduceUsualSubtext(section_layout, curr_module_name, curr_source_name,
-                                          curr_unit_lookup, is_in_lcomm, is_after_eti_init_info,
-                                          is_multi_stt_section, line_number))
+            unit_trait(DeduceUsualSubtext(scanning_context))
       {
       }
       // 3-column normal symbols
       explicit Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
                     int alignment_, std::string_view name_, std::string_view module_name_,
-                    std::string_view source_name_, SectionLayout& section_layout,
-                    std::string_view& curr_module_name, std::string_view& curr_source_name,
-                    UnitLookup*& curr_unit_lookup, bool& is_in_lcomm, bool& is_after_eti_init_info,
-                    bool& is_multi_stt_section, std::size_t line_number)
+                    std::string_view source_name_, ScanningContext& scanning_context)
           : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset{}, alignment(alignment_), name(name_),
             entry_parent(nullptr), module_name(module_name_), source_name(source_name_),
-            unit_trait(DeduceUsualSubtext(section_layout, curr_module_name, curr_source_name,
-                                          curr_unit_lookup, is_in_lcomm, is_after_eti_init_info,
-                                          is_multi_stt_section, line_number))
+            unit_trait(DeduceUsualSubtext(scanning_context))
       {
       }
       // 4-column normal symbols
       explicit Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
                     std::uint32_t file_offset_, int alignment_, std::string_view name_,
                     std::string_view module_name_, std::string_view source_name_,
-                    SectionLayout& section_layout, std::string_view& curr_module_name,
-                    std::string_view& curr_source_name, UnitLookup*& curr_unit_lookup,
-                    bool& is_in_lcomm, bool& is_after_eti_init_info, bool& is_multi_stt_section,
-                    std::size_t line_number)
+                    ScanningContext& scanning_context)
           : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
             name(name_), entry_parent(nullptr), module_name(module_name_),
-            source_name(source_name_),
-            unit_trait(DeduceUsualSubtext(section_layout, curr_module_name, curr_source_name,
-                                          curr_unit_lookup, is_in_lcomm, is_after_eti_init_info,
-                                          is_multi_stt_section, line_number))
+            source_name(source_name_), unit_trait(DeduceUsualSubtext(scanning_context))
       {
       }
       // 3-column entry symbols
@@ -679,8 +678,7 @@ struct Map
     private:
       void Print3Column(std::ostream&, std::size_t&) const;
       void Print4Column(std::ostream&, std::size_t&) const;
-      Unit::Trait DeduceUsualSubtext(SectionLayout&, std::string_view&, std::string_view&,
-                                     UnitLookup*&, bool&, bool&, bool&, std::size_t);
+      Unit::Trait DeduceUsualSubtext(ScanningContext&);
     };
 
     explicit SectionLayout(Kind section_kind_, std::string_view name_)
@@ -704,14 +702,16 @@ struct Map
       static inline bool do_warn_repeat_compilation_unit = true;
       static inline bool do_warn_odr_violation = true;
       static inline bool do_warn_sym_on_flag_detected = true;
-      static inline bool do_warn_comm_after_lcomm = true;
+      static inline bool do_warn_common_on_flag_detected = true;
+      static inline bool do_warn_lcomm_after_comm = true;
 
     private:
       static void RepeatCompilationUnit(std::size_t, std::string_view, std::string_view);
       static void OneDefinitionRuleViolation(std::size_t, std::string_view, std::string_view,
                                              std::string_view);
       static void SymOnFlagDetected(std::size_t, std::string_view, std::string_view);
-      static void CommAfterLComm(std::size_t);
+      static void CommonOnFlagDetected(std::size_t, std::string_view, std::string_view);
+      static void LCommAfterComm(std::size_t);
     };
 
   private:

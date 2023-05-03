@@ -35,7 +35,7 @@ static void tempfunc(const char* name, int choice)
   MWLinker::Map::EPPC_PatternMatching::Warn::do_warn_folding_odr_violation = false;
   MWLinker::Map::EPPC_PatternMatching::Warn::do_warn_folding_repeat_object = false;
   MWLinker::Map::EPPC_PatternMatching::Warn::do_warn_merging_odr_violation = false;
-  MWLinker::Map::SectionLayout::Warn::do_warn_comm_after_lcomm = false;
+  MWLinker::Map::SectionLayout::Warn::do_warn_lcomm_after_comm = false;
   MWLinker::Map::SectionLayout::Warn::do_warn_odr_violation = false;
   MWLinker::Map::SectionLayout::Warn::do_warn_repeat_compilation_unit = false;
   MWLinker::Map::SectionLayout::Warn::do_warn_sym_on_flag_detected = false;

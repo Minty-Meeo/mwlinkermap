@@ -108,12 +108,22 @@ void Map::SectionLayout::Warn::SymOnFlagDetected(const std::size_t line_number,
                 compilation_unit_name, section_name);
 }
 
-void Map::SectionLayout::Warn::CommAfterLComm(const std::size_t line_number)
+void Map::SectionLayout::Warn::CommonOnFlagDetected(const std::size_t line_number,
+                                                    const std::string_view compilation_unit_name,
+                                                    const std::string_view section_name)
+{
+  if (!do_warn_common_on_flag_detected)
+    return;
+  util::println(std::cerr, "Line {:d}] Detected '-common on' flag in \"{:s}\" ({:s})", line_number,
+                compilation_unit_name, section_name);
+}
+
+void Map::SectionLayout::Warn::LCommAfterComm(const std::size_t line_number)
 {
   // Shouldn't this be impossible?
-  if (!do_warn_comm_after_lcomm)
+  if (!do_warn_lcomm_after_comm)
     return;
-  util::println(std::cerr, "Line {:d}] .comm symbols found after .lcomm symbols.", line_number);
+  util::println(std::cerr, "Line {:d}] .lcomm symbols found after .comm symbols.", line_number);
 }
 
 // clang-format off
@@ -1714,11 +1724,12 @@ void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream,
   line_number += 2u;
 }
 
-Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(
-    Map::SectionLayout& section_layout, std::string_view& curr_module_name,
-    std::string_view& curr_source_name, UnitLookup*& curr_unit_lookup, bool& is_in_lcomm,
-    bool& is_after_eti_init_info, bool& is_multi_stt_section, const std::size_t line_number)
+Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  //
+    ScanningContext& scanning_context)
 {
+  auto& [section_layout, line_number, is_second_lap, is_after_eti_init_info, is_multi_stt_section,
+         curr_unit_lookup, curr_module_name, curr_source_name] = scanning_context;
+
   const bool is_symbol_stt_section = (this->name == section_layout.name);
 
   // Detect a change in compilation unit
@@ -1737,18 +1748,18 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(
     {
       if (is_repeat_compilation_unit_detected)
       {
-        // TODO: At some point, a BSS section's second lap for printing .lcomm symbols was given
+        // TODO: At some point, a BSS section's second lap for printing .comm symbols was given
         // STT_SECTION symbols, making them indistinguishable from a repeat-name compilation unit
         // without further heuristics.  In other words, false positives ahoy.
         // TODO: What version?
         Map::SectionLayout::Warn::RepeatCompilationUnit(line_number, compilation_unit_name,
                                                         section_layout.name);
       }
-      if (is_in_lcomm)
+      if (is_second_lap)
       {
         // Shouldn't this be impossible?
-        Map::SectionLayout::Warn::CommAfterLComm(line_number);
-        is_in_lcomm = false;
+        Map::SectionLayout::Warn::LCommAfterComm(line_number);
+        is_second_lap = false;
       }
       return Unit::Trait::Section;
     }
@@ -1756,10 +1767,12 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(
     {
       if (section_layout.section_kind == Map::SectionLayout::Kind::BSS)
       {
+        Map::SectionLayout::Warn::CommonOnFlagDetected(line_number, compilation_unit_name,
+                                                       section_layout.name);
         // TODO: There is currently no clean way to detect repeat-name compilation units during
         // a BSS section's second lap for printing .lcomm symbols.
-        is_in_lcomm = true;
-        return Unit::Trait::LCommon;
+        is_second_lap = true;
+        return Unit::Trait::Common;
       }
       if (section_layout.section_kind == Map::SectionLayout::Kind::ExTabIndex)
       {
@@ -1813,7 +1826,9 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(
                                        section_layout.name);
     }
   }
-  if (is_in_lcomm)
+  if (is_second_lap)
+    return Unit::Trait::Common;
+  if (section_layout.section_kind == Map::SectionLayout::Kind::BSS)
     return Unit::Trait::LCommon;
   return Unit::Trait::None;
 }
@@ -1834,9 +1849,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                                            std::size_t& line_number)
 {
   std::cmatch match;
-  std::string_view curr_module_name, curr_source_name;
-  UnitLookup* curr_unit_lookup = nullptr;
-  bool is_in_lcomm = false, is_multi_stt_section = false, is_after_eti_init_info = false;
+  ScanningContext scanning_context{*this, line_number, false, false, false, nullptr, {}, {}};
 
   while (true)
   {
@@ -1847,9 +1860,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
           util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
           util::xsmto<Elf32_Addr>(match[3]), util::smto<int>(match[4]),
           util::to_string_view(match[5]), util::to_string_view(match[6]),
-          util::to_string_view(match[7]), *this, curr_module_name, curr_source_name,
-          curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
-      curr_unit_lookup->emplace(unit.name, unit);
+          util::to_string_view(match[7]), scanning_context);
+      scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1859,10 +1871,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     {
       const Unit& unit = this->units.emplace_back(
           util::xsmto<Elf32_Word>(match[1]), util::to_string_view(match[2]),
-          util::to_string_view(match[3]), util::to_string_view(match[4]), *this, curr_module_name,
-          curr_source_name, curr_unit_lookup, is_in_lcomm, is_multi_stt_section,
-          is_after_eti_init_info, line_number);
-      curr_unit_lookup->emplace(unit.name, unit);
+          util::to_string_view(match[3]), util::to_string_view(match[4]), scanning_context);
+      scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1884,7 +1894,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
           continue;
         // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
         // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
-        if (curr_unit_lookup->contains(symbol_name))
+        if (scanning_context.m_curr_unit_lookup->contains(symbol_name))
         {
           const std::string_view& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
@@ -1895,7 +1905,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
             util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
             util::xsmto<Elf32_Addr>(match[3]), symbol_name, &parent_unit.operator*(), module_name,
             source_name, Unit::Trait::None);
-        curr_unit_lookup->emplace(unit.name, unit);
+        scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
         parent_unit->entry_children.push_back(&unit);
         line_number += 1u;
         head = match[0].second;
@@ -1929,9 +1939,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                                            std::size_t& line_number)
 {
   std::cmatch match;
-  std::string_view curr_module_name, curr_source_name;
-  UnitLookup* curr_unit_lookup = nullptr;
-  bool is_in_lcomm = false, is_multi_stt_section = false, is_after_eti_init_info = false;
+  ScanningContext scanning_context{*this, line_number, false, false, false, nullptr, {}, {}};
 
   while (true)
   {
@@ -1942,9 +1950,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
           util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
           util::xsmto<Elf32_Addr>(match[3]), util::xsmto<std::uint32_t>(match[4]),
           util::smto<int>(match[5]), util::to_string_view(match[6]), util::to_string_view(match[7]),
-          util::to_string_view(match[8]), *this, curr_module_name, curr_source_name,
-          curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
-      curr_unit_lookup->emplace(unit.name, unit);
+          util::to_string_view(match[8]), scanning_context);
+      scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1954,10 +1961,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     {
       const Unit& unit = this->units.emplace_back(
           util::xsmto<Elf32_Word>(match[1]), util::to_string_view(match[2]),
-          util::to_string_view(match[3]), util::to_string_view(match[4]), *this, curr_module_name,
-          curr_source_name, curr_unit_lookup, is_in_lcomm, is_multi_stt_section,
-          is_after_eti_init_info, line_number);
-      curr_unit_lookup->emplace(unit.name, unit);
+          util::to_string_view(match[3]), util::to_string_view(match[4]), scanning_context);
+      scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1979,7 +1984,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
           continue;
         // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
         // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
-        if (curr_unit_lookup->contains(symbol_name))
+        if (scanning_context.m_curr_unit_lookup->contains(symbol_name))
         {
           const std::string_view& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
@@ -1990,7 +1995,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
             util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
             util::xsmto<Elf32_Addr>(match[3]), util::xsmto<std::uint32_t>(match[4]), symbol_name,
             &parent_unit.operator*(), module_name, source_name, Unit::Trait::None);
-        curr_unit_lookup->emplace(unit.name, unit);
+        scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
         parent_unit->entry_children.push_back(&unit);
         line_number += 1u;
         head = match[0].second;
@@ -2043,9 +2048,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                                           std::size_t& line_number)
 {
   std::cmatch match;
-  std::string_view curr_module_name, curr_source_name;
-  UnitLookup* curr_unit_lookup = nullptr;
-  bool is_in_lcomm = false, is_multi_stt_section = false, is_after_eti_init_info = false;
+  ScanningContext scanning_context{*this, line_number, false, false, false, nullptr, {}, {}};
 
   while (true)
   {
@@ -2056,9 +2059,8 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
           util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
           util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, util::smto<int>(match[4]),
           util::to_string_view(match[5]), util::to_string_view(match[6]),
-          util::to_string_view(match[7]), *this, curr_module_name, curr_source_name,
-          curr_unit_lookup, is_in_lcomm, is_multi_stt_section, is_after_eti_init_info, line_number);
-      curr_unit_lookup->emplace(unit.name, unit);
+          util::to_string_view(match[7]), scanning_context);
+      scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -2080,7 +2082,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
           continue;
         // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
         // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
-        if (curr_unit_lookup->contains(symbol_name))
+        if (scanning_context.m_curr_unit_lookup->contains(symbol_name))
         {
           const std::string_view& compilation_unit_name =
               source_name.empty() ? module_name : source_name;
@@ -2091,7 +2093,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
             util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
             util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name,
             &parent_unit.operator*(), module_name, source_name, Unit::Trait::None);
-        curr_unit_lookup->emplace(unit.name, unit);
+        scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
         parent_unit->entry_children.push_back(&unit);
         line_number += 1u;
         head = match[0].second;
