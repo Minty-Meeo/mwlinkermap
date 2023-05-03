@@ -1010,13 +1010,14 @@ Map::Error Map::SymbolClosure::Scan(  //
       const std::string_view symbol_name = util::to_string_view(match[2]),
                              module_name = util::to_string_view(match[5]),
                              source_name = util::to_string_view(match[6]);
-      const std::size_t line_number_backup = line_number;  // unfortunate
-      line_number += 1u;
-      head = match[0].second;
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->parent;
       curr_hierarchy_level = next_hierarchy_level;
+
+      const std::size_t line_number_backup = line_number;  // unfortunate
+      line_number += 1u;
+      head = match[0].second;
 
       std::list<NodeReal::UnreferencedDuplicate> unref_dups;
 
@@ -1283,9 +1284,9 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
         if (util::to_string_view(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
+        will_be_replaced = true;
         line_number += 3u;
         head = match[0].second;
-        will_be_replaced = true;
       }
       const MergingUnit& unit = this->merging_units.emplace_back(
           first_name, second_name, size, will_be_replaced, was_interchanged);
@@ -1310,10 +1311,9 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
         if (util::to_string_view(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
-
+        will_be_replaced = true;
         line_number += 3u;
         head = match[0].second;
-        will_be_replaced = true;
       }
       if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                             std::regex_constants::match_continuous))
@@ -1360,11 +1360,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         const std::string_view first_name = util::to_string_view(match[1]);
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
-        line_number += 2u;
-        head = match[0].second;
         const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
             first_name, util::to_string_view(match[2]), util::smto<Elf32_Word>(match[3]), false);
         curr_unit_lookup.emplace(unit.first_name, unit);
+        line_number += 2u;
+        head = match[0].second;
         continue;
       }
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
@@ -1376,11 +1376,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
-        line_number += 2u;
-        head = match[0].second;
         const FoldingUnit::Unit& unit = folding_unit.units.emplace_back(
             first_name, util::to_string_view(match[2]), util::smto<Elf32_Word>(match[3]), true);
         curr_unit_lookup.emplace(unit.first_name, unit);
+        line_number += 2u;
+        head = match[0].second;
         continue;
       }
       break;
@@ -1492,37 +1492,37 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_not_near,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1u;
-      head = match[0].second;
       this->units.emplace_back(Unit::Kind::NotNear, util::to_string_view(match[1]),
                                util::to_string_view(match[2]), util::to_string_view(match[3]));
+      line_number += 1u;
+      head = match[0].second;
       continue;
     }
     if (std::regex_search(head, tail, match, re_linker_opts_unit_disassemble_error,
                           std::regex_constants::match_continuous))
     {
+      this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]));
       line_number += 1u;
       head = match[0].second;
-      this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]));
       continue;
     }
     if (std::regex_search(head, tail, match, re_linker_opts_unit_address_not_computed,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1u;
-      head = match[0].second;
       this->units.emplace_back(Unit::Kind::NotComputed, util::to_string_view(match[1]),
                                util::to_string_view(match[2]), util::to_string_view(match[3]));
+      line_number += 1u;
+      head = match[0].second;
       continue;
     }
     // I have not seen a single linker map with this
     if (std::regex_search(head, tail, match, re_linker_opts_unit_optimized,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1u;
-      head = match[0].second;
       this->units.emplace_back(Unit::Kind::Optimized, util::to_string_view(match[1]),
                                util::to_string_view(match[2]), util::to_string_view(match[3]));
+      line_number += 1u;
+      head = match[0].second;
       continue;
     }
     break;
@@ -1587,19 +1587,19 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1u;
-      head = match[0].second;
       this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
                                false);
+      line_number += 1u;
+      head = match[0].second;
       continue;
     }
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1u;
-      head = match[0].second;
       this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
                                true);
+      line_number += 1u;
+      head = match[0].second;
       continue;
     }
     break;
@@ -1652,19 +1652,19 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_branch_islands_created,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1u;
-      head = match[0].second;
       this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
                                false);
+      line_number += 1u;
+      head = match[0].second;
       continue;
     }
     if (std::regex_search(head, tail, match, re_branch_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      line_number += 1u;
-      head = match[0].second;
       this->units.emplace_back(util::to_string_view(match[1]), util::to_string_view(match[2]),
                                true);
+      line_number += 1u;
+      head = match[0].second;
       continue;
     }
     break;
@@ -2104,22 +2104,22 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       std::string_view special_name = util::to_string_view(match[5]);
       if (special_name == "*fill*")
       {
-        line_number += 1u;
-        head = match[0].second;
         this->units.emplace_back(  //
             util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
             util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, util::smto<int>(match[4]),
             Unit::Trait::Fill1);
+        line_number += 1u;
+        head = match[0].second;
         continue;
       }
       if (special_name == "**fill**")
       {
-        line_number += 1u;
-        head = match[0].second;
         this->units.emplace_back(  //
             util::xsmto<std::uint32_t>(match[1]), util::xsmto<Elf32_Word>(match[2]),
             util::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, util::smto<int>(match[4]),
             Unit::Trait::Fill2);
+        line_number += 1u;
+        head = match[0].second;
         continue;
       }
       return Error::SectionLayoutSpecialNotFill;
@@ -2239,11 +2239,11 @@ Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const t
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple_old,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug_old(head, tail, line_number);
 }
@@ -2262,12 +2262,12 @@ Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const t
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_old,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
         util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug_old(head, tail, line_number);
 }
@@ -2287,13 +2287,13 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug_old,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     const std::csub_match& size = match[2];
     if (size.length() == 8 && *size.first == '0')  // Make sure it's not just an overflowed value
       this->SetMinVersion(Version::version_3_0_4);
     this->debug_units.emplace_back(util::to_string_view(match[1]), util::xsmto<Elf32_Word>(size),
                                    util::xsmto<std::uint32_t>(match[3]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return Error::None;
 }
@@ -2312,11 +2312,11 @@ Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2335,12 +2335,12 @@ Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
         util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2359,12 +2359,12 @@ Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
         util::smto<int>(match[5]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2383,12 +2383,12 @@ Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_binfile,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
         util::xsmto<std::uint32_t>(match[5]), util::to_string_view(match[6]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2407,13 +2407,13 @@ Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
         util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]),
         util::smto<int>(match[7]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2432,13 +2432,13 @@ Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_binfile,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
         util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]),
         util::xsmto<std::uint32_t>(match[7]), util::to_string_view(match[8]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2457,13 +2457,13 @@ Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* con
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
         util::smto<int>(match[5]), util::xsmto<std::uint32_t>(match[6]),
         util::to_string_view(match[7]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2482,14 +2482,14 @@ Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const cha
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->normal_units.emplace_back(
         util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]),
         util::xsmto<Elf32_Word>(match[3]), util::xsmto<std::uint32_t>(match[4]),
         util::xsmto<std::uint32_t>(match[5]), util::xsmto<std::uint32_t>(match[6]),
         util::smto<int>(match[7]), util::xsmto<std::uint32_t>(match[8]),
         util::to_string_view(match[9]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return ScanDebug(head, tail, line_number);
 }
@@ -2508,11 +2508,11 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
                            std::regex_constants::match_continuous))
   {
-    line_number += 1u;
-    head = match[0].second;
     this->debug_units.emplace_back(util::to_string_view(match[1]),
                                    util::xsmto<Elf32_Word>(match[2]),
                                    util::xsmto<std::uint32_t>(match[3]));
+    line_number += 1u;
+    head = match[0].second;
   }
   return Error::None;
 }
@@ -2790,9 +2790,9 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_linker_generated_symbols_unit,
                            std::regex_constants::match_continuous))
   {
+    this->units.emplace_back(util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]));
     line_number += 1u;
     head = match[0].second;
-    this->units.emplace_back(util::to_string_view(match[1]), util::xsmto<Elf32_Addr>(match[2]));
   }
   return Error::None;
 }
