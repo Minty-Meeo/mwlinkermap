@@ -1,5 +1,5 @@
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wpedantic -Wconversion)
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
