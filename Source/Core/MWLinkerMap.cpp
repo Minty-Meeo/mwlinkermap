@@ -160,21 +160,56 @@ static const std::regex re_linker_generated_symbols_header{
     "\r?\n\r?\nLinker generated symbols:\r?\n"};
 // clang-format on
 
+// This is far from a comprehensive listing.  There's also all of these which may or may not appear
+// in a linker map:
+// ".PPC.EMB.sdata0" ".PPC.EMB.sbss0" ".PPC.EMB.seginfo" ".PPC.EMB.apuinfo"
+// ".gnu.version" ".gnu.version_r" ".gnu.warning" ".gnu.version_d"
+// ".BINARY" ".rela" ".dynsym" ".rel" ".symtab" ".interp" ".dynstr" ".hash" ".dynamic" ".plt" ".got"
+// ".note.ABI-tag" ".line" ".shstrtab" ".strtab" ".comment" ".stab"
 static const std::unordered_map<std::string_view, Map::SectionLayout::Kind> map_section_layout_kind{
+    {".init", Map::SectionLayout::Kind::Code},
+    {".text", Map::SectionLayout::Kind::Code},
+    {".fini", Map::SectionLayout::Kind::Code},
+
+    {".init_vle", Map::SectionLayout::Kind::VLECode},
+    {".text_vle", Map::SectionLayout::Kind::VLECode},
+
+    {".compress.init", Map::SectionLayout::Kind::ZCode},
+    {".compress.text", Map::SectionLayout::Kind::ZCode},
+    {".compress.fini", Map::SectionLayout::Kind::ZCode},
+
+    {".data", Map::SectionLayout::Kind::Data},
+    {".rodata", Map::SectionLayout::Kind::Data},
+    {".sdata", Map::SectionLayout::Kind::Data},
+    {".sdata2", Map::SectionLayout::Kind::Data},
+
     {".bss", Map::SectionLayout::Kind::BSS},
     {".sbss", Map::SectionLayout::Kind::BSS},
     {".sbss2", Map::SectionLayout::Kind::BSS},
+
     {".ctors", Map::SectionLayout::Kind::Ctors},
     {".dtors", Map::SectionLayout::Kind::Dtors},
     {"extab", Map::SectionLayout::Kind::ExTab},
     {"extabindex", Map::SectionLayout::Kind::ExTabIndex},
+
+    {".debug", Map::SectionLayout::Kind::Debug},
+    {".debug_sfnames", Map::SectionLayout::Kind::Debug},
+    {".debug_scrinfo", Map::SectionLayout::Kind::Debug},
+    {".debug_abbrev", Map::SectionLayout::Kind::Debug},
+    {".debug_info", Map::SectionLayout::Kind::Debug},
+    {".debug_arranges", Map::SectionLayout::Kind::Debug},
+    {".debug_frame", Map::SectionLayout::Kind::Debug},
+    {".debug_line", Map::SectionLayout::Kind::Debug},
+    {".debug_loc", Map::SectionLayout::Kind::Debug},
+    {".debug_macinfo", Map::SectionLayout::Kind::Debug},
+    {".debug_pubnames", Map::SectionLayout::Kind::Debug},
 };
 
 Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string_view section_name)
 {
   if (map_section_layout_kind.contains(section_name))
     return map_section_layout_kind.at(section_name);
-  return Map::SectionLayout::Kind::Normal;
+  return Map::SectionLayout::Kind::Unknown;
 }
 
 Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
@@ -406,8 +441,8 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     line_number += 2u;
     head = match[0].second;
     // TODO: detect and split Section Layout subtext by observing the Starting Address
-    auto portion = std::make_unique<SectionLayout>(SectionLayout::Kind::Normal,
-                                                   mijo::to_string_view(match[1]));
+    auto portion =
+        std::make_unique<SectionLayout>(SectionLayout::Kind::Code, mijo::to_string_view(match[1]));
     portion->SetMinVersion(Version::version_3_0_4);
     const auto error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
@@ -1771,6 +1806,15 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
       is_second_lap = true;
       return Unit::Trait::Common;
     }
+    if (section_layout.section_kind == Map::SectionLayout::Kind::ExTab)
+    {
+      if (is_repeat_compilation_unit_detected)
+      {
+        Map::SectionLayout::Warn::RepeatCompilationUnit(line_number, compilation_unit_name,
+                                                        section_layout.name);
+      }
+      return Unit::Trait::ExTab;
+    }
     if (section_layout.section_kind == Map::SectionLayout::Kind::ExTabIndex)
     {
       if (this->name == "_eti_init_info" && compilation_unit_name == "Linker Generated Symbol File")
@@ -1824,7 +1868,32 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
     return Unit::Trait::Common;
   if (section_layout.section_kind == Map::SectionLayout::Kind::BSS)
     return Unit::Trait::LCommon;
+  if (section_layout.section_kind == Map::SectionLayout::Kind::Code)
+    return Unit::Trait::Function;
+  if (section_layout.section_kind == Map::SectionLayout::Kind::Data)
+    return Unit::Trait::Object;
+  if (section_layout.section_kind == Map::SectionLayout::Kind::ExTab)
+    return Unit::Trait::ExTab;
+  if (section_layout.section_kind == Map::SectionLayout::Kind::ExTabIndex)
+    return Unit::Trait::ExTabIndex;
   return Unit::Trait::None;
+}
+
+Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceEntrySubtext(  //
+    ScanningContext& scanning_context)
+{
+  auto& [section_layout, line_number, is_second_lap, is_after_eti_init_info, is_multi_stt_section,
+         curr_unit_lookup, curr_module_name, curr_source_name] = scanning_context;
+
+  // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
+  // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
+  if (scanning_context.m_curr_unit_lookup->contains(this->name))
+  {
+    const std::string_view& compilation_unit_name = source_name.empty() ? module_name : source_name;
+    Warn::OneDefinitionRuleViolation(line_number, this->name, compilation_unit_name,
+                                     section_layout.name);
+  }
+  return Trait::NoType;
 }
 
 // clang-format off
@@ -1886,19 +1955,10 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->name)
           continue;
-        // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
-        // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
-        if (scanning_context.m_curr_unit_lookup->contains(symbol_name))
-        {
-          const std::string_view& compilation_unit_name =
-              source_name.empty() ? module_name : source_name;
-          Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name,
-                                           this->name);
-        }
         const Unit& unit = this->units.emplace_back(
             mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
             mijo::xsmto<Elf32_Addr>(match[3]), symbol_name, &parent_unit.operator*(), module_name,
-            source_name, Unit::Trait::None);
+            source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
         parent_unit->entry_children.push_back(&unit);
         line_number += 1u;
@@ -1976,19 +2036,10 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->name)
           continue;
-        // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
-        // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
-        if (scanning_context.m_curr_unit_lookup->contains(symbol_name))
-        {
-          const std::string_view& compilation_unit_name =
-              source_name.empty() ? module_name : source_name;
-          Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name,
-                                           this->name);
-        }
         const Unit& unit = this->units.emplace_back(
             mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
             mijo::xsmto<Elf32_Addr>(match[3]), mijo::xsmto<std::uint32_t>(match[4]), symbol_name,
-            &parent_unit.operator*(), module_name, source_name, Unit::Trait::None);
+            &parent_unit.operator*(), module_name, source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
         parent_unit->entry_children.push_back(&unit);
         line_number += 1u;
@@ -2074,19 +2125,10 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->name)
           continue;
-        // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
-        // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
-        if (scanning_context.m_curr_unit_lookup->contains(symbol_name))
-        {
-          const std::string_view& compilation_unit_name =
-              source_name.empty() ? module_name : source_name;
-          Warn::OneDefinitionRuleViolation(line_number, symbol_name, compilation_unit_name,
-                                           this->name);
-        }
         const Unit& unit = this->units.emplace_back(
             mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
             mijo::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name,
-            &parent_unit.operator*(), module_name, source_name, Unit::Trait::None);
+            &parent_unit.operator*(), module_name, source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.name, unit);
         parent_unit->entry_children.push_back(&unit);
         line_number += 1u;

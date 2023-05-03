@@ -542,12 +542,19 @@ struct Map
 
     enum class Kind
     {
-      Normal,
+      Code,
+      ZCode,
+      VLECode,
+      Data,
       BSS,
       Ctors,
       Dtors,
       ExTab,
       ExTabIndex,
+      Debug,
+      Mixed,  // ?
+
+      Unknown,
     };
 
     struct Unit;
@@ -585,6 +592,12 @@ struct Map
       {
         // Nothing special
         None,
+        // Lives in a code section
+        Function,
+        // Lives in a data section
+        Object,
+        // Assumed to be of notype
+        NoType,
         // Named after the section they are native to. Multiple can appear in a single compilation
         // unit with the '-sym on' option. The size of a section symbol is the total of all symbols,
         // both used and unused, that one is meant to encompass.
@@ -594,6 +607,8 @@ struct Map
         // BSS common symbols.
         // '-common on' moves these into a common section.
         Common,
+        // Native to the extab section.
+        ExTab,
         // Native to the extabindex section.
         ExTabIndex,
         // *fill*
@@ -635,21 +650,23 @@ struct Map
       // 3-column entry symbols
       explicit Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
                     std::string_view name_, const Unit* entry_parent_,
-                    std::string_view module_name_, std::string_view source_name_, Trait unit_trait_)
+                    std::string_view module_name_, std::string_view source_name_,
+                    ScanningContext& scanning_context)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset{}, alignment{}, name(name_),
             entry_parent(entry_parent_), module_name(module_name_), source_name(source_name_),
-            unit_trait(unit_trait_)
+            unit_trait(DeduceEntrySubtext(scanning_context))
       {
       }
       // 4-column entry symbols
       explicit Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
                     std::uint32_t file_offset_, std::string_view name_, const Unit* entry_parent_,
-                    std::string_view module_name_, std::string_view source_name_, Trait unit_trait_)
+                    std::string_view module_name_, std::string_view source_name_,
+                    ScanningContext& scanning_context)
           : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
             virtual_address(virtual_address_), file_offset(file_offset_), alignment{}, name(name_),
             entry_parent(entry_parent_), module_name(module_name_), source_name(source_name_),
-            unit_trait(unit_trait_)
+            unit_trait(DeduceEntrySubtext(scanning_context))
       {
       }
       // 4-column special symbols
@@ -692,6 +709,7 @@ struct Map
       void Print3Column(std::ostream&, std::size_t&) const;
       void Print4Column(std::ostream&, std::size_t&) const;
       Unit::Trait DeduceUsualSubtext(ScanningContext&);
+      Unit::Trait DeduceEntrySubtext(ScanningContext&);
     };
 
     explicit SectionLayout(Kind section_kind_, std::string_view name_)
