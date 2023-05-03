@@ -76,13 +76,12 @@ static void tempfunc(const char* name, int choice)
   // containing the string is meant to be the unit within the linker map portion / the value stored
   // by reference in the map.
   std::fill(temp.begin(), temp.end(), '\0');
-  const MWLinker::Version min_version = linker_map.GetMinVersion();
   mijo::println(
       std::cout,
       "scan line: {:d}   print line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}  "
-      " time: {:d}ms",
+      "max_version: {:d}   time: {:d}ms",
       scan_line_number, print_line_number, static_cast<int>(error), matches,
-      static_cast<int>(min_version),
+      static_cast<int>(linker_map.GetMinVersion()), static_cast<int>(linker_map.GetMaxVersion()),
       (std::accumulate(time_attack.begin(), time_attack.end(), std::chrono::milliseconds{}) /
        time_attack.size())
           .count());

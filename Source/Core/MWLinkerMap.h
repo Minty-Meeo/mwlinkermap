@@ -18,6 +18,7 @@ using Elf32_Addr = std::uint32_t;
 
 enum class Version
 {
+  // Oldest known version
   Unknown,
   // Codewarrior for GCN 1.0   (May 21 2000 19:00:24)
   version_2_3_3_build_126,
@@ -47,6 +48,8 @@ enum class Version
   version_4_3_build_172,
   // CodeWarrior for Wii 1.7   (Sep  5 2011 13:02:03)
   version_4_3_build_213,
+  // Latest known version
+  Latest,
 };
 
 enum class Type
@@ -118,15 +121,30 @@ struct Map
 
   struct PortionBase
   {
-    virtual ~PortionBase() = default;
+    friend Map;
 
-    void SetMinVersion(const Version version) noexcept
+    virtual ~PortionBase() = default;
+    constexpr Version GetMinVersion() const noexcept { return min_version; }
+    constexpr Version GetMaxVersion() const noexcept { return max_version; }
+    constexpr static Version GetMinVersion(PortionBase* portion)
     {
-      min_version = std::max(min_version, version);
+      return portion ? portion->GetMinVersion() : Version::Unknown;
+    }
+    constexpr static Version GetMaxVersion(PortionBase* portion)
+    {
+      return portion ? portion->GetMaxVersion() : Version::Latest;
     }
     virtual bool IsEmpty() const noexcept = 0;
 
+  private:
+    constexpr void SetVersionRange(const Version min, const Version max) noexcept
+    {
+      min_version = std::max(min_version, min);
+      max_version = std::min(max_version, max);
+    }
+
     Version min_version = Version::Unknown;
+    Version max_version = Version::Latest;
   };
 
   struct SymbolClosure final : PortionBase
@@ -334,7 +352,10 @@ struct Map
 
     using MergingUnitLookup = std::unordered_multimap<std::string_view, const MergingUnit&>;
 
-    explicit EPPC_PatternMatching() { SetMinVersion(Version::version_4_2_build_142); }
+    explicit EPPC_PatternMatching()
+    {
+      SetVersionRange(Version::version_4_2_build_142, Version::Latest);
+    }
     virtual ~EPPC_PatternMatching() override = default;
 
     virtual bool IsEmpty() const noexcept override
@@ -417,7 +438,7 @@ struct Map
       void Print(std::ostream&, std::size_t&) const;
     };
 
-    explicit LinkerOpts() { SetMinVersion(Version::version_4_2_build_142); }
+    explicit LinkerOpts() { SetVersionRange(Version::version_4_2_build_142, Version::Latest); }
     virtual ~LinkerOpts() override = default;
 
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
@@ -454,7 +475,7 @@ struct Map
       void Print(std::ostream&, std::size_t&) const;
     };
 
-    explicit BranchIslands() { SetMinVersion(Version::version_4_1_build_51213); }
+    explicit BranchIslands() { SetVersionRange(Version::version_4_1_build_51213, Version::Latest); }
     virtual ~BranchIslands() override = default;
 
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
@@ -491,7 +512,10 @@ struct Map
       void Print(std::ostream&, std::size_t&) const;
     };
 
-    explicit MixedModeIslands() { SetMinVersion(Version::version_4_1_build_51213); }
+    explicit MixedModeIslands()
+    {
+      SetVersionRange(Version::version_4_1_build_51213, Version::Latest);
+    }
     virtual ~MixedModeIslands() override = default;
 
     virtual bool IsEmpty() const noexcept override { return units.empty(); }
@@ -893,11 +917,12 @@ struct Map
     explicit MemoryMap(bool has_rom_ram_)  // ctor for old memory map
         : has_rom_ram(has_rom_ram_), has_s_record(false), has_bin_file(false)
     {
+      SetVersionRange(Version::Unknown, Version::version_4_2_build_60320);
     }
     explicit MemoryMap(bool has_rom_ram_, bool has_s_record_, bool has_bin_file_)
         : has_rom_ram(has_rom_ram_), has_s_record(has_s_record_), has_bin_file(has_bin_file_)
     {
-      SetMinVersion(Version::version_4_2_build_142);
+      SetVersionRange(Version::version_4_2_build_142, Version::Latest);
     }
     virtual ~MemoryMap() override = default;
 
@@ -980,7 +1005,42 @@ struct Map
   Error ScanSMGalaxy(std::string_view, std::size_t&);
   Error ScanSMGalaxy(const char*, const char*, std::size_t&);
   void Print(std::ostream&, std::size_t&) const;
-  Version GetMinVersion() const noexcept;
+  Version GetMinVersion() const noexcept
+  {
+    Version min_version = std::max({
+        PortionBase::GetMinVersion(normal_symbol_closure.get()),
+        PortionBase::GetMinVersion(eppc_pattern_matching.get()),
+        PortionBase::GetMinVersion(dwarf_symbol_closure.get()),
+        PortionBase::GetMinVersion(linker_opts.get()),
+        PortionBase::GetMinVersion(mixed_mode_islands.get()),
+        PortionBase::GetMinVersion(branch_islands.get()),
+        PortionBase::GetMinVersion(linktime_size_decreasing_optimizations.get()),
+        PortionBase::GetMinVersion(linktime_size_increasing_optimizations.get()),
+        PortionBase::GetMinVersion(memory_map.get()),
+        PortionBase::GetMinVersion(linker_generated_symbols.get()),
+    });
+    for (const auto& section_layout : section_layouts)
+      min_version = std::max(PortionBase::GetMinVersion(section_layout.get()), min_version);
+    return min_version;
+  }
+  Version GetMaxVersion() const noexcept
+  {
+    Version max_version = std::min({
+        PortionBase::GetMaxVersion(normal_symbol_closure.get()),
+        PortionBase::GetMaxVersion(eppc_pattern_matching.get()),
+        PortionBase::GetMaxVersion(dwarf_symbol_closure.get()),
+        PortionBase::GetMaxVersion(linker_opts.get()),
+        PortionBase::GetMaxVersion(mixed_mode_islands.get()),
+        PortionBase::GetMaxVersion(branch_islands.get()),
+        PortionBase::GetMaxVersion(linktime_size_decreasing_optimizations.get()),
+        PortionBase::GetMaxVersion(linktime_size_increasing_optimizations.get()),
+        PortionBase::GetMaxVersion(memory_map.get()),
+        PortionBase::GetMaxVersion(linker_generated_symbols.get()),
+    });
+    for (const auto& section_layout : section_layouts)
+      max_version = std::min(PortionBase::GetMaxVersion(section_layout.get()), max_version);
+    return max_version;
+  }
 
   const std::string& GetEntryPointName() const noexcept { return entry_point_name; }
   const std::unique_ptr<SymbolClosure>& GetNormalSymbolClosure() const noexcept

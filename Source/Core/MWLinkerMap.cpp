@@ -294,7 +294,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      portion->SetMinVersion(Version::version_3_0_4);
+      portion->SetVersionRange(Version::version_3_0_4, Version::Latest);
     this->dwarf_symbol_closure = std::move(portion);
   }
   // Unresolved symbol post-prints probably belong here (I have not confirmed if they preceed
@@ -412,7 +412,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
     head = match[0].second;
     auto portion =
         std::make_unique<SectionLayout>(SectionLayout::ToSectionKind(section_name), section_name);
-    portion->SetMinVersion(Version::version_3_0_4);
+    portion->SetVersionRange(Version::version_3_0_4, Version::version_3_0_4);
     const auto error = portion->ScanTLOZTP(head, tail, line_number);
     if (error != Error::None)
       return error;
@@ -443,7 +443,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     // TODO: detect and split Section Layout subtext by observing the Starting Address
     auto portion =
         std::make_unique<SectionLayout>(SectionLayout::Kind::Code, mijo::to_string_view(match[1]));
-    portion->SetMinVersion(Version::version_3_0_4);
+    portion->SetVersionRange(Version::version_3_0_4, Version::Latest);
     const auto error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
       return error;
@@ -497,27 +497,6 @@ void Map::Print(std::ostream& stream, std::size_t& line_number) const
     linker_generated_symbols->Print(stream, line_number);
 }
 
-Version Map::GetMinVersion() const noexcept
-{
-  Version min_version = std::max({
-      normal_symbol_closure ? normal_symbol_closure->min_version : Version::Unknown,
-      eppc_pattern_matching ? eppc_pattern_matching->min_version : Version::Unknown,
-      dwarf_symbol_closure ? dwarf_symbol_closure->min_version : Version::Unknown,
-      linker_opts ? linker_opts->min_version : Version::Unknown,
-      mixed_mode_islands ? mixed_mode_islands->min_version : Version::Unknown,
-      branch_islands ? branch_islands->min_version : Version::Unknown,
-      linktime_size_decreasing_optimizations ? linktime_size_decreasing_optimizations->min_version :
-                                               Version::Unknown,
-      linktime_size_increasing_optimizations ? linktime_size_increasing_optimizations->min_version :
-                                               Version::Unknown,
-      memory_map ? memory_map->min_version : Version::Unknown,
-      linker_generated_symbols ? linker_generated_symbols->min_version : Version::Unknown,
-  });
-  for (const auto& section_layout : section_layouts)
-    min_version = std::max(section_layout->min_version, min_version);
-  return min_version;
-}
-
 // clang-format off
 static const std::regex re_section_layout_3column_prologue_1{
 //  "  Starting        Virtual\r\n"
@@ -560,6 +539,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
         line_number += 1u;
         head = match[0].second;
         auto portion = std::make_unique<SectionLayout>(SectionLayout::ToSectionKind(name), name);
+        portion->SetVersionRange(Version::Unknown, Version::version_2_4_7_build_107);
         const auto error = portion->Scan3Column(head, tail, line_number);
         if (error != Error::None)
           return error;
@@ -591,7 +571,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
         line_number += 1u;
         head = match[0].second;
         auto portion = std::make_unique<SectionLayout>(SectionLayout::ToSectionKind(name), name);
-        portion->SetMinVersion(Version::version_3_0_4);
+        portion->SetVersionRange(Version::version_3_0_4, Version::Latest);
         const auto error = portion->Scan4Column(head, tail, line_number);
         if (error != Error::None)
           return error;
@@ -1084,7 +1064,7 @@ Map::Error Map::SymbolClosure::Scan(  //
         }
         if (unref_dups.empty())
           return Error::SymbolClosureUnrefDupsEmpty;
-        this->SetMinVersion(Version::version_2_3_3_build_137);
+        this->SetVersionRange(Version::version_2_3_3_build_137, Version::Latest);
       }
 
       NodeReal* next_node = new NodeReal(  // Non-owning pointer.
@@ -1110,7 +1090,7 @@ Map::Error Map::SymbolClosure::Scan(  //
         // Create a dummy node for hierarchy level 2.
         curr_node = curr_node->children.emplace_back(new NodeBase(curr_node)).get();
         ++curr_hierarchy_level;
-        this->SetMinVersion(Version::version_3_0_4);
+        this->SetVersionRange(Version::version_3_0_4, Version::Latest);
       }
       continue;
     }
@@ -2175,7 +2155,7 @@ void Map::SectionLayout::Print(std::ostream& stream, std::size_t& line_number) c
 {
   // "\r\n\r\n%s section layout\r\n"
   mijo::print(stream, "\r\n\r\n{:s} section layout\r\n", name);
-  if (min_version < Version::version_3_0_4)
+  if (GetMinVersion() < Version::version_3_0_4)
   {
     mijo::print(stream, "  Starting        Virtual\r\n"
                         "  address  Size   address\r\n"
@@ -2331,7 +2311,7 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
   {
     const std::csub_match& size = match[2];
     if (size.length() == 8 && *size.first == '0')  // Make sure it's not just an overflowed value
-      this->SetMinVersion(Version::version_3_0_4);
+      this->SetVersionRange(Version::version_3_0_4, Version::Latest);
     this->debug_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Word>(size),
                                    mijo::xsmto<std::uint32_t>(match[3]));
     line_number += 1u;
@@ -2563,7 +2543,7 @@ void Map::MemoryMap::Print(std::ostream& stream, std::size_t& line_number) const
 {
   mijo::print(stream, "\r\n\r\nMemory map:\r\n");
   line_number += 3u;
-  if (min_version < Version::version_4_2_build_142)
+  if (GetMinVersion() < Version::version_4_2_build_142)
   {
     if (has_rom_ram)
       PrintRomRam_old(stream, line_number);
@@ -2636,7 +2616,7 @@ void Map::MemoryMap::UnitNormal::PrintRomRam_old(std::ostream& stream,
 
 void Map::MemoryMap::PrintDebug_old(std::ostream& stream, std::size_t& line_number) const
 {
-  if (min_version < Version::version_3_0_4)
+  if (GetMinVersion() < Version::version_3_0_4)
     for (const auto& unit : debug_units)
       unit.Print_older(stream, line_number);
   else
