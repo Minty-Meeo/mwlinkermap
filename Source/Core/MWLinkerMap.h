@@ -236,6 +236,12 @@ struct Map
     {
       friend SymbolClosure;
 
+      constexpr static void DisableAll() noexcept
+      {
+        do_warn_odr_violation = false;
+        do_warn_sym_on_flag_detected = false;
+      }
+
       static inline bool do_warn_odr_violation = true;
       static inline bool do_warn_sym_on_flag_detected = true;
 
@@ -343,6 +349,13 @@ struct Map
     struct Warn
     {
       friend EPPC_PatternMatching;
+
+      constexpr static void DisableAll() noexcept
+      {
+        do_warn_merging_odr_violation = false;
+        do_warn_folding_repeat_object = false;
+        do_warn_folding_odr_violation = false;
+      }
 
       static inline bool do_warn_merging_odr_violation = true;
       static inline bool do_warn_folding_repeat_object = true;
@@ -699,6 +712,15 @@ struct Map
     {
       friend SectionLayout;
 
+      constexpr static void DisableAll() noexcept
+      {
+        do_warn_repeat_compilation_unit = false;
+        do_warn_odr_violation = false;
+        do_warn_sym_on_flag_detected = false;
+        do_warn_common_on_flag_detected = false;
+        do_warn_lcomm_after_comm = false;
+      }
+
       static inline bool do_warn_repeat_compilation_unit = true;
       static inline bool do_warn_odr_violation = true;
       static inline bool do_warn_sym_on_flag_detected = true;
@@ -968,6 +990,18 @@ struct Map
   {
     return linker_generated_symbols;
   }
+
+  struct Warn
+  {
+    friend Map;
+
+    constexpr static void DisableAll() noexcept
+    {
+      SymbolClosure::Warn::DisableAll();
+      EPPC_PatternMatching::Warn::DisableAll();
+      SectionLayout::Warn::DisableAll();
+    }
+  };
 
 private:
   Error ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string_view);

@@ -30,15 +30,7 @@ static void tempfunc(const char* name, int choice)
   std::string temp = std::move(sstream).str();
 
   MWLinker::Map linker_map;
-  MWLinker::Map::SymbolClosure::Warn::do_warn_odr_violation = false;
-  MWLinker::Map::SymbolClosure::Warn::do_warn_sym_on_flag_detected = false;
-  MWLinker::Map::EPPC_PatternMatching::Warn::do_warn_folding_odr_violation = false;
-  MWLinker::Map::EPPC_PatternMatching::Warn::do_warn_folding_repeat_object = false;
-  MWLinker::Map::EPPC_PatternMatching::Warn::do_warn_merging_odr_violation = false;
-  MWLinker::Map::SectionLayout::Warn::do_warn_lcomm_after_comm = false;
-  MWLinker::Map::SectionLayout::Warn::do_warn_odr_violation = false;
-  MWLinker::Map::SectionLayout::Warn::do_warn_repeat_compilation_unit = false;
-  MWLinker::Map::SectionLayout::Warn::do_warn_sym_on_flag_detected = false;
+  MWLinker::Map::Warn::DisableAll();
 
   std::size_t scan_line_number = 0;
   MWLinker::Map::Error error = MWLinker::Map::Error::None;
