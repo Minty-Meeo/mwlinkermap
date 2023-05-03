@@ -174,8 +174,7 @@ Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string_vie
 {
   if (map_section_layout_kind.contains(section_name))
     return map_section_layout_kind.at(section_name);
-  else
-    return Map::SectionLayout::Kind::Normal;
+  return Map::SectionLayout::Kind::Normal;
 }
 
 Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
@@ -1763,33 +1762,29 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
       }
       return Unit::Trait::Section;
     }
-    else
+    if (section_layout.section_kind == Map::SectionLayout::Kind::BSS)
     {
-      if (section_layout.section_kind == Map::SectionLayout::Kind::BSS)
+      Map::SectionLayout::Warn::CommonOnFlagDetected(line_number, compilation_unit_name,
+                                                     section_layout.name);
+      // TODO: There is currently no clean way to detect repeat-name compilation units during
+      // a BSS section's second lap for printing .lcomm symbols.
+      is_second_lap = true;
+      return Unit::Trait::Common;
+    }
+    if (section_layout.section_kind == Map::SectionLayout::Kind::ExTabIndex)
+    {
+      if (this->name == "_eti_init_info" && compilation_unit_name == "Linker Generated Symbol File")
       {
-        Map::SectionLayout::Warn::CommonOnFlagDetected(line_number, compilation_unit_name,
-                                                       section_layout.name);
-        // TODO: There is currently no clean way to detect repeat-name compilation units during
-        // a BSS section's second lap for printing .lcomm symbols.
-        is_second_lap = true;
-        return Unit::Trait::Common;
+        is_after_eti_init_info = true;
       }
-      if (section_layout.section_kind == Map::SectionLayout::Kind::ExTabIndex)
+      // TODO: There is currently no clean way to detect repeat-name compilation units during
+      // an extabindex section's second lap for printing UNUSED symbols after _eti_init_info.
+      else if (is_repeat_compilation_unit_detected && !is_after_eti_init_info)
       {
-        if (this->name == "_eti_init_info" &&
-            compilation_unit_name == "Linker Generated Symbol File")
-        {
-          is_after_eti_init_info = true;
-        }
-        // TODO: There is currently no clean way to detect repeat-name compilation units during
-        // an extabindex section's second lap for printing UNUSED symbols after _eti_init_info.
-        else if (is_repeat_compilation_unit_detected && !is_after_eti_init_info)
-        {
-          Map::SectionLayout::Warn::RepeatCompilationUnit(line_number, compilation_unit_name,
-                                                          section_layout.name);
-        }
-        return Unit::Trait::ExTabIndex;
+        Map::SectionLayout::Warn::RepeatCompilationUnit(line_number, compilation_unit_name,
+                                                        section_layout.name);
       }
+      return Unit::Trait::ExTabIndex;
     }
     return Unit::Trait::None;
   }
@@ -1813,19 +1808,18 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
     }
     return Unit::Trait::Section;
   }
-  else
+
+  if (curr_unit_lookup->contains(this->name))
   {
     const std::string_view& compilation_unit_name =
         this->source_name.empty() ? this->module_name : this->source_name;
-    if (curr_unit_lookup->contains(this->name))
-    {
-      // This can be a strong hint that there are two or more repeat-name compilation units in your
-      // linker map, assuming it's not messed up in any way.  Note that this does not detect symbols
-      // with identical names across section layouts.
-      Warn::OneDefinitionRuleViolation(line_number, this->name, compilation_unit_name,
-                                       section_layout.name);
-    }
+    // This can be a strong hint that there are two or more repeat-name compilation units in your
+    // linker map, assuming it's not messed up in any way.  Note that this does not detect symbols
+    // with identical names across section layouts.
+    Warn::OneDefinitionRuleViolation(line_number, this->name, compilation_unit_name,
+                                     section_layout.name);
   }
+
   if (is_second_lap)
     return Unit::Trait::Common;
   if (section_layout.section_kind == Map::SectionLayout::Kind::BSS)
