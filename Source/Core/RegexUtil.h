@@ -7,7 +7,7 @@
 #include <string_view>
 #include <utility>
 
-namespace util
+namespace mijo
 {
 // TODO: Make these constexpr after std::from_chars becomes constexpr in C++23.
 
@@ -58,4 +58,4 @@ constexpr static std::wstring_view to_wstring_view(
 {
   return {wssm.first, wssm.second};
 }
-}  // namespace util
+}  // namespace mijo

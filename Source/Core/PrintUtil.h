@@ -9,7 +9,7 @@
 
 // TODO: Replace with C++23's std::print(std::ostream&) overloads.
 
-namespace util
+namespace mijo
 {
 template <class... Args>
 void print(std::ostream& os, fmt::format_string<Args...> fmt, Args&&... args)
@@ -21,7 +21,7 @@ void print(std::ostream& os, fmt::format_string<Args...> fmt, Args&&... args)
 template <class... Args>
 void println(std::ostream& os, fmt::format_string<Args...> fmt, Args&&... args)
 {
-  util::print(os, std::move(fmt), std::forward<Args>(args)...);
+  mijo::print(os, std::move(fmt), std::forward<Args>(args)...);
   std::endl(os);
 }
-}  // namespace util
+}  // namespace mijo
