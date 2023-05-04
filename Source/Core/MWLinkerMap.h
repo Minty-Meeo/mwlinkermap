@@ -260,8 +260,8 @@ struct Map
         do_warn_sym_on_flag_detected = false;
       }
 
-      static inline bool do_warn_odr_violation = true;
-      static inline bool do_warn_sym_on_flag_detected = true;
+      static bool do_warn_odr_violation;
+      static bool do_warn_sym_on_flag_detected;
 
     private:
       static void OneDefinitionRuleViolation(std::size_t, std::string_view, std::string_view);
@@ -378,9 +378,9 @@ struct Map
         do_warn_folding_odr_violation = false;
       }
 
-      static inline bool do_warn_merging_odr_violation = true;
-      static inline bool do_warn_folding_repeat_object = true;
-      static inline bool do_warn_folding_odr_violation = true;
+      static bool do_warn_merging_odr_violation;
+      static bool do_warn_folding_repeat_object;
+      static bool do_warn_folding_odr_violation;
 
     private:
       static void MergingOneDefinitionRuleViolation(std::size_t, std::string_view);
@@ -763,11 +763,11 @@ struct Map
         do_warn_lcomm_after_comm = false;
       }
 
-      static inline bool do_warn_repeat_compilation_unit = true;
-      static inline bool do_warn_odr_violation = true;
-      static inline bool do_warn_sym_on_flag_detected = true;
-      static inline bool do_warn_common_on_flag_detected = true;
-      static inline bool do_warn_lcomm_after_comm = true;
+      static bool do_warn_repeat_compilation_unit;
+      static bool do_warn_odr_violation;
+      static bool do_warn_sym_on_flag_detected;
+      static bool do_warn_common_on_flag_detected;
+      static bool do_warn_lcomm_after_comm;
 
     private:
       static void RepeatCompilationUnit(std::size_t, std::string_view, std::string_view);

@@ -24,6 +24,8 @@
 
 namespace MWLinker
 {
+bool Map::SymbolClosure::Warn::do_warn_odr_violation = true;
+
 void Map::SymbolClosure::Warn::OneDefinitionRuleViolation(
     const std::size_t line_number, const std::string_view symbol_name,
     const std::string_view compilation_unit_name)
@@ -34,6 +36,8 @@ void Map::SymbolClosure::Warn::OneDefinitionRuleViolation(
   mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
                 compilation_unit_name);
 }
+
+bool Map::SymbolClosure::Warn::do_warn_sym_on_flag_detected = true;
 
 void Map::SymbolClosure::Warn::SymOnFlagDetected(const std::size_t line_number,
                                                  const std::string_view compilation_unit_name)
@@ -46,6 +50,8 @@ void Map::SymbolClosure::Warn::SymOnFlagDetected(const std::size_t line_number,
                 compilation_unit_name);
 }
 
+bool Map::EPPC_PatternMatching::Warn::do_warn_merging_odr_violation = true;
+
 void Map::EPPC_PatternMatching::Warn::MergingOneDefinitionRuleViolation(
     const std::size_t line_number, const std::string_view symbol_name)
 {
@@ -55,6 +61,8 @@ void Map::EPPC_PatternMatching::Warn::MergingOneDefinitionRuleViolation(
   mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again", line_number, symbol_name);
 }
 
+bool Map::EPPC_PatternMatching::Warn::do_warn_folding_repeat_object = true;
+
 void Map::EPPC_PatternMatching::Warn::FoldingRepeatObject(const std::size_t line_number,
                                                           const std::string_view object_name)
 {
@@ -63,6 +71,8 @@ void Map::EPPC_PatternMatching::Warn::FoldingRepeatObject(const std::size_t line
     mijo::println(std::cerr, "Line {:d}] Detected repeat-name object \"{:s}\"", line_number,
                   object_name);
 }
+
+bool Map::EPPC_PatternMatching::Warn::do_warn_folding_odr_violation = true;
 
 void Map::EPPC_PatternMatching::Warn::FoldingOneDefinitionRuleViolation(
     const std::size_t line_number, const std::string_view symbol_name,
@@ -75,6 +85,8 @@ void Map::EPPC_PatternMatching::Warn::FoldingOneDefinitionRuleViolation(
                 object_name);
 }
 
+bool Map::SectionLayout::Warn::do_warn_repeat_compilation_unit = true;
+
 void Map::SectionLayout::Warn::RepeatCompilationUnit(const std::size_t line_number,
                                                      const std::string_view compilation_unit_name,
                                                      const std::string_view section_name)
@@ -84,6 +96,8 @@ void Map::SectionLayout::Warn::RepeatCompilationUnit(const std::size_t line_numb
   mijo::println(std::cerr, "Line {:d}] Detected repeat-name compilation unit \"{:s}\" ({:s})",
                 line_number, compilation_unit_name, section_name);
 }
+
+bool Map::SectionLayout::Warn::do_warn_odr_violation = true;
 
 void Map::SectionLayout::Warn::OneDefinitionRuleViolation(
     const std::size_t line_number, const std::string_view symbol_name,
@@ -95,6 +109,8 @@ void Map::SectionLayout::Warn::OneDefinitionRuleViolation(
   mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\" ({:s})", line_number,
                 symbol_name, compilation_unit_name, section_name);
 }
+
+bool Map::SectionLayout::Warn::do_warn_sym_on_flag_detected = true;
 
 void Map::SectionLayout::Warn::SymOnFlagDetected(const std::size_t line_number,
                                                  const std::string_view compilation_unit_name,
@@ -108,6 +124,8 @@ void Map::SectionLayout::Warn::SymOnFlagDetected(const std::size_t line_number,
                 compilation_unit_name, section_name);
 }
 
+bool Map::SectionLayout::Warn::do_warn_common_on_flag_detected = true;
+
 void Map::SectionLayout::Warn::CommonOnFlagDetected(const std::size_t line_number,
                                                     const std::string_view compilation_unit_name,
                                                     const std::string_view section_name)
@@ -117,6 +135,8 @@ void Map::SectionLayout::Warn::CommonOnFlagDetected(const std::size_t line_numbe
   mijo::println(std::cerr, "Line {:d}] Detected '-common on' flag in \"{:s}\" ({:s})", line_number,
                 compilation_unit_name, section_name);
 }
+
+bool Map::SectionLayout::Warn::do_warn_lcomm_after_comm = true;
 
 void Map::SectionLayout::Warn::LCommAfterComm(const std::size_t line_number)
 {
