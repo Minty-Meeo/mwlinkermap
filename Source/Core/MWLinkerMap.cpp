@@ -24,6 +24,28 @@
 
 namespace MWLinker
 {
+void Map::SymbolClosure::Warn::OneDefinitionRuleViolation(
+    const std::size_t line_number, const std::string_view symbol_name,
+    const std::string_view compilation_unit_name)
+{
+  // For legal linker maps, this should only ever happen in repeat-name compilation units.
+  if (!do_warn_odr_violation)
+    return;
+  mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
+                compilation_unit_name);
+}
+
+void Map::SymbolClosure::Warn::SymOnFlagDetected(const std::size_t line_number,
+                                                 const std::string_view compilation_unit_name)
+{
+  // Multiple STT_SECTION symbols were seen in an uninterrupted compilation unit.  This could be
+  // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
+  if (!do_warn_sym_on_flag_detected)
+    return;
+  mijo::println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" (.text)", line_number,
+                compilation_unit_name);
+}
+
 void Map::EPPC_PatternMatching::Warn::MergingOneDefinitionRuleViolation(
     const std::size_t line_number, const std::string_view symbol_name)
 {
@@ -51,28 +73,6 @@ void Map::EPPC_PatternMatching::Warn::FoldingOneDefinitionRuleViolation(
     return;
   mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
                 object_name);
-}
-
-void Map::SymbolClosure::Warn::OneDefinitionRuleViolation(
-    const std::size_t line_number, const std::string_view symbol_name,
-    const std::string_view compilation_unit_name)
-{
-  // For legal linker maps, this should only ever happen in repeat-name compilation units.
-  if (!do_warn_odr_violation)
-    return;
-  mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
-                compilation_unit_name);
-}
-
-void Map::SymbolClosure::Warn::SymOnFlagDetected(const std::size_t line_number,
-                                                 const std::string_view compilation_unit_name)
-{
-  // Multiple STT_SECTION symbols were seen in an uninterrupted compilation unit.  This could be
-  // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
-  if (!do_warn_sym_on_flag_detected)
-    return;
-  mijo::println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" (.text)", line_number,
-                compilation_unit_name);
 }
 
 void Map::SectionLayout::Warn::RepeatCompilationUnit(const std::size_t line_number,
