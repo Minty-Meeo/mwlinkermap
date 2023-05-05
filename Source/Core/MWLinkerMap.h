@@ -127,8 +127,8 @@ struct Map
     friend Map;
 
     virtual ~PortionBase() = default;
-    constexpr Version GetMinVersion() const noexcept { return min_version; }
-    constexpr Version GetMaxVersion() const noexcept { return max_version; }
+    constexpr Version GetMinVersion() const noexcept { return m_min_version; }
+    constexpr Version GetMaxVersion() const noexcept { return m_max_version; }
     constexpr static Version GetMinVersion(PortionBase* portion)
     {
       return portion ? portion->GetMinVersion() : Version::Unknown;
@@ -140,14 +140,14 @@ struct Map
     virtual bool IsEmpty() const noexcept = 0;
 
   private:
-    constexpr void SetVersionRange(const Version min, const Version max) noexcept
+    constexpr void SetVersionRange(const Version min_version, const Version max_version) noexcept
     {
-      min_version = std::max(min_version, min);
-      max_version = std::min(max_version, max);
+      m_min_version = std::max(m_min_version, min_version);
+      m_max_version = std::min(m_max_version, max_version);
     }
 
-    Version min_version = Version::Unknown;
-    Version max_version = Version::Latest;
+    Version m_min_version = Version::Unknown;
+    Version m_max_version = Version::Latest;
   };
 
   struct SymbolClosure final : PortionBase
@@ -165,12 +165,12 @@ struct Map
     {
       friend SymbolClosure;
 
-      explicit NodeBase() : parent(nullptr) {}  // Necessary for root node
-      explicit NodeBase(NodeBase* parent_) : parent(parent_) {}
+      explicit NodeBase() : m_parent(nullptr) {}  // Necessary for root node
+      explicit NodeBase(NodeBase* parent_) : m_parent(parent_) {}
       virtual ~NodeBase() = default;
 
-      const NodeBase* GetParent() { return parent; }
-      const std::list<std::unique_ptr<NodeBase>>& GetChildren() { return children; }
+      const NodeBase* GetParent() { return m_parent; }
+      const std::list<std::unique_ptr<NodeBase>>& GetChildren() { return m_children; }
       static constexpr std::string_view ToName(Type) noexcept;
       static constexpr std::string_view ToName(Bind) noexcept;
 
@@ -179,8 +179,8 @@ struct Map
                          UnresolvedSymbols::const_iterator, std::size_t&) const;
       static void PrintPrefix(std::ostream&, int);
 
-      NodeBase* parent;
-      std::list<std::unique_ptr<NodeBase>> children;
+      NodeBase* m_parent;
+      std::list<std::unique_ptr<NodeBase>> m_children;
     };
 
     struct NodeReal final : NodeBase
@@ -191,14 +191,14 @@ struct Map
 
         explicit UnreferencedDuplicate(Type type_, Bind bind_, std::string_view module_name_,
                                        std::string_view source_name_)
-            : type(type_), bind(bind_), module_name(module_name_), source_name(source_name_)
+            : m_type(type_), m_bind(bind_), m_module_name(module_name_), m_source_name(source_name_)
         {
         }
 
-        const Type type;
-        const Bind bind;
-        const std::string module_name;
-        const std::string source_name;
+        const Type m_type;
+        const Bind m_bind;
+        const std::string m_module_name;
+        const std::string m_source_name;
 
       private:
         void Print(std::ostream&, int, std::size_t&) const;
@@ -207,22 +207,23 @@ struct Map
       explicit NodeReal(NodeBase* parent_, std::string_view name_, Type type_, Bind bind_,
                         std::string_view module_name_, std::string_view source_name_,
                         std::list<UnreferencedDuplicate> unref_dups_)
-          : NodeBase(parent_), name(name_), type(type_), bind(bind_), module_name(module_name_),
-            source_name(source_name_), unref_dups(std::move(unref_dups_))
+          : NodeBase(parent_), m_name(name_), m_type(type_), m_bind(bind_),
+            m_module_name(module_name_), m_source_name(source_name_),
+            m_unref_dups(std::move(unref_dups_))
       {
       }
       virtual ~NodeReal() override = default;
 
-      const std::string name;
-      const Type type;
-      const Bind bind;
+      const std::string m_name;
+      const Type m_type;
+      const Bind m_bind;
       // Static library or object name
-      const std::string module_name;
+      const std::string m_module_name;
       // When linking a static library, this is either:
       // A) The name of the STT_FILE symbol from the relevant object in the static library.
       // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
-      const std::string source_name;
-      const std::list<UnreferencedDuplicate> unref_dups;
+      const std::string m_source_name;
+      const std::list<UnreferencedDuplicate> m_unref_dups;
 
     private:
       virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
@@ -232,12 +233,12 @@ struct Map
     struct NodeLinkerGenerated final : NodeBase
     {
       explicit NodeLinkerGenerated(NodeBase* parent_, std::string_view name_)
-          : NodeBase(parent_), name(name_)
+          : NodeBase(parent_), m_name(name_)
       {
       }
       virtual ~NodeLinkerGenerated() override = default;
 
-      const std::string name;
+      const std::string m_name;
 
     private:
       virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
@@ -250,8 +251,8 @@ struct Map
     explicit SymbolClosure() = default;
     virtual ~SymbolClosure() override = default;
 
-    virtual bool IsEmpty() const noexcept override { return root.children.empty(); }
-    const ModuleLookup& GetModuleLookup() { return lookup; }
+    virtual bool IsEmpty() const noexcept override { return m_root.m_children.empty(); }
+    const ModuleLookup& GetModuleLookup() { return m_lookup; }
 
     struct Warn
     {
@@ -276,8 +277,8 @@ struct Map
     void Print(std::ostream&, UnresolvedSymbols::const_iterator&, UnresolvedSymbols::const_iterator,
                std::size_t&) const;
 
-    NodeBase root;
-    ModuleLookup lookup;
+    NodeBase m_root;
+    ModuleLookup m_lookup;
   };
 
   struct EPPC_PatternMatching final : PortionBase
@@ -293,22 +294,22 @@ struct Map
 
       explicit MergingUnit(std::string_view first_name_, std::string_view second_name_,
                            Elf32_Word size_, bool will_be_replaced_, bool was_interchanged_)
-          : first_name(first_name_), second_name(second_name_), size(size_),
-            will_be_replaced(will_be_replaced_), was_interchanged(was_interchanged_)
+          : m_first_name(first_name_), m_second_name(second_name_), m_size(size_),
+            m_will_be_replaced(will_be_replaced_), m_was_interchanged(was_interchanged_)
       {
       }
 
-      const std::string first_name;
-      const std::string second_name;
-      const Elf32_Word size;
+      const std::string m_first_name;
+      const std::string m_second_name;
+      const Elf32_Word m_size;
       // If the conditions are right (e.g. the function is more than just a BLR instruction), then
       // one function is replaced with a branch to the other function, saving space at the cost of a
       // tiny amount of overhead. This is by far the more common code merging technique.
-      const bool will_be_replaced;
+      const bool m_will_be_replaced;
       // Rarely, a function can be marked for removal when a duplicate of it is elsewhere in the
       // binary. All references to it are then redirected to the duplicate. Even rarer than that,
       // sometimes the linker can change its mind and replace it with a branch instead.
-      const bool was_interchanged;
+      const bool m_was_interchanged;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
@@ -324,15 +325,15 @@ struct Map
 
         explicit Unit(std::string_view first_name_, std::string_view second_name_, Elf32_Word size_,
                       bool new_branch_function_)
-            : first_name(first_name_), second_name(second_name_), size(size_),
-              new_branch_function(new_branch_function_)
+            : m_first_name(first_name_), m_second_name(second_name_), m_size(size_),
+              m_new_branch_function(new_branch_function_)
         {
         }
 
-        const std::string first_name;
-        const std::string second_name;
-        const Elf32_Word size;
-        const bool new_branch_function;
+        const std::string m_first_name;
+        const std::string m_second_name;
+        const Elf32_Word m_size;
+        const bool m_new_branch_function;
 
       private:
         void Print(std::ostream&, std::size_t&) const;
@@ -341,16 +342,16 @@ struct Map
       using UnitLookup = std::unordered_multimap<std::string_view, const Unit&>;
       using ModuleLookup = std::unordered_map<std::string_view, UnitLookup>;
 
-      explicit FoldingUnit(std::string_view object_name_) : object_name(object_name_) {}
+      explicit FoldingUnit(std::string_view object_name_) : m_object_name(object_name_) {}
 
-      const std::list<Unit>& GetUnits() { return units; }
+      const std::list<Unit>& GetUnits() { return m_units; }
 
-      const std::string object_name;
+      const std::string m_object_name;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
 
-      std::list<Unit> units;
+      std::list<Unit> m_units;
     };
 
     using MergingUnitLookup = std::unordered_multimap<std::string_view, const MergingUnit&>;
@@ -363,12 +364,12 @@ struct Map
 
     virtual bool IsEmpty() const noexcept override
     {
-      return merging_units.empty() || folding_units.empty();
+      return m_merging_units.empty() || m_folding_units.empty();
     }
-    const std::list<MergingUnit>& GetMergingUnits() { return merging_units; }
-    const std::list<FoldingUnit>& GetFoldingUnits() { return folding_units; }
-    const MergingUnitLookup& GetMergingLookup() { return merging_lookup; }
-    const FoldingUnit::ModuleLookup& GetFoldingModuleLookup() { return folding_lookup; }
+    const std::list<MergingUnit>& GetMergingUnits() { return m_merging_units; }
+    const std::list<FoldingUnit>& GetFoldingUnits() { return m_folding_units; }
+    const MergingUnitLookup& GetMergingLookup() { return m_merging_lookup; }
+    const FoldingUnit::ModuleLookup& GetFoldingModuleLookup() { return m_folding_lookup; }
 
     struct Warn
     {
@@ -396,10 +397,10 @@ struct Map
     Error Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
-    std::list<MergingUnit> merging_units;
-    std::list<FoldingUnit> folding_units;
-    MergingUnitLookup merging_lookup;
-    FoldingUnit::ModuleLookup folding_lookup;
+    std::list<MergingUnit> m_merging_units;
+    std::list<FoldingUnit> m_folding_units;
+    MergingUnitLookup m_merging_lookup;
+    FoldingUnit::ModuleLookup m_folding_lookup;
   };
 
   struct LinkerOpts final : PortionBase
@@ -422,20 +423,20 @@ struct Map
       };
 
       explicit Unit(std::string_view module_name_, std::string_view name_)
-          : unit_kind(Kind::DisassembleError), module_name(module_name_), name(name_)
+          : m_unit_kind(Kind::DisassembleError), m_module_name(module_name_), m_name(name_)
       {
       }
       explicit Unit(const Kind unit_kind_, std::string_view module_name_, std::string_view name_,
                     std::string_view reference_name_)
-          : unit_kind(unit_kind_), module_name(module_name_), name(name_),
-            reference_name(reference_name_)
+          : m_unit_kind(unit_kind_), m_module_name(module_name_), m_name(name_),
+            m_reference_name(reference_name_)
       {
       }
 
-      const Kind unit_kind;
-      const std::string module_name;
-      const std::string name;
-      const std::string reference_name;
+      const Kind m_unit_kind;
+      const std::string m_module_name;
+      const std::string m_name;
+      const std::string m_reference_name;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
@@ -444,14 +445,14 @@ struct Map
     explicit LinkerOpts() { SetVersionRange(Version::version_4_2_build_142, Version::Latest); }
     virtual ~LinkerOpts() override = default;
 
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
-    const std::list<Unit>& GetUnits() { return units; }
+    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
     Error Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
-    std::list<Unit> units;
+    std::list<Unit> m_units;
   };
 
   struct BranchIslands final : PortionBase
@@ -466,13 +467,13 @@ struct Map
       friend BranchIslands;
 
       explicit Unit(std::string_view first_name_, std::string_view second_name_, bool is_safe_)
-          : first_name(first_name_), second_name(second_name_), is_safe(is_safe_)
+          : m_first_name(first_name_), m_second_name(second_name_), m_is_safe(is_safe_)
       {
       }
 
-      const std::string first_name;
-      const std::string second_name;
-      const bool is_safe;
+      const std::string m_first_name;
+      const std::string m_second_name;
+      const bool m_is_safe;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
@@ -481,14 +482,14 @@ struct Map
     explicit BranchIslands() { SetVersionRange(Version::version_4_1_build_51213, Version::Latest); }
     virtual ~BranchIslands() override = default;
 
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
-    const std::list<Unit>& GetUnits() { return units; }
+    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
     Error Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
-    std::list<Unit> units;
+    std::list<Unit> m_units;
   };
 
   struct MixedModeIslands final : PortionBase
@@ -503,13 +504,13 @@ struct Map
       friend MixedModeIslands;
 
       explicit Unit(std::string_view first_name_, std::string_view second_name_, bool is_safe_)
-          : first_name(first_name_), second_name(second_name_), is_safe(is_safe_)
+          : m_first_name(first_name_), m_second_name(second_name_), m_is_safe(is_safe_)
       {
       }
 
-      const std::string first_name;
-      const std::string second_name;
-      const bool is_safe;
+      const std::string m_first_name;
+      const std::string m_second_name;
+      const bool m_is_safe;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
@@ -521,14 +522,14 @@ struct Map
     }
     virtual ~MixedModeIslands() override = default;
 
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
-    const std::list<Unit>& GetUnits() { return units; }
+    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
     Error Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
-    std::list<Unit> units;
+    std::list<Unit> m_units;
   };
 
   struct LinktimeSizeDecreasingOptimizations final : PortionBase
@@ -647,20 +648,20 @@ struct Map
       // UNUSED symbols
       explicit Unit(Elf32_Word size_, std::string_view name_, std::string_view module_name_,
                     std::string_view source_name_, ScanningContext& scanning_context)
-          : unit_kind(Kind::Unused), starting_address{},
-            size(size_), virtual_address{}, file_offset{}, alignment{}, name(name_),
-            entry_parent(nullptr), module_name(module_name_), source_name(source_name_),
-            unit_trait(DeduceUsualSubtext(scanning_context))
+          : m_unit_kind(Kind::Unused), m_starting_address{},
+            m_size(size_), m_virtual_address{}, m_file_offset{}, m_alignment{}, m_name(name_),
+            m_entry_parent(nullptr), m_module_name(module_name_), m_source_name(source_name_),
+            m_unit_trait(DeduceUsualSubtext(scanning_context))
       {
       }
       // 3-column normal symbols
       explicit Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
                     int alignment_, std::string_view name_, std::string_view module_name_,
                     std::string_view source_name_, ScanningContext& scanning_context)
-          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset{}, alignment(alignment_), name(name_),
-            entry_parent(nullptr), module_name(module_name_), source_name(source_name_),
-            unit_trait(DeduceUsualSubtext(scanning_context))
+          : m_unit_kind(Kind::Normal), m_starting_address(starting_address_), m_size(size_),
+            m_virtual_address(virtual_address_), m_file_offset{}, m_alignment(alignment_),
+            m_name(name_), m_entry_parent(nullptr), m_module_name(module_name_),
+            m_source_name(source_name_), m_unit_trait(DeduceUsualSubtext(scanning_context))
       {
       }
       // 4-column normal symbols
@@ -668,10 +669,11 @@ struct Map
                     std::uint32_t file_offset_, int alignment_, std::string_view name_,
                     std::string_view module_name_, std::string_view source_name_,
                     ScanningContext& scanning_context)
-          : unit_kind(Kind::Normal), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            name(name_), entry_parent(nullptr), module_name(module_name_),
-            source_name(source_name_), unit_trait(DeduceUsualSubtext(scanning_context))
+          : m_unit_kind(Kind::Normal), m_starting_address(starting_address_), m_size(size_),
+            m_virtual_address(virtual_address_), m_file_offset(file_offset_),
+            m_alignment(alignment_), m_name(name_), m_entry_parent(nullptr),
+            m_module_name(module_name_), m_source_name(source_name_),
+            m_unit_trait(DeduceUsualSubtext(scanning_context))
       {
       }
       // 3-column entry symbols
@@ -679,10 +681,10 @@ struct Map
                     std::string_view name_, const Unit* entry_parent_,
                     std::string_view module_name_, std::string_view source_name_,
                     ScanningContext& scanning_context)
-          : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset{}, alignment{}, name(name_),
-            entry_parent(entry_parent_), module_name(module_name_), source_name(source_name_),
-            unit_trait(DeduceEntrySubtext(scanning_context))
+          : m_unit_kind(Kind::Entry), m_starting_address(starting_address_), m_size(size_),
+            m_virtual_address(virtual_address_), m_file_offset{}, m_alignment{}, m_name(name_),
+            m_entry_parent(entry_parent_), m_module_name(module_name_), m_source_name(source_name_),
+            m_unit_trait(DeduceEntrySubtext(scanning_context))
       {
       }
       // 4-column entry symbols
@@ -690,47 +692,47 @@ struct Map
                     std::uint32_t file_offset_, std::string_view name_, const Unit* entry_parent_,
                     std::string_view module_name_, std::string_view source_name_,
                     ScanningContext& scanning_context)
-          : unit_kind(Kind::Entry), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset(file_offset_), alignment{}, name(name_),
-            entry_parent(entry_parent_), module_name(module_name_), source_name(source_name_),
-            unit_trait(DeduceEntrySubtext(scanning_context))
+          : m_unit_kind(Kind::Entry), m_starting_address(starting_address_), m_size(size_),
+            m_virtual_address(virtual_address_), m_file_offset(file_offset_), m_alignment{},
+            m_name(name_), m_entry_parent(entry_parent_), m_module_name(module_name_),
+            m_source_name(source_name_), m_unit_trait(DeduceEntrySubtext(scanning_context))
       {
       }
       // 4-column special symbols
       explicit Unit(std::uint32_t starting_address_, Elf32_Word size_, Elf32_Addr virtual_address_,
                     std::uint32_t file_offset_, int alignment_, Trait unit_trait_)
-          : unit_kind(Kind::Special), starting_address(starting_address_), size(size_),
-            virtual_address(virtual_address_), file_offset(file_offset_), alignment(alignment_),
-            entry_parent(nullptr), unit_trait(unit_trait_)
+          : m_unit_kind(Kind::Special), m_starting_address(starting_address_), m_size(size_),
+            m_virtual_address(virtual_address_), m_file_offset(file_offset_),
+            m_alignment(alignment_), m_entry_parent(nullptr), m_unit_trait(unit_trait_)
       {
       }
 
-      const Unit* GetEntryParent() { return entry_parent; }
-      const std::list<const Unit*>& GetEntryChildren() { return entry_children; }
+      const Unit* GetEntryParent() { return m_entry_parent; }
+      const std::list<const Unit*>& GetEntryChildren() { return m_entry_children; }
       static constexpr std::string_view ToSpecialName(Trait);
 
-      const Kind unit_kind;
-      const std::uint32_t starting_address;
-      const Elf32_Word size;
-      const Elf32_Addr virtual_address;
-      const std::uint32_t file_offset;
-      const int alignment;
-      const std::string name;
+      const Kind m_unit_kind;
+      const std::uint32_t m_starting_address;
+      const Elf32_Word m_size;
+      const Elf32_Addr m_virtual_address;
+      const std::uint32_t m_file_offset;
+      const int m_alignment;
+      const std::string m_name;
 
     private:
       // Doubly-linked relationship between entry symbols and their host.
-      const Unit* const entry_parent;
+      const Unit* const m_entry_parent;
       // Doubly-linked relationship between entry symbols and their host.
-      std::list<const Unit*> entry_children;
+      std::list<const Unit*> m_entry_children;
 
     public:
       // Static library or object name
-      const std::string module_name;
+      const std::string m_module_name;
       // When linking a static library, this is either:
       // A) The name of the STT_FILE symbol from the relevant object in the static library.
       // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
-      const std::string source_name;
-      const Trait unit_trait;
+      const std::string m_source_name;
+      const Trait m_unit_trait;
 
     private:
       void Print3Column(std::ostream&, std::size_t&) const;
@@ -740,18 +742,18 @@ struct Map
     };
 
     explicit SectionLayout(Kind section_kind_, std::string_view name_)
-        : section_kind(section_kind_), name(name_)
+        : m_section_kind(section_kind_), m_name(name_)
     {
     }
     virtual ~SectionLayout() override = default;
 
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
-    const std::list<Unit>& GetUnits() const noexcept { return units; }
-    const ModuleLookup& GetModuleLookup() const noexcept { return lookup; }
+    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    const std::list<Unit>& GetUnits() const noexcept { return m_units; }
+    const ModuleLookup& GetModuleLookup() const noexcept { return m_lookup; }
     static Kind ToSectionKind(std::string_view);
 
-    const Kind section_kind;
-    const std::string name;
+    const Kind m_section_kind;
+    const std::string m_name;
 
     struct Warn
     {
@@ -787,8 +789,8 @@ struct Map
     Error ScanTLOZTP(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
-    std::list<Unit> units;
-    ModuleLookup lookup;
+    std::list<Unit> m_units;
+    ModuleLookup m_lookup;
   };
 
   struct MemoryMap final : PortionBase
@@ -808,82 +810,82 @@ struct Map
 
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_)
-          : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), rom_address{}, ram_buffer_address{}, s_record_line{},
-            bin_file_offset{}
+          : m_name(name_), m_starting_address(starting_address_), m_size(size_),
+            m_file_offset(file_offset_), m_rom_address{}, m_ram_buffer_address{}, m_srecord_line{},
+            m_bin_file_offset{}
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, int s_record_line_)
-          : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), rom_address{}, ram_buffer_address{},
-            s_record_line(s_record_line_), bin_file_offset{}
+          : m_name(name_), m_starting_address(starting_address_), m_size(size_),
+            m_file_offset(file_offset_), m_rom_address{}, m_ram_buffer_address{},
+            m_srecord_line(s_record_line_), m_bin_file_offset{}
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, std::uint32_t rom_address_,
                           std::uint32_t ram_buffer_address_)
-          : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), rom_address(rom_address_),
-            ram_buffer_address(ram_buffer_address_), s_record_line{}, bin_file_offset{}
+          : m_name(name_), m_starting_address(starting_address_), m_size(size_),
+            m_file_offset(file_offset_), m_rom_address(rom_address_),
+            m_ram_buffer_address(ram_buffer_address_), m_srecord_line{}, m_bin_file_offset{}
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, std::uint32_t rom_address_,
                           std::uint32_t ram_buffer_address_, int s_record_line_)
-          : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), rom_address(rom_address_),
-            ram_buffer_address(ram_buffer_address_),
-            s_record_line(s_record_line_), bin_file_offset{}
+          : m_name(name_), m_starting_address(starting_address_), m_size(size_),
+            m_file_offset(file_offset_), m_rom_address(rom_address_),
+            m_ram_buffer_address(ram_buffer_address_),
+            m_srecord_line(s_record_line_), m_bin_file_offset{}
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, std::uint32_t bin_file_offset_,
                           std::string_view bin_file_name_)
-          : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), rom_address{}, ram_buffer_address{}, s_record_line{},
-            bin_file_offset(bin_file_offset_), bin_file_name(bin_file_name_)
+          : m_name(name_), m_starting_address(starting_address_), m_size(size_),
+            m_file_offset(file_offset_), m_rom_address{}, m_ram_buffer_address{}, m_srecord_line{},
+            m_bin_file_offset(bin_file_offset_), m_bin_file_name(bin_file_name_)
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, int s_record_line_,
                           std::uint32_t bin_file_offset_, std::string_view bin_file_name_)
-          : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), rom_address{}, ram_buffer_address{},
-            s_record_line(s_record_line_), bin_file_offset(bin_file_offset_),
-            bin_file_name(bin_file_name_)
+          : m_name(name_), m_starting_address(starting_address_), m_size(size_),
+            m_file_offset(file_offset_), m_rom_address{}, m_ram_buffer_address{},
+            m_srecord_line(s_record_line_), m_bin_file_offset(bin_file_offset_),
+            m_bin_file_name(bin_file_name_)
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, std::uint32_t rom_address_,
                           std::uint32_t ram_buffer_address_, std::uint32_t bin_file_offset_,
                           std::string_view bin_file_name_)
-          : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), rom_address(rom_address_),
-            ram_buffer_address(ram_buffer_address_), s_record_line{},
-            bin_file_offset(bin_file_offset_), bin_file_name(bin_file_name_)
+          : m_name(name_), m_starting_address(starting_address_), m_size(size_),
+            m_file_offset(file_offset_), m_rom_address(rom_address_),
+            m_ram_buffer_address(ram_buffer_address_), m_srecord_line{},
+            m_bin_file_offset(bin_file_offset_), m_bin_file_name(bin_file_name_)
       {
       }
       explicit UnitNormal(std::string_view name_, Elf32_Addr starting_address_, Elf32_Word size_,
                           std::uint32_t file_offset_, std::uint32_t rom_address_,
                           std::uint32_t ram_buffer_address_, int s_record_line_,
                           std::uint32_t bin_file_offset_, std::string_view bin_file_name_)
-          : name(name_), starting_address(starting_address_), size(size_),
-            file_offset(file_offset_), rom_address(rom_address_),
-            ram_buffer_address(ram_buffer_address_), s_record_line(s_record_line_),
-            bin_file_offset(bin_file_offset_), bin_file_name(bin_file_name_)
+          : m_name(name_), m_starting_address(starting_address_), m_size(size_),
+            m_file_offset(file_offset_), m_rom_address(rom_address_),
+            m_ram_buffer_address(ram_buffer_address_), m_srecord_line(s_record_line_),
+            m_bin_file_offset(bin_file_offset_), m_bin_file_name(bin_file_name_)
       {
       }
 
-      const std::string name;
-      const Elf32_Addr starting_address;
-      const Elf32_Word size;
-      const std::uint32_t file_offset;
-      const std::uint32_t rom_address;
-      const std::uint32_t ram_buffer_address;
-      const int s_record_line;
-      const std::uint32_t bin_file_offset;
-      const std::string bin_file_name;
+      const std::string m_name;
+      const Elf32_Addr m_starting_address;
+      const Elf32_Word m_size;
+      const std::uint32_t m_file_offset;
+      const std::uint32_t m_rom_address;
+      const std::uint32_t m_ram_buffer_address;
+      const int m_srecord_line;
+      const std::uint32_t m_bin_file_offset;
+      const std::string m_bin_file_name;
 
     private:
       void PrintSimple_old(std::ostream&, std::size_t&) const;
@@ -903,13 +905,13 @@ struct Map
       friend MemoryMap;
 
       explicit UnitDebug(std::string_view name_, Elf32_Word size_, std::uint32_t file_offset_)
-          : name(name_), size(size_), file_offset(file_offset_)
+          : m_name(name_), m_size(size_), m_file_offset(file_offset_)
       {
       }
 
-      const std::string name;
-      const Elf32_Word size;
-      const std::uint32_t file_offset;
+      const std::string m_name;
+      const Elf32_Word m_size;
+      const std::uint32_t m_file_offset;
 
     private:
       void Print_older(std::ostream&, std::size_t&) const;
@@ -918,12 +920,12 @@ struct Map
     };
 
     explicit MemoryMap(bool has_rom_ram_)  // ctor for old memory map
-        : has_rom_ram(has_rom_ram_), has_s_record(false), has_bin_file(false)
+        : m_has_rom_ram(has_rom_ram_), m_has_s_record(false), m_has_bin_file(false)
     {
       SetVersionRange(Version::Unknown, Version::version_4_2_build_60320);
     }
     explicit MemoryMap(bool has_rom_ram_, bool has_s_record_, bool has_bin_file_)
-        : has_rom_ram(has_rom_ram_), has_s_record(has_s_record_), has_bin_file(has_bin_file_)
+        : m_has_rom_ram(has_rom_ram_), m_has_s_record(has_s_record_), m_has_bin_file(has_bin_file_)
     {
       SetVersionRange(Version::version_4_2_build_142, Version::Latest);
     }
@@ -931,14 +933,14 @@ struct Map
 
     virtual bool IsEmpty() const noexcept override
     {
-      return normal_units.empty() || debug_units.empty();
+      return m_normal_units.empty() || m_debug_units.empty();
     }
-    const std::list<UnitNormal>& GetNormalUnits() const noexcept { return normal_units; }
-    const std::list<UnitDebug>& GetDebugUnits() const noexcept { return debug_units; }
+    const std::list<UnitNormal>& GetNormalUnits() const noexcept { return m_normal_units; }
+    const std::list<UnitDebug>& GetDebugUnits() const noexcept { return m_debug_units; }
 
-    const bool has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
-    const bool has_s_record;  // Enabled by '-srec [filename]' option
-    const bool has_bin_file;  // Enabled by '-genbinary keyword' option
+    const bool m_has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
+    const bool m_has_s_record;  // Enabled by '-srec [filename]' option
+    const bool m_has_bin_file;  // Enabled by '-genbinary keyword' option
 
   private:
     Error ScanSimple_old(const char*&, const char*, std::size_t&);
@@ -967,8 +969,8 @@ struct Map
     void PrintRomRamSRecordBinFile(std::ostream&, std::size_t&) const;
     void PrintDebug(std::ostream&, std::size_t&) const;
 
-    std::list<UnitNormal> normal_units;
-    std::list<UnitDebug> debug_units;
+    std::list<UnitNormal> m_normal_units;
+    std::list<UnitDebug> m_debug_units;
   };
 
   struct LinkerGeneratedSymbols final : PortionBase
@@ -979,10 +981,10 @@ struct Map
     {
       friend LinkerGeneratedSymbols;
 
-      explicit Unit(std::string_view name_, Elf32_Addr value_) : name(name_), value(value_) {}
+      explicit Unit(std::string_view name_, Elf32_Addr value_) : m_name(name_), m_value(value_) {}
 
-      const std::string name;
-      const Elf32_Addr value;
+      const std::string m_name;
+      const Elf32_Addr m_value;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
@@ -991,14 +993,14 @@ struct Map
     explicit LinkerGeneratedSymbols() = default;
     virtual ~LinkerGeneratedSymbols() override = default;
 
-    virtual bool IsEmpty() const noexcept override { return units.empty(); }
-    const std::list<Unit>& GetUnits() const noexcept { return units; }
+    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    const std::list<Unit>& GetUnits() const noexcept { return m_units; }
 
   private:
     Error Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
-    std::list<Unit> units;
+    std::list<Unit> m_units;
   };
 
   Error Scan(std::string_view, std::size_t&);
@@ -1011,65 +1013,65 @@ struct Map
   Version GetMinVersion() const noexcept
   {
     Version min_version = std::max({
-        PortionBase::GetMinVersion(normal_symbol_closure.get()),
-        PortionBase::GetMinVersion(eppc_pattern_matching.get()),
-        PortionBase::GetMinVersion(dwarf_symbol_closure.get()),
-        PortionBase::GetMinVersion(linker_opts.get()),
-        PortionBase::GetMinVersion(mixed_mode_islands.get()),
-        PortionBase::GetMinVersion(branch_islands.get()),
-        PortionBase::GetMinVersion(linktime_size_decreasing_optimizations.get()),
-        PortionBase::GetMinVersion(linktime_size_increasing_optimizations.get()),
-        PortionBase::GetMinVersion(memory_map.get()),
-        PortionBase::GetMinVersion(linker_generated_symbols.get()),
+        PortionBase::GetMinVersion(m_normal_symbol_closure.get()),
+        PortionBase::GetMinVersion(m_eppc_pattern_matching.get()),
+        PortionBase::GetMinVersion(m_dwarf_symbol_closure.get()),
+        PortionBase::GetMinVersion(m_linker_opts.get()),
+        PortionBase::GetMinVersion(m_mixed_mode_islands.get()),
+        PortionBase::GetMinVersion(m_branch_islands.get()),
+        PortionBase::GetMinVersion(m_linktime_size_decreasing_optimizations.get()),
+        PortionBase::GetMinVersion(m_linktime_size_increasing_optimizations.get()),
+        PortionBase::GetMinVersion(m_memory_map.get()),
+        PortionBase::GetMinVersion(m_linker_generated_symbols.get()),
     });
-    for (const auto& section_layout : section_layouts)
+    for (const auto& section_layout : m_section_layouts)
       min_version = std::max(PortionBase::GetMinVersion(section_layout.get()), min_version);
     return min_version;
   }
   Version GetMaxVersion() const noexcept
   {
     Version max_version = std::min({
-        PortionBase::GetMaxVersion(normal_symbol_closure.get()),
-        PortionBase::GetMaxVersion(eppc_pattern_matching.get()),
-        PortionBase::GetMaxVersion(dwarf_symbol_closure.get()),
-        PortionBase::GetMaxVersion(linker_opts.get()),
-        PortionBase::GetMaxVersion(mixed_mode_islands.get()),
-        PortionBase::GetMaxVersion(branch_islands.get()),
-        PortionBase::GetMaxVersion(linktime_size_decreasing_optimizations.get()),
-        PortionBase::GetMaxVersion(linktime_size_increasing_optimizations.get()),
-        PortionBase::GetMaxVersion(memory_map.get()),
-        PortionBase::GetMaxVersion(linker_generated_symbols.get()),
+        PortionBase::GetMaxVersion(m_normal_symbol_closure.get()),
+        PortionBase::GetMaxVersion(m_eppc_pattern_matching.get()),
+        PortionBase::GetMaxVersion(m_dwarf_symbol_closure.get()),
+        PortionBase::GetMaxVersion(m_linker_opts.get()),
+        PortionBase::GetMaxVersion(m_mixed_mode_islands.get()),
+        PortionBase::GetMaxVersion(m_branch_islands.get()),
+        PortionBase::GetMaxVersion(m_linktime_size_decreasing_optimizations.get()),
+        PortionBase::GetMaxVersion(m_linktime_size_increasing_optimizations.get()),
+        PortionBase::GetMaxVersion(m_memory_map.get()),
+        PortionBase::GetMaxVersion(m_linker_generated_symbols.get()),
     });
-    for (const auto& section_layout : section_layouts)
+    for (const auto& section_layout : m_section_layouts)
       max_version = std::min(PortionBase::GetMaxVersion(section_layout.get()), max_version);
     return max_version;
   }
 
-  const std::string& GetEntryPointName() const noexcept { return entry_point_name; }
+  const std::string& GetEntryPointName() const noexcept { return m_entry_point_name; }
   const std::unique_ptr<SymbolClosure>& GetNormalSymbolClosure() const noexcept
   {
-    return normal_symbol_closure;
+    return m_normal_symbol_closure;
   }
   const std::unique_ptr<EPPC_PatternMatching>& GetEPPC_PatternMatching() const noexcept
   {
-    return eppc_pattern_matching;
+    return m_eppc_pattern_matching;
   }
   const std::unique_ptr<SymbolClosure>& GetDwarfSymbolClosure() const noexcept
   {
-    return dwarf_symbol_closure;
+    return m_dwarf_symbol_closure;
   }
-  const UnresolvedSymbols& GetUnresolvedSymbols() const noexcept { return unresolved_symbols; }
+  const UnresolvedSymbols& GetUnresolvedSymbols() const noexcept { return m_unresolved_symbols; }
   const std::list<std::unique_ptr<SectionLayout>>& GetSectionLayouts() const noexcept
   {
-    return section_layouts;
+    return m_section_layouts;
   }
   const std::unique_ptr<MemoryMap>& GetMemoryMap() const noexcept  //
   {
-    return memory_map;
+    return m_memory_map;
   }
   const std::unique_ptr<LinkerGeneratedSymbols>& GetLinkerGeneratedSymbols() const noexcept
   {
-    return linker_generated_symbols;
+    return m_linker_generated_symbols;
   }
 
   struct Warn
@@ -1091,18 +1093,18 @@ private:
   static void PrintUnresolvedSymbols(std::ostream&, UnresolvedSymbols::const_iterator&,
                                      UnresolvedSymbols::const_iterator, std::size_t&);
 
-  std::string entry_point_name;
-  std::unique_ptr<SymbolClosure> normal_symbol_closure;
-  std::unique_ptr<EPPC_PatternMatching> eppc_pattern_matching;
-  std::unique_ptr<SymbolClosure> dwarf_symbol_closure;
-  UnresolvedSymbols unresolved_symbols;
-  std::unique_ptr<LinkerOpts> linker_opts;
-  std::unique_ptr<MixedModeIslands> mixed_mode_islands;
-  std::unique_ptr<BranchIslands> branch_islands;
-  std::unique_ptr<LinktimeSizeDecreasingOptimizations> linktime_size_decreasing_optimizations;
-  std::unique_ptr<LinktimeSizeIncreasingOptimizations> linktime_size_increasing_optimizations;
-  std::list<std::unique_ptr<SectionLayout>> section_layouts;
-  std::unique_ptr<MemoryMap> memory_map;
-  std::unique_ptr<LinkerGeneratedSymbols> linker_generated_symbols;
+  std::string m_entry_point_name;
+  std::unique_ptr<SymbolClosure> m_normal_symbol_closure;
+  std::unique_ptr<EPPC_PatternMatching> m_eppc_pattern_matching;
+  std::unique_ptr<SymbolClosure> m_dwarf_symbol_closure;
+  UnresolvedSymbols m_unresolved_symbols;
+  std::unique_ptr<LinkerOpts> m_linker_opts;
+  std::unique_ptr<MixedModeIslands> m_mixed_mode_islands;
+  std::unique_ptr<BranchIslands> m_branch_islands;
+  std::unique_ptr<LinktimeSizeDecreasingOptimizations> m_linktime_size_decreasing_optimizations;
+  std::unique_ptr<LinktimeSizeIncreasingOptimizations> m_linktime_size_increasing_optimizations;
+  std::list<std::unique_ptr<SectionLayout>> m_section_layouts;
+  std::unique_ptr<MemoryMap> m_memory_map;
+  std::unique_ptr<LinkerGeneratedSymbols> m_linker_generated_symbols;
 };
 }  // namespace MWLinker
