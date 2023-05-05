@@ -1,3 +1,6 @@
+// Copyright 2023 Bradley G. (Minty Meeo)
+// SPDX-License-Identifier: MIT
+
 #include "MWLinkerMap.h"
 
 #include <cassert>
