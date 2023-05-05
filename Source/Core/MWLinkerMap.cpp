@@ -1836,6 +1836,9 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
     {
       if (m_name == "_eti_init_info" && compilation_unit_name == "Linker Generated Symbol File")
       {
+        // This technically is a minimum version clue, but then again so is every symbol
+        // originating from the "Linker Generated Symbol File".  They all started appearing with
+        // CodeWarrior for GCN 2.7, which has plenty of other clues that have already been caught.
         is_second_lap = true;
       }
       // TODO: There is currently no clean way to detect repeat-name compilation units during
