@@ -1088,6 +1088,8 @@ private:
   Error ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string_view);
   Error ScanPrologue_MemoryMap(const char*&, const char*, std::size_t&);
   Error ScanForGarbage(const char*, const char*);
+  static void PrintUnresolvedSymbols(std::ostream&, UnresolvedSymbols::const_iterator&,
+                                     UnresolvedSymbols::const_iterator, std::size_t&);
 
   std::string entry_point_name;
   std::unique_ptr<SymbolClosure> normal_symbol_closure;

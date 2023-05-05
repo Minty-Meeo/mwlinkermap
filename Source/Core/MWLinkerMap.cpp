@@ -297,7 +297,8 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number, this->unresolved_symbols);
     if (error != Error::None)
       return error;
-    this->normal_symbol_closure = std::move(portion);
+    if (!portion->IsEmpty())
+      this->normal_symbol_closure = std::move(portion);
   }
   {
     auto portion = std::make_unique<EPPC_PatternMatching>();
@@ -317,8 +318,10 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
+    {
       portion->SetVersionRange(Version::version_3_0_4, Version::Latest);
-    this->dwarf_symbol_closure = std::move(portion);
+      this->dwarf_symbol_closure = std::move(portion);
+    }
   }
   // Unresolved symbol post-prints probably belong here (I have not confirmed if they preceed
   // LinkerOpts), but the Symbol Closure scanning code that just happened handles them well enough.
@@ -502,6 +505,8 @@ void Map::Print(std::ostream& stream, std::size_t& line_number) const
     eppc_pattern_matching->Print(stream, line_number);
   if (dwarf_symbol_closure)
     dwarf_symbol_closure->Print(stream, unresolved_head, unresolved_tail, line_number);
+  // This handles post-print unresolved symbols as well as when no symbol closure(s) exist.
+  PrintUnresolvedSymbols(stream, unresolved_head, unresolved_tail, line_number);
   if (linker_opts)
     linker_opts->Print(stream, line_number);
   if (mixed_mode_islands)
@@ -518,6 +523,18 @@ void Map::Print(std::ostream& stream, std::size_t& line_number) const
     memory_map->Print(stream, line_number);
   if (linker_generated_symbols)
     linker_generated_symbols->Print(stream, line_number);
+}
+
+void Map::PrintUnresolvedSymbols(  //
+    std::ostream& stream, UnresolvedSymbols::const_iterator& head,
+    const UnresolvedSymbols::const_iterator tail, std::size_t& line_number)
+{
+  while (head != tail && head->first == line_number)
+  {
+    // ">>> SYMBOL NOT FOUND: %s\r\n"
+    mijo::print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", (head++)->second);
+    line_number += 1u;
+  }
 }
 
 // clang-format off
@@ -1222,12 +1239,9 @@ void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarc
                                          const UnresolvedSymbols::const_iterator unresolved_tail,
                                          std::size_t& line_number) const
 {
-  while (unresolved_head != unresolved_tail && unresolved_head->first == line_number)
-  {
-    // ">>> SYMBOL NOT FOUND: %s\r\n"
-    mijo::print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", (unresolved_head++)->second);
-    line_number += 1;
-  }
+  // This handles pre-print and mid-print unresolved symbols. Assuming the symbol closure exists at
+  // the right time, this will also handle post-print unresolved symbols.
+  Map::PrintUnresolvedSymbols(stream, unresolved_head, unresolved_tail, line_number);
   for (const auto& node : this->children)
     node->Print(stream, hierarchy_level + 1, unresolved_head, unresolved_tail, line_number);
 }
