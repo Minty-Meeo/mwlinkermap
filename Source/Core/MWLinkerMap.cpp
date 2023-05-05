@@ -237,7 +237,7 @@ Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string_vie
 
 Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->Scan(string_view.begin(), string_view.end(), line_number);
+  return Scan(string_view.begin(), string_view.end(), line_number);
 }
 
 Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line_number)
@@ -258,7 +258,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     line_number += 2u;
     head = match[0].second;
     const auto error =
-        this->ScanPrologue_SectionLayout(head, tail, line_number, mijo::to_string_view(match[1]));
+        ScanPrologue_SectionLayout(head, tail, line_number, mijo::to_string_view(match[1]));
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -275,7 +275,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     line_number += 1u;
     head = match[0].second;
     const auto error =
-        this->ScanPrologue_SectionLayout(head, tail, line_number, mijo::to_string_view(match[1]));
+        ScanPrologue_SectionLayout(head, tail, line_number, mijo::to_string_view(match[1]));
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -285,7 +285,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 1u;
     head = match[0].second;
-    this->m_entry_point_name = match.str(1);
+    m_entry_point_name = match.str(1);
   }
   else
   {
@@ -294,11 +294,11 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   }
   {
     auto portion = std::make_unique<SymbolClosure>();
-    const auto error = portion->Scan(head, tail, line_number, this->m_unresolved_symbols);
+    const auto error = portion->Scan(head, tail, line_number, m_unresolved_symbols);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      this->m_normal_symbol_closure = std::move(portion);
+      m_normal_symbol_closure = std::move(portion);
   }
   {
     auto portion = std::make_unique<EPPC_PatternMatching>();
@@ -306,7 +306,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      this->m_eppc_pattern_matching = std::move(portion);
+      m_eppc_pattern_matching = std::move(portion);
   }
   // With '-listdwarf' and DWARF debugging information enabled, a second symbol closure
   // containing info about the .dwarf and .debug sections will appear. Note that, without an
@@ -314,13 +314,13 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   // eyes of this scan function.
   {
     auto portion = std::make_unique<SymbolClosure>();
-    const auto error = portion->Scan(head, tail, line_number, this->m_unresolved_symbols);
+    const auto error = portion->Scan(head, tail, line_number, m_unresolved_symbols);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
     {
       portion->SetVersionRange(Version::version_3_0_4, Version::Latest);
-      this->m_dwarf_symbol_closure = std::move(portion);
+      m_dwarf_symbol_closure = std::move(portion);
     }
   }
   // Unresolved symbol post-prints probably belong here (I have not confirmed if they preceed
@@ -331,7 +331,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      this->m_linker_opts = std::move(portion);
+      m_linker_opts = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_mixed_mode_islands_header,
                         std::regex_constants::match_continuous))
@@ -342,7 +342,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->m_mixed_mode_islands = std::move(portion);
+    m_mixed_mode_islands = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_branch_islands_header,
                         std::regex_constants::match_continuous))
@@ -353,7 +353,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->m_branch_islands = std::move(portion);
+    m_branch_islands = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_linktime_size_decreasing_optimizations_header,
                         std::regex_constants::match_continuous))
@@ -364,7 +364,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->m_linktime_size_decreasing_optimizations = std::move(portion);
+    m_linktime_size_decreasing_optimizations = std::move(portion);
   }
   if (std::regex_search(head, tail, match, re_linktime_size_increasing_optimizations_header,
                         std::regex_constants::match_continuous))
@@ -375,7 +375,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->m_linktime_size_increasing_optimizations = std::move(portion);
+    m_linktime_size_increasing_optimizations = std::move(portion);
   }
 NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   while (std::regex_search(head, tail, match, re_section_layout_header,
@@ -384,7 +384,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
     line_number += 3u;
     head = match[0].second;
     const auto error =
-        this->ScanPrologue_SectionLayout(head, tail, line_number, mijo::to_string_view(match[1]));
+        ScanPrologue_SectionLayout(head, tail, line_number, mijo::to_string_view(match[1]));
     if (error != Error::None)
       return error;
   }
@@ -393,7 +393,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   {
     line_number += 3u;
     head = match[0].second;
-    const auto error = this->ScanPrologue_MemoryMap(head, tail, line_number);
+    const auto error = ScanPrologue_MemoryMap(head, tail, line_number);
     if (error != Error::None)
       return error;
   }
@@ -406,14 +406,14 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
     const auto error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->m_linker_generated_symbols = std::move(portion);
+    m_linker_generated_symbols = std::move(portion);
   }
-  return this->ScanForGarbage(head, tail);
+  return ScanForGarbage(head, tail);
 }
 
 Map::Error Map::ScanTLOZTP(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->ScanTLOZTP(string_view.begin(), string_view.end(), line_number);
+  return ScanTLOZTP(string_view.begin(), string_view.end(), line_number);
 }
 
 Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t& line_number)
@@ -424,7 +424,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
   std::cmatch match;
   line_number = 1u;
 
-  this->m_entry_point_name = "__start";
+  m_entry_point_name = "__start";
   // The Legend of Zelda: Twilight Princess features CodeWarrior for GCN 2.7 linker maps that have
   // been post-processed to appear similar to older linker maps. Nintendo EAD probably did this to
   // procrastinate updating the JUTException library. These linker maps contain prologue-free,
@@ -442,14 +442,14 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
     const auto error = portion->ScanTLOZTP(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->m_section_layouts.push_back(std::move(portion));
+    m_section_layouts.push_back(std::move(portion));
   }
-  return this->ScanForGarbage(head, tail);
+  return ScanForGarbage(head, tail);
 }
 
 Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& line_number)
 {
-  return this->ScanSMGalaxy(string_view.begin(), string_view.end(), line_number);
+  return ScanSMGalaxy(string_view.begin(), string_view.end(), line_number);
 }
 
 Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size_t& line_number)
@@ -473,7 +473,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     const auto error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
       return error;
-    this->m_section_layouts.push_back(std::move(portion));
+    m_section_layouts.push_back(std::move(portion));
   }
   else
   {
@@ -487,15 +487,15 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
   }
-  return this->ScanForGarbage(head, tail);
+  return ScanForGarbage(head, tail);
 }
 
 void Map::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  auto unresolved_head = this->m_unresolved_symbols.cbegin(),
-       unresolved_tail = this->m_unresolved_symbols.cend();
+  auto unresolved_head = m_unresolved_symbols.cbegin(),
+       unresolved_tail = m_unresolved_symbols.cend();
   // "Link map of %s\r\n"
   mijo::print(stream, "Link map of {:s}\r\n", m_entry_point_name);
   line_number = 2;
@@ -583,7 +583,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
         const auto error = portion->Scan3Column(head, tail, line_number);
         if (error != Error::None)
           return error;
-        this->m_section_layouts.push_back(std::move(portion));
+        m_section_layouts.push_back(std::move(portion));
       }
       else
       {
@@ -615,7 +615,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
         const auto error = portion->Scan4Column(head, tail, line_number);
         if (error != Error::None)
           return error;
-        this->m_section_layouts.push_back(std::move(portion));
+        m_section_layouts.push_back(std::move(portion));
       }
       else
       {
@@ -716,7 +716,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanSimple_old(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -737,7 +737,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRam_old(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -758,7 +758,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanSimple(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -779,7 +779,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRam(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -800,7 +800,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanSRecord(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -821,7 +821,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -842,7 +842,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRamSRecord(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -863,7 +863,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRamBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -884,7 +884,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -905,7 +905,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       const auto error = portion->ScanRomRamSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
-      this->m_memory_map = std::move(portion);
+      m_memory_map = std::move(portion);
     }
     else
     {
@@ -1036,7 +1036,7 @@ Map::Error Map::SymbolClosure::Scan(  //
 {
   std::cmatch match;
 
-  NodeBase* curr_node = &this->m_root;
+  NodeBase* curr_node = &m_root;
   int curr_hierarchy_level = 0;
 
   while (true)
@@ -1097,7 +1097,7 @@ Map::Error Map::SymbolClosure::Scan(  //
         }
         if (unref_dups.empty())
           return Error::SymbolClosureUnrefDupsEmpty;
-        this->SetVersionRange(Version::version_2_3_3_build_137, Version::Latest);
+        SetVersionRange(Version::version_2_3_3_build_137, Version::Latest);
       }
 
       NodeReal* next_node = new NodeReal(  // Non-owning pointer.
@@ -1107,7 +1107,7 @@ Map::Error Map::SymbolClosure::Scan(  //
 
       const std::string_view& compilation_unit_name =
           next_node->m_source_name.empty() ? next_node->m_module_name : next_node->m_source_name;
-      NodeLookup& curr_node_lookup = this->m_lookup[compilation_unit_name];
+      NodeLookup& curr_node_lookup = m_lookup[compilation_unit_name];
       if (curr_node_lookup.contains(symbol_name))
       {
         // TODO: restore sym on detection (it was flawed)
@@ -1123,7 +1123,7 @@ Map::Error Map::SymbolClosure::Scan(  //
         // Create a dummy node for hierarchy level 2.
         curr_node = curr_node->m_children.emplace_back(new NodeBase(curr_node)).get();
         ++curr_hierarchy_level;
-        this->SetVersionRange(Version::version_3_0_4, Version::Latest);
+        SetVersionRange(Version::version_3_0_4, Version::Latest);
       }
       continue;
     }
@@ -1177,7 +1177,7 @@ void Map::SymbolClosure::Print(std::ostream& stream,
                                const UnresolvedSymbols::const_iterator unresolved_tail,
                                std::size_t& line_number) const
 {
-  this->m_root.Print(stream, 0, unresolved_head, unresolved_tail, line_number);
+  m_root.Print(stream, 0, unresolved_head, unresolved_tail, line_number);
 }
 
 void Map::SymbolClosure::NodeBase::PrintPrefix(std::ostream& stream, const int hierarchy_level)
@@ -1235,7 +1235,7 @@ void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarc
   // This handles pre-print and mid-print unresolved symbols. Assuming the symbol closure exists at
   // the right time, this will also handle post-print unresolved symbols.
   Map::PrintUnresolvedSymbols(stream, unresolved_head, unresolved_tail, line_number);
-  for (const auto& node : this->m_children)
+  for (const auto& node : m_children)
     node->Print(stream, hierarchy_level + 1, unresolved_head, unresolved_tail, line_number);
 }
 
@@ -1249,7 +1249,7 @@ void Map::SymbolClosure::NodeReal::Print(std::ostream& stream, const int hierarc
   mijo::print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", m_name, ToName(m_type),
               ToName(m_bind), m_module_name, m_source_name);
   line_number += 1u;
-  if (!this->m_unref_dups.empty())
+  if (!m_unref_dups.empty())
   {
     PrintPrefix(stream, hierarchy_level);
     // ">>> UNREFERENCED DUPLICATE %s\r\n"
@@ -1333,8 +1333,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
         line_number += 3u;
         head = match[0].second;
       }
-      const MergingUnit& unit = this->m_merging_units.emplace_back(
-          first_name, second_name, size, will_be_replaced, was_interchanged);
+      const MergingUnit& unit = m_merging_units.emplace_back(first_name, second_name, size,
+                                                             will_be_replaced, was_interchanged);
       if (m_merging_lookup.contains(first_name))
         Warn::MergingOneDefinitionRuleViolation(line_number - 5u, first_name);
       m_merging_lookup.emplace(unit.m_first_name, unit);
@@ -1376,8 +1376,8 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       {
         return Error::EPPC_PatternMatchingMergingInterchangeMissingEpilogue;
       }
-      const MergingUnit& unit = this->m_merging_units.emplace_back(
-          first_name, second_name, size, will_be_replaced, was_interchanged);
+      const MergingUnit& unit = m_merging_units.emplace_back(first_name, second_name, size,
+                                                             will_be_replaced, was_interchanged);
       if (m_merging_lookup.contains(first_name))
         Warn::MergingOneDefinitionRuleViolation(line_number - 5u, first_name);
       m_merging_lookup.emplace(unit.m_first_name, unit);
@@ -1390,11 +1390,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
                            std::regex_constants::match_continuous))
   {
     const std::string_view object_name = mijo::to_string_view(match[1]);
-    if (this->m_folding_lookup.contains(object_name))
+    if (m_folding_lookup.contains(object_name))
       Warn::FoldingRepeatObject(line_number + 3u, object_name);
-    FoldingUnit& folding_unit = this->m_folding_units.emplace_back(object_name);
+    FoldingUnit& folding_unit = m_folding_units.emplace_back(object_name);
 
-    FoldingUnit::UnitLookup& curr_unit_lookup = this->m_folding_lookup[folding_unit.m_object_name];
+    FoldingUnit::UnitLookup& curr_unit_lookup = m_folding_lookup[folding_unit.m_object_name];
     line_number += 4u;
     head = match[0].second;
     while (true)
@@ -1537,8 +1537,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_not_near,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.emplace_back(Unit::Kind::NotNear, mijo::to_string_view(match[1]),
-                                 mijo::to_string_view(match[2]), mijo::to_string_view(match[3]));
+      m_units.emplace_back(Unit::Kind::NotNear, mijo::to_string_view(match[1]),
+                           mijo::to_string_view(match[2]), mijo::to_string_view(match[3]));
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1546,7 +1546,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_disassemble_error,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]));
+      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]));
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1554,8 +1554,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_address_not_computed,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.emplace_back(Unit::Kind::NotComputed, mijo::to_string_view(match[1]),
-                                 mijo::to_string_view(match[2]), mijo::to_string_view(match[3]));
+      m_units.emplace_back(Unit::Kind::NotComputed, mijo::to_string_view(match[1]),
+                           mijo::to_string_view(match[2]), mijo::to_string_view(match[3]));
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1564,8 +1564,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_optimized,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.emplace_back(Unit::Kind::Optimized, mijo::to_string_view(match[1]),
-                                 mijo::to_string_view(match[2]), mijo::to_string_view(match[3]));
+      m_units.emplace_back(Unit::Kind::Optimized, mijo::to_string_view(match[1]),
+                           mijo::to_string_view(match[2]), mijo::to_string_view(match[3]));
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1583,7 +1583,7 @@ void Map::LinkerOpts::Print(std::ostream& stream, std::size_t& line_number) cons
 
 void Map::LinkerOpts::Unit::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  switch (this->m_unit_kind)
+  switch (m_unit_kind)
   {
   case Kind::NotNear:
     // "  %s/ %s()/ %s - address not in near addressing range \r\n"
@@ -1633,8 +1633,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]),
-                                 false);
+      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]), false);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1642,8 +1641,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]),
-                                 true);
+      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]), true);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1699,8 +1697,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_branch_islands_created,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]),
-                                 false);
+      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]), false);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1708,8 +1705,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_branch_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      this->m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]),
-                                 true);
+      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]), true);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1777,16 +1773,16 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
   auto& [section_layout, line_number, is_second_lap, is_after_eti_init_info, is_multi_stt_section,
          curr_unit_lookup, curr_module_name, curr_source_name] = scanning_context;
 
-  const bool is_symbol_stt_section = (this->m_name == section_layout.m_name);
+  const bool is_symbol_stt_section = (m_name == section_layout.m_name);
 
   // Detect a change in compilation unit
-  if (curr_module_name != this->m_module_name || curr_source_name != this->m_source_name)
+  if (curr_module_name != m_module_name || curr_source_name != m_source_name)
   {
-    curr_module_name = this->m_module_name;
-    curr_source_name = this->m_source_name;
+    curr_module_name = m_module_name;
+    curr_source_name = m_source_name;
     is_multi_stt_section = false;
     const std::string_view& compilation_unit_name =
-        this->m_source_name.empty() ? this->m_module_name : this->m_source_name;
+        m_source_name.empty() ? m_module_name : m_source_name;
     const bool is_repeat_compilation_unit_detected =
         section_layout.m_lookup.contains(compilation_unit_name);
     curr_unit_lookup = &section_layout.m_lookup[compilation_unit_name];
@@ -1830,8 +1826,7 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
     }
     if (section_layout.m_section_kind == Map::SectionLayout::Kind::ExTabIndex)
     {
-      if (this->m_name == "_eti_init_info" &&
-          compilation_unit_name == "Linker Generated Symbol File")
+      if (m_name == "_eti_init_info" && compilation_unit_name == "Linker Generated Symbol File")
       {
         is_after_eti_init_info = true;
       }
@@ -1852,7 +1847,7 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
         section_layout.m_section_kind == Map::SectionLayout::Kind::Dtors)
     {
       const std::string_view& compilation_unit_name =
-          this->m_source_name.empty() ? this->m_module_name : this->m_source_name;
+          m_source_name.empty() ? m_module_name : m_source_name;
       Warn::RepeatCompilationUnit(line_number, compilation_unit_name, section_layout.m_name);
     }
     else if (!is_multi_stt_section)
@@ -1860,21 +1855,21 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
       // Either this compilation unit was compiled with '-sym on', or two repeat-name compilation
       // units are adjacent to one another.
       const std::string_view& compilation_unit_name =
-          this->m_source_name.empty() ? this->m_module_name : this->m_source_name;
+          m_source_name.empty() ? m_module_name : m_source_name;
       Warn::SymOnFlagDetected(line_number, compilation_unit_name, section_layout.m_name);
       is_multi_stt_section = true;
     }
     return Unit::Trait::Section;
   }
 
-  if (curr_unit_lookup->contains(this->m_name))
+  if (curr_unit_lookup->contains(m_name))
   {
     const std::string_view& compilation_unit_name =
-        this->m_source_name.empty() ? this->m_module_name : this->m_source_name;
+        m_source_name.empty() ? m_module_name : m_source_name;
     // This can be a strong hint that there are two or more repeat-name compilation units in your
     // linker map, assuming it's not messed up in any way.  Note that this does not detect symbols
     // with identical names across section layouts.
-    Warn::OneDefinitionRuleViolation(line_number, this->m_name, compilation_unit_name,
+    Warn::OneDefinitionRuleViolation(line_number, m_name, compilation_unit_name,
                                      section_layout.m_name);
   }
 
@@ -1901,11 +1896,11 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceEntrySubtext(  /
 
   // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
   // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
-  if (scanning_context.m_curr_unit_lookup->contains(this->m_name))
+  if (scanning_context.m_curr_unit_lookup->contains(m_name))
   {
     const std::string_view& compilation_unit_name =
         m_source_name.empty() ? m_module_name : m_source_name;
-    Warn::OneDefinitionRuleViolation(line_number, this->m_name, compilation_unit_name,
+    Warn::OneDefinitionRuleViolation(line_number, m_name, compilation_unit_name,
                                      section_layout.m_name);
   }
   return Trait::NoType;
@@ -1934,7 +1929,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = this->m_units.emplace_back(
+      const Unit& unit = m_units.emplace_back(
           mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
           mijo::xsmto<Elf32_Addr>(match[3]), mijo::smto<int>(match[4]),
           mijo::to_string_view(match[5]), mijo::to_string_view(match[6]),
@@ -1947,7 +1942,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = this->m_units.emplace_back(
+      const Unit& unit = m_units.emplace_back(
           mijo::xsmto<Elf32_Word>(match[1]), mijo::to_string_view(match[2]),
           mijo::to_string_view(match[3]), mijo::to_string_view(match[4]), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
@@ -1963,14 +1958,13 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                              module_name = mijo::to_string_view(match[6]),
                              source_name = mijo::to_string_view(match[7]);
       // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
-      for (auto parent_unit = this->m_units.rbegin(); parent_unit != this->m_units.rend();
-           ++parent_unit)
+      for (auto parent_unit = m_units.rbegin(); parent_unit != m_units.rend(); ++parent_unit)
       {
         if (source_name != parent_unit->m_source_name || module_name != parent_unit->m_module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
           continue;
-        const Unit& unit = this->m_units.emplace_back(
+        const Unit& unit = m_units.emplace_back(
             mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
             mijo::xsmto<Elf32_Addr>(match[3]), symbol_name, &parent_unit.operator*(), module_name,
             source_name, scanning_context);
@@ -2015,7 +2009,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_normal,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = this->m_units.emplace_back(
+      const Unit& unit = m_units.emplace_back(
           mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
           mijo::xsmto<Elf32_Addr>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
           mijo::smto<int>(match[5]), mijo::to_string_view(match[6]), mijo::to_string_view(match[7]),
@@ -2028,7 +2022,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = this->m_units.emplace_back(
+      const Unit& unit = m_units.emplace_back(
           mijo::xsmto<Elf32_Word>(match[1]), mijo::to_string_view(match[2]),
           mijo::to_string_view(match[3]), mijo::to_string_view(match[4]), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
@@ -2044,14 +2038,13 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                              module_name = mijo::to_string_view(match[7]),
                              source_name = mijo::to_string_view(match[8]);
       // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
-      for (auto parent_unit = this->m_units.rbegin(); parent_unit != this->m_units.rend();
-           ++parent_unit)
+      for (auto parent_unit = m_units.rbegin(); parent_unit != m_units.rend(); ++parent_unit)
       {
         if (source_name != parent_unit->m_source_name || module_name != parent_unit->m_module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
           continue;
-        const Unit& unit = this->m_units.emplace_back(
+        const Unit& unit = m_units.emplace_back(
             mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
             mijo::xsmto<Elf32_Addr>(match[3]), mijo::xsmto<std::uint32_t>(match[4]), symbol_name,
             &parent_unit.operator*(), module_name, source_name, scanning_context);
@@ -2072,20 +2065,20 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
       const std::string_view special_name = mijo::to_string_view(match[6]);
       if (special_name == "*fill*")
       {
-        this->m_units.emplace_back(
-            mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-            mijo::xsmto<Elf32_Addr>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-            mijo::smto<int>(match[5]), Unit::Trait::Fill1);
+        m_units.emplace_back(mijo::xsmto<std::uint32_t>(match[1]),
+                             mijo::xsmto<Elf32_Word>(match[2]), mijo::xsmto<Elf32_Addr>(match[3]),
+                             mijo::xsmto<std::uint32_t>(match[4]), mijo::smto<int>(match[5]),
+                             Unit::Trait::Fill1);
         line_number += 1u;
         head = match[0].second;
         continue;
       }
       if (special_name == "**fill**")
       {
-        this->m_units.emplace_back(
-            mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-            mijo::xsmto<Elf32_Addr>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-            mijo::smto<int>(match[5]), Unit::Trait::Fill2);
+        m_units.emplace_back(mijo::xsmto<std::uint32_t>(match[1]),
+                             mijo::xsmto<Elf32_Word>(match[2]), mijo::xsmto<Elf32_Addr>(match[3]),
+                             mijo::xsmto<std::uint32_t>(match[4]), mijo::smto<int>(match[5]),
+                             Unit::Trait::Fill2);
         line_number += 1u;
         head = match[0].second;
         continue;
@@ -2115,7 +2108,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = this->m_units.emplace_back(
+      const Unit& unit = m_units.emplace_back(
           mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
           mijo::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, mijo::smto<int>(match[4]),
           mijo::to_string_view(match[5]), mijo::to_string_view(match[6]),
@@ -2133,14 +2126,13 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                        module_name = mijo::to_string_view(match[6]),
                        source_name = mijo::to_string_view(match[7]);
       // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
-      for (auto parent_unit = this->m_units.rbegin(); parent_unit != this->m_units.rend();
-           ++parent_unit)
+      for (auto parent_unit = m_units.rbegin(); parent_unit != m_units.rend(); ++parent_unit)
       {
         if (source_name != parent_unit->m_source_name || module_name != parent_unit->m_module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
           continue;
-        const Unit& unit = this->m_units.emplace_back(
+        const Unit& unit = m_units.emplace_back(
             mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
             mijo::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name,
             &parent_unit.operator*(), module_name, source_name, scanning_context);
@@ -2161,20 +2153,18 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       std::string_view special_name = mijo::to_string_view(match[5]);
       if (special_name == "*fill*")
       {
-        this->m_units.emplace_back(  //
-            mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-            mijo::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, mijo::smto<int>(match[4]),
-            Unit::Trait::Fill1);
+        m_units.emplace_back(mijo::xsmto<std::uint32_t>(match[1]),
+                             mijo::xsmto<Elf32_Word>(match[2]), mijo::xsmto<Elf32_Addr>(match[3]),
+                             std::uint32_t{0}, mijo::smto<int>(match[4]), Unit::Trait::Fill1);
         line_number += 1u;
         head = match[0].second;
         continue;
       }
       if (special_name == "**fill**")
       {
-        this->m_units.emplace_back(  //
-            mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-            mijo::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, mijo::smto<int>(match[4]),
-            Unit::Trait::Fill2);
+        m_units.emplace_back(mijo::xsmto<std::uint32_t>(match[1]),
+                             mijo::xsmto<Elf32_Word>(match[2]), mijo::xsmto<Elf32_Addr>(match[3]),
+                             std::uint32_t{0}, mijo::smto<int>(match[4]), Unit::Trait::Fill2);
         line_number += 1u;
         head = match[0].second;
         continue;
@@ -2196,7 +2186,7 @@ void Map::SectionLayout::Print(std::ostream& stream, std::size_t& line_number) c
                         "  address  Size   address\r\n"
                         "  -----------------------\r\n");
     line_number += 6u;
-    for (const auto& unit : this->m_units)
+    for (const auto& unit : m_units)
       unit.Print3Column(stream, line_number);
   }
   else
@@ -2205,14 +2195,14 @@ void Map::SectionLayout::Print(std::ostream& stream, std::size_t& line_number) c
                         "  address  Size   address  offset\r\n"
                         "  ---------------------------------\r\n");
     line_number += 6u;
-    for (const auto& unit : this->m_units)
+    for (const auto& unit : m_units)
       unit.Print4Column(stream, line_number);
   }
 }
 
 void Map::SectionLayout::Unit::Print3Column(std::ostream& stream, std::size_t& line_number) const
 {
-  switch (this->m_unit_kind)
+  switch (m_unit_kind)
   {
   case Kind::Normal:
     // "  %08x %06x %08x %2i %s \t%s %s\r\n"
@@ -2241,7 +2231,7 @@ void Map::SectionLayout::Unit::Print3Column(std::ostream& stream, std::size_t& l
 
 void Map::SectionLayout::Unit::Print4Column(std::ostream& stream, std::size_t& line_number) const
 {
-  switch (this->m_unit_kind)
+  switch (m_unit_kind)
   {
   case Kind::Normal:
     // "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
@@ -2296,9 +2286,9 @@ Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const t
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple_old,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]));
+    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
+                                mijo::xsmto<Elf32_Word>(match[3]),
+                                mijo::xsmto<std::uint32_t>(match[4]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2319,7 +2309,7 @@ Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const t
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_old,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
+    m_normal_units.emplace_back(
         mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
         mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
         mijo::xsmto<std::uint32_t>(match[5]), mijo::xsmto<std::uint32_t>(match[6]));
@@ -2346,9 +2336,9 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
   {
     const std::csub_match& size = match[2];
     if (size.length() == 8 && *size.first == '0')  // Make sure it's not just an overflowed value
-      this->SetVersionRange(Version::version_3_0_4, Version::Latest);
-    this->m_debug_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Word>(size),
-                                     mijo::xsmto<std::uint32_t>(match[3]));
+      SetVersionRange(Version::version_3_0_4, Version::Latest);
+    m_debug_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Word>(size),
+                               mijo::xsmto<std::uint32_t>(match[3]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2369,9 +2359,9 @@ Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]));
+    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
+                                mijo::xsmto<Elf32_Word>(match[3]),
+                                mijo::xsmto<std::uint32_t>(match[4]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2392,7 +2382,7 @@ Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
+    m_normal_units.emplace_back(
         mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
         mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
         mijo::xsmto<std::uint32_t>(match[5]), mijo::xsmto<std::uint32_t>(match[6]));
@@ -2416,10 +2406,9 @@ Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-        mijo::smto<int>(match[5]));
+    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
+                                mijo::xsmto<Elf32_Word>(match[3]),
+                                mijo::xsmto<std::uint32_t>(match[4]), mijo::smto<int>(match[5]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2440,7 +2429,7 @@ Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_binfile,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
+    m_normal_units.emplace_back(
         mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
         mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
         mijo::xsmto<std::uint32_t>(match[5]), mijo::to_string_view(match[6]));
@@ -2464,11 +2453,11 @@ Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-        mijo::xsmto<std::uint32_t>(match[5]), mijo::xsmto<std::uint32_t>(match[6]),
-        mijo::smto<int>(match[7]));
+    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
+                                mijo::xsmto<Elf32_Word>(match[3]),
+                                mijo::xsmto<std::uint32_t>(match[4]),
+                                mijo::xsmto<std::uint32_t>(match[5]),
+                                mijo::xsmto<std::uint32_t>(match[6]), mijo::smto<int>(match[7]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2489,7 +2478,7 @@ Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_binfile,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
+    m_normal_units.emplace_back(
         mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
         mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
         mijo::xsmto<std::uint32_t>(match[5]), mijo::xsmto<std::uint32_t>(match[6]),
@@ -2514,11 +2503,11 @@ Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* con
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-        mijo::smto<int>(match[5]), mijo::xsmto<std::uint32_t>(match[6]),
-        mijo::to_string_view(match[7]));
+    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
+                                mijo::xsmto<Elf32_Word>(match[3]),
+                                mijo::xsmto<std::uint32_t>(match[4]), mijo::smto<int>(match[5]),
+                                mijo::xsmto<std::uint32_t>(match[6]),
+                                mijo::to_string_view(match[7]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2539,7 +2528,7 @@ Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const cha
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
-    this->m_normal_units.emplace_back(
+    m_normal_units.emplace_back(
         mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
         mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
         mijo::xsmto<std::uint32_t>(match[5]), mijo::xsmto<std::uint32_t>(match[6]),
@@ -2565,9 +2554,8 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
                            std::regex_constants::match_continuous))
   {
-    this->m_debug_units.emplace_back(mijo::to_string_view(match[1]),
-                                     mijo::xsmto<Elf32_Word>(match[2]),
-                                     mijo::xsmto<std::uint32_t>(match[3]));
+    m_debug_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
+                               mijo::xsmto<std::uint32_t>(match[3]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2849,7 +2837,7 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_linker_generated_symbols_unit,
                            std::regex_constants::match_continuous))
   {
-    this->m_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]));
+    m_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]));
     line_number += 1u;
     head = match[0].second;
   }
