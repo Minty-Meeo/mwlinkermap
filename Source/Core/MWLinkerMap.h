@@ -257,7 +257,7 @@ struct Map
     {
       friend SymbolClosure;
 
-      constexpr static void DisableAll() noexcept
+      static void DisableAll() noexcept
       {
         do_warn_odr_violation = false;
         do_warn_sym_on_flag_detected = false;
@@ -374,7 +374,7 @@ struct Map
     {
       friend EPPC_PatternMatching;
 
-      constexpr static void DisableAll() noexcept
+      static void DisableAll() noexcept
       {
         do_warn_merging_odr_violation = false;
         do_warn_folding_repeat_object = false;
@@ -757,7 +757,7 @@ struct Map
     {
       friend SectionLayout;
 
-      constexpr static void DisableAll() noexcept
+      static void DisableAll() noexcept
       {
         do_warn_repeat_compilation_unit = false;
         do_warn_odr_violation = false;
@@ -1076,7 +1076,7 @@ struct Map
   {
     friend Map;
 
-    constexpr static void DisableAll() noexcept
+    static void DisableAll() noexcept
     {
       SymbolClosure::Warn::DisableAll();
       EPPC_PatternMatching::Warn::DisableAll();
