@@ -149,6 +149,12 @@ void Map::SectionLayout::Warn::LCommAfterComm(const std::size_t line_number)
   mijo::println(std::cerr, "Line {:d}] .lcomm symbols found after .comm symbols.", line_number);
 }
 
+static constexpr std::string_view GetCompilationUnitName(const std::string& module_name,
+                                                         const std::string& source_name)
+{
+  return source_name.empty() ? module_name : source_name;
+}
+
 // clang-format off
 static const std::regex re_entry_point_name{
 //  "Link map of %s\r\n"
@@ -1105,8 +1111,8 @@ Map::Error Map::SymbolClosure::Scan(  //
           map_symbol_closure_st_bind.at(bind), module_name, source_name, std::move(unref_dups));
       curr_node = curr_node->m_children.emplace_back(next_node).get();
 
-      const std::string_view& compilation_unit_name =
-          next_node->m_source_name.empty() ? next_node->m_module_name : next_node->m_source_name;
+      const std::string_view compilation_unit_name =
+          GetCompilationUnitName(next_node->m_module_name, next_node->m_source_name);
       NodeLookup& curr_node_lookup = m_lookup[compilation_unit_name];
       if (curr_node_lookup.contains(symbol_name))
       {
@@ -1781,8 +1787,8 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
     curr_module_name = m_module_name;
     curr_source_name = m_source_name;
     is_multi_stt_section = false;
-    const std::string_view& compilation_unit_name =
-        m_source_name.empty() ? m_module_name : m_source_name;
+    const std::string_view compilation_unit_name =
+        GetCompilationUnitName(m_module_name, m_source_name);
     const bool is_repeat_compilation_unit_detected =
         section_layout.m_lookup.contains(compilation_unit_name);
     curr_unit_lookup = &section_layout.m_lookup[compilation_unit_name];
@@ -1846,16 +1852,16 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
     if (section_layout.m_section_kind == Map::SectionLayout::Kind::Ctors ||
         section_layout.m_section_kind == Map::SectionLayout::Kind::Dtors)
     {
-      const std::string_view& compilation_unit_name =
-          m_source_name.empty() ? m_module_name : m_source_name;
+      const std::string_view compilation_unit_name =
+          GetCompilationUnitName(m_module_name, m_source_name);
       Warn::RepeatCompilationUnit(line_number, compilation_unit_name, section_layout.m_name);
     }
     else if (!is_multi_stt_section)
     {
       // Either this compilation unit was compiled with '-sym on', or two repeat-name compilation
       // units are adjacent to one another.
-      const std::string_view& compilation_unit_name =
-          m_source_name.empty() ? m_module_name : m_source_name;
+      const std::string_view compilation_unit_name =
+          GetCompilationUnitName(m_module_name, m_source_name);
       Warn::SymOnFlagDetected(line_number, compilation_unit_name, section_layout.m_name);
       is_multi_stt_section = true;
     }
@@ -1864,8 +1870,8 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
 
   if (curr_unit_lookup->contains(m_name))
   {
-    const std::string_view& compilation_unit_name =
-        m_source_name.empty() ? m_module_name : m_source_name;
+    const std::string_view compilation_unit_name =
+        GetCompilationUnitName(m_module_name, m_source_name);
     // This can be a strong hint that there are two or more repeat-name compilation units in your
     // linker map, assuming it's not messed up in any way.  Note that this does not detect symbols
     // with identical names across section layouts.
@@ -1898,8 +1904,8 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceEntrySubtext(  /
   // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
   if (scanning_context.m_curr_unit_lookup->contains(m_name))
   {
-    const std::string_view& compilation_unit_name =
-        m_source_name.empty() ? m_module_name : m_source_name;
+    const std::string_view compilation_unit_name =
+        GetCompilationUnitName(m_module_name, m_source_name);
     Warn::OneDefinitionRuleViolation(line_number, m_name, compilation_unit_name,
                                      section_layout.m_name);
   }
