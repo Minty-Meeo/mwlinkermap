@@ -595,8 +595,9 @@ struct Map
     {
       SectionLayout& m_section_layout;
       std::size_t& m_line_number;
-      bool m_is_second_lap;  // BSS '-common on'
-      bool m_is_after_eti_init_info;
+      // BSS: now in common symbols
+      // extabindex: now after '_eti_init_info'
+      bool m_is_second_lap;
       bool m_is_multi_stt_section;
       UnitLookup* m_curr_unit_lookup;
       std::string_view m_curr_module_name;

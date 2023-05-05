@@ -143,7 +143,6 @@ bool Map::SectionLayout::Warn::do_warn_lcomm_after_comm = true;
 
 void Map::SectionLayout::Warn::LCommAfterComm(const std::size_t line_number)
 {
-  // Shouldn't this be impossible?
   if (!do_warn_lcomm_after_comm)
     return;
   mijo::println(std::cerr, "Line {:d}] .lcomm symbols found after .comm symbols.", line_number);
@@ -1776,8 +1775,8 @@ void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream,
 Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  //
     ScanningContext& scanning_context)
 {
-  auto& [section_layout, line_number, is_second_lap, is_after_eti_init_info, is_multi_stt_section,
-         curr_unit_lookup, curr_module_name, curr_source_name] = scanning_context;
+  auto& [section_layout, line_number, is_second_lap, is_multi_stt_section, curr_unit_lookup,
+         curr_module_name, curr_source_name] = scanning_context;
 
   const bool is_symbol_stt_section = (m_name == section_layout.m_name);
 
@@ -1806,8 +1805,11 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
       }
       if (is_second_lap)
       {
-        // Shouldn't this be impossible?
-        Map::SectionLayout::Warn::LCommAfterComm(line_number);
+        // This should never happen if my heuristics are accurate, but they tend to have edge cases.
+        if (section_layout.m_section_kind == Map::SectionLayout::Kind::BSS)
+          Map::SectionLayout::Warn::LCommAfterComm(line_number);
+        // Should probably warn about extabindex's second lap here as well, but that would be doubly
+        // weird since extabindex should never have STT_SECTION symbols in the first place.
         is_second_lap = false;
       }
       return Unit::Trait::Section;
@@ -1834,11 +1836,11 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
     {
       if (m_name == "_eti_init_info" && compilation_unit_name == "Linker Generated Symbol File")
       {
-        is_after_eti_init_info = true;
+        is_second_lap = true;
       }
       // TODO: There is currently no clean way to detect repeat-name compilation units during
       // an extabindex section's second lap for printing UNUSED symbols after _eti_init_info.
-      else if (is_repeat_compilation_unit_detected && !is_after_eti_init_info)
+      else if (is_repeat_compilation_unit_detected && !is_second_lap)
       {
         Map::SectionLayout::Warn::RepeatCompilationUnit(line_number, compilation_unit_name,
                                                         section_layout.m_name);
@@ -1879,14 +1881,17 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
                                      section_layout.m_name);
   }
 
-  if (is_second_lap)
-    return Unit::Trait::Common;
-  if (section_layout.m_section_kind == Map::SectionLayout::Kind::BSS)
-    return Unit::Trait::LCommon;
   if (section_layout.m_section_kind == Map::SectionLayout::Kind::Code)
     return Unit::Trait::Function;
   if (section_layout.m_section_kind == Map::SectionLayout::Kind::Data)
     return Unit::Trait::Object;
+  if (section_layout.m_section_kind == Map::SectionLayout::Kind::BSS)
+  {
+    if (is_second_lap)
+      return Unit::Trait::Common;
+    else
+      return Unit::Trait::LCommon;
+  }
   if (section_layout.m_section_kind == Map::SectionLayout::Kind::ExTab)
     return Unit::Trait::ExTab;
   if (section_layout.m_section_kind == Map::SectionLayout::Kind::ExTabIndex)
@@ -1897,8 +1902,8 @@ Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceUsualSubtext(  /
 Map::SectionLayout::Unit::Trait Map::SectionLayout::Unit::DeduceEntrySubtext(  //
     ScanningContext& scanning_context)
 {
-  auto& [section_layout, line_number, is_second_lap, is_after_eti_init_info, is_multi_stt_section,
-         curr_unit_lookup, curr_module_name, curr_source_name] = scanning_context;
+  auto& [section_layout, line_number, is_second_lap, is_multi_stt_section, curr_unit_lookup,
+         curr_module_name, curr_source_name] = scanning_context;
 
   // Should never be the STT_SECTION symbol. Also, this can never belong to a new compilation
   // unit (a new curr_unit_lookup) since that would inherently be an orphaned entry symbol.
@@ -1928,7 +1933,7 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                                            std::size_t& line_number)
 {
   std::cmatch match;
-  ScanningContext scanning_context{*this, line_number, false, false, false, nullptr, {}, {}};
+  ScanningContext scanning_context{*this, line_number, false, false, nullptr, {}, {}};
 
   while (true)
   {
@@ -2008,7 +2013,7 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                                            std::size_t& line_number)
 {
   std::cmatch match;
-  ScanningContext scanning_context{*this, line_number, false, false, false, nullptr, {}, {}};
+  ScanningContext scanning_context{*this, line_number, false, false, nullptr, {}, {}};
 
   while (true)
   {
@@ -2107,7 +2112,7 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                                           std::size_t& line_number)
 {
   std::cmatch match;
-  ScanningContext scanning_context{*this, line_number, false, false, false, nullptr, {}, {}};
+  ScanningContext scanning_context{*this, line_number, false, false, nullptr, {}, {}};
 
   while (true)
   {
