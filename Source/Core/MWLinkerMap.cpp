@@ -11,6 +11,7 @@
 #include <ostream>
 #include <ranges>
 #include <regex>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -240,9 +241,9 @@ Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string_vie
   return Map::SectionLayout::Kind::Unknown;
 }
 
-Map::Error Map::Scan(const std::string_view string_view, std::size_t& line_number)
+Map::Error Map::Scan(const std::span<const char> view, std::size_t& line_number)
 {
-  return Scan(string_view.begin(), string_view.end(), line_number);
+  return Scan(view.data(), view.data() + view.size(), line_number);
 }
 
 Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line_number)
@@ -416,9 +417,9 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   return ScanForGarbage(head, tail);
 }
 
-Map::Error Map::ScanTLOZTP(const std::string_view string_view, std::size_t& line_number)
+Map::Error Map::ScanTLOZTP(const std::span<const char> view, std::size_t& line_number)
 {
-  return ScanTLOZTP(string_view.begin(), string_view.end(), line_number);
+  return ScanTLOZTP(view.data(), view.data() + view.size(), line_number);
 }
 
 Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t& line_number)
@@ -452,9 +453,9 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
   return ScanForGarbage(head, tail);
 }
 
-Map::Error Map::ScanSMGalaxy(const std::string_view string_view, std::size_t& line_number)
+Map::Error Map::ScanSMGalaxy(const std::span<const char> view, std::size_t& line_number)
 {
-  return ScanSMGalaxy(string_view.begin(), string_view.end(), line_number);
+  return ScanSMGalaxy(view.data(), view.data() + view.size(), line_number);
 }
 
 Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size_t& line_number)

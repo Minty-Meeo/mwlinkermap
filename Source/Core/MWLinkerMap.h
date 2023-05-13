@@ -9,6 +9,7 @@
 #include <list>
 #include <memory>
 #include <ostream>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -1001,11 +1002,11 @@ struct Map
     std::list<Unit> m_units;
   };
 
-  Error Scan(std::string_view, std::size_t&);
+  Error Scan(std::span<const char>, std::size_t&);
   Error Scan(const char*, const char*, std::size_t&);
-  Error ScanTLOZTP(std::string_view, std::size_t&);
+  Error ScanTLOZTP(std::span<const char>, std::size_t&);
   Error ScanTLOZTP(const char*, const char*, std::size_t&);
-  Error ScanSMGalaxy(std::string_view, std::size_t&);
+  Error ScanSMGalaxy(std::span<const char>, std::size_t&);
   Error ScanSMGalaxy(const char*, const char*, std::size_t&);
   void Print(std::ostream&, std::size_t&) const;
   Version GetMinVersion() const noexcept
