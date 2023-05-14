@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <iostream>
 #include <map>
+#include <new>
 #include <ostream>
 #include <ranges>
 #include <regex>
@@ -1106,10 +1107,12 @@ Map::Error Map::SymbolClosure::Scan(  //
         SetVersionRange(Version::version_2_3_3_build_137, Version::Latest);
       }
 
-      NodeReal* next_node = new NodeReal(  // Non-owning pointer.
+      // clang-format off
+      curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeReal>(
           curr_node, symbol_name, map_symbol_closure_st_type.at(type),
-          map_symbol_closure_st_bind.at(bind), module_name, source_name, std::move(unref_dups));
-      curr_node = curr_node->m_children.emplace_back(next_node).get();
+          map_symbol_closure_st_bind.at(bind), module_name, source_name, std::move(unref_dups))).get();
+      // clang-format on
+      const NodeReal* next_node = std::launder(reinterpret_cast<NodeReal*>(curr_node));
 
       const std::string_view compilation_unit_name =
           GetCompilationUnitName(next_node->m_module_name, next_node->m_source_name);
@@ -1127,7 +1130,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       if (symbol_name == "_dtors$99" && module_name == "Linker Generated Symbol File")
       {
         // Create a dummy node for hierarchy level 2.
-        curr_node = curr_node->m_children.emplace_back(new NodeBase(curr_node)).get();
+        curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeBase>(curr_node)).get();
         ++curr_hierarchy_level;
         SetVersionRange(Version::version_3_0_4, Version::Latest);
       }
@@ -1147,7 +1150,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       curr_hierarchy_level = next_hierarchy_level;
 
       // clang-format off
-      curr_node = curr_node->m_children.emplace_back(new NodeLinkerGenerated(curr_node, mijo::to_string_view(match[2]))).get();
+      curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeLinkerGenerated>(curr_node, mijo::to_string_view(match[2]))).get();
       // clang-format on
 
       line_number += 1u;
