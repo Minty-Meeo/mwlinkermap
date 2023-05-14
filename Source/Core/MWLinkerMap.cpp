@@ -1108,17 +1108,17 @@ Map::Error Map::SymbolClosure::Scan(  //
           curr_node, symbol_name, map_symbol_closure_st_type.at(type),
           map_symbol_closure_st_bind.at(bind), module_name, source_name, std::move(unref_dups))).get();
       // clang-format on
-      const NodeReal* next_node = std::launder(reinterpret_cast<NodeReal*>(curr_node));
+      const NodeReal& curr_node_real = *std::launder(reinterpret_cast<NodeReal*>(curr_node));
 
       const std::string_view compilation_unit_name =
-          GetCompilationUnitName(next_node->m_module_name, next_node->m_source_name);
+          GetCompilationUnitName(curr_node_real.m_module_name, curr_node_real.m_source_name);
       NodeLookup& curr_node_lookup = m_lookup[compilation_unit_name];
       if (curr_node_lookup.contains(symbol_name))
       {
         // TODO: restore sym on detection (it was flawed)
         Warn::OneDefinitionRuleViolation(line_number_backup, symbol_name, compilation_unit_name);
       }
-      curr_node_lookup.emplace(next_node->m_name, *next_node);
+      curr_node_lookup.emplace(curr_node_real.m_name, curr_node_real);
 
       // Though I do not understand it, the following is a normal occurrence for _dtors$99:
       // "  1] _dtors$99 (object,global) found in Linker Generated Symbol File "
