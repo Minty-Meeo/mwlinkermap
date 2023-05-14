@@ -19,12 +19,12 @@
 
 static void tempfunc(const char* name, int choice)
 {
-  mijo::println(std::cout, "{:s}", name);
+  Mijo::Println(std::cout, "{:s}", name);
 
   std::ifstream infile(name);
   if (!infile.is_open())
   {
-    mijo::println(std::cerr, "Could not open!");
+    Mijo::Println(std::cerr, "Could not open!");
     return;
   }
   std::stringstream sstream;
@@ -53,7 +53,7 @@ static void tempfunc(const char* name, int choice)
       error = linker_map.ScanSMGalaxy(temp, scan_line_number);
       break;
     default:
-      mijo::println(std::cerr, "bad choice");
+      Mijo::Println(std::cerr, "bad choice");
       return;
     }
     const auto time_end = std::chrono::high_resolution_clock::now();
@@ -78,7 +78,7 @@ static void tempfunc(const char* name, int choice)
   // containing the string is meant to be the unit within the linker map portion / the value stored
   // by reference in the map.
   std::fill(temp.begin(), temp.end(), '\0');
-  mijo::println(
+  Mijo::Println(
       std::cout,
       "scan line: {:d}   print line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}  "
       "max_version: {:d}   time: {:d}ms",
@@ -93,7 +93,7 @@ int main(const int argc, const char** argv)
 {
   if (argc < 2)
   {
-    mijo::println(std::cerr, "Provide the name");
+    Mijo::Println(std::cerr, "Provide the name");
     return EXIT_FAILURE;
   }
   if (argc < 3)

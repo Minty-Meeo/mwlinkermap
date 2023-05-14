@@ -38,7 +38,7 @@ void Map::SymbolClosure::Warn::OneDefinitionRuleViolation(
   // For legal linker maps, this should only ever happen in repeat-name compilation units.
   if (!do_warn_odr_violation)
     return;
-  mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
+  Mijo::Println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
                 compilation_unit_name);
 }
 
@@ -51,7 +51,7 @@ void Map::SymbolClosure::Warn::SymOnFlagDetected(const std::size_t line_number,
   // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
   if (!do_warn_sym_on_flag_detected)
     return;
-  mijo::println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" (.text)", line_number,
+  Mijo::Println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" (.text)", line_number,
                 compilation_unit_name);
 }
 
@@ -63,7 +63,7 @@ void Map::EPPC_PatternMatching::Warn::MergingOneDefinitionRuleViolation(
   // Could be a false positive, as code merging has no information about where the symbol came from.
   if (!do_warn_merging_odr_violation)
     return;
-  mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again", line_number, symbol_name);
+  Mijo::Println(std::cerr, "Line {:d}] \"{:s}\" seen again", line_number, symbol_name);
 }
 
 bool Map::EPPC_PatternMatching::Warn::do_warn_folding_repeat_object = true;
@@ -73,7 +73,7 @@ void Map::EPPC_PatternMatching::Warn::FoldingRepeatObject(const std::size_t line
 {
   // This warning is pretty much the only one guaranteed to not produce false positives.
   if (!do_warn_folding_repeat_object)
-    mijo::println(std::cerr, "Line {:d}] Detected repeat-name object \"{:s}\"", line_number,
+    Mijo::Println(std::cerr, "Line {:d}] Detected repeat-name object \"{:s}\"", line_number,
                   object_name);
 }
 
@@ -86,7 +86,7 @@ void Map::EPPC_PatternMatching::Warn::FoldingOneDefinitionRuleViolation(
   // For legal linker maps, this should only ever happen in repeat-name objects.
   if (!do_warn_folding_odr_violation)
     return;
-  mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
+  Mijo::Println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
                 object_name);
 }
 
@@ -98,7 +98,7 @@ void Map::SectionLayout::Warn::RepeatCompilationUnit(const std::size_t line_numb
 {
   if (!do_warn_repeat_compilation_unit)
     return;
-  mijo::println(std::cerr, "Line {:d}] Detected repeat-name compilation unit \"{:s}\" ({:s})",
+  Mijo::Println(std::cerr, "Line {:d}] Detected repeat-name compilation unit \"{:s}\" ({:s})",
                 line_number, compilation_unit_name, section_name);
 }
 
@@ -111,7 +111,7 @@ void Map::SectionLayout::Warn::OneDefinitionRuleViolation(
   // For legal linker maps, this should only ever happen in repeat-name compilation units.
   if (!do_warn_odr_violation)
     return;
-  mijo::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\" ({:s})", line_number,
+  Mijo::Println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\" ({:s})", line_number,
                 symbol_name, compilation_unit_name, section_name);
 }
 
@@ -125,7 +125,7 @@ void Map::SectionLayout::Warn::SymOnFlagDetected(const std::size_t line_number,
   // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
   if (!do_warn_sym_on_flag_detected)
     return;
-  mijo::println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" ({:s})", line_number,
+  Mijo::Println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" ({:s})", line_number,
                 compilation_unit_name, section_name);
 }
 
@@ -137,7 +137,7 @@ void Map::SectionLayout::Warn::CommonOnFlagDetected(const std::size_t line_numbe
 {
   if (!do_warn_common_on_flag_detected)
     return;
-  mijo::println(std::cerr, "Line {:d}] Detected '-common on' flag in \"{:s}\" ({:s})", line_number,
+  Mijo::Println(std::cerr, "Line {:d}] Detected '-common on' flag in \"{:s}\" ({:s})", line_number,
                 compilation_unit_name, section_name);
 }
 
@@ -147,7 +147,7 @@ void Map::SectionLayout::Warn::LCommAfterComm(const std::size_t line_number)
 {
   if (!do_warn_lcomm_after_comm)
     return;
-  mijo::println(std::cerr, "Line {:d}] .lcomm symbols found after .comm symbols.", line_number);
+  Mijo::Println(std::cerr, "Line {:d}] .lcomm symbols found after .comm symbols.", line_number);
 }
 
 static constexpr std::string_view GetCompilationUnitName(const std::string& module_name,
@@ -264,8 +264,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 2u;
     head = match[0].second;
-    const auto error =
-        ScanPrologue_SectionLayout(head, tail, line_number, mijo::to_string_view(match[1]));
+    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, Mijo::SMToSV(match[1]));
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -281,8 +280,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 1u;
     head = match[0].second;
-    const auto error =
-        ScanPrologue_SectionLayout(head, tail, line_number, mijo::to_string_view(match[1]));
+    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, Mijo::SMToSV(match[1]));
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -390,8 +388,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   {
     line_number += 3u;
     head = match[0].second;
-    const auto error =
-        ScanPrologue_SectionLayout(head, tail, line_number, mijo::to_string_view(match[1]));
+    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, Mijo::SMToSV(match[1]));
     if (error != Error::None)
       return error;
   }
@@ -440,7 +437,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
   while (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
                            std::regex_constants::match_continuous))
   {
-    const std::string_view section_name = mijo::to_string_view(match[1]);
+    const std::string_view section_name = Mijo::SMToSV(match[1]);
     line_number += 1u;
     head = match[0].second;
     auto portion =
@@ -475,7 +472,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     head = match[0].second;
     // TODO: detect and split Section Layout subtext by observing the Starting Address
     auto portion =
-        std::make_unique<SectionLayout>(SectionLayout::Kind::Code, mijo::to_string_view(match[1]));
+        std::make_unique<SectionLayout>(SectionLayout::Kind::Code, Mijo::SMToSV(match[1]));
     portion->SetVersionRange(Version::version_3_0_4, Version::Latest);
     const auto error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
@@ -504,7 +501,7 @@ void Map::Print(std::ostream& stream, std::size_t& line_number) const
   auto unresolved_head = m_unresolved_symbols.cbegin(),
        unresolved_tail = m_unresolved_symbols.cend();
   // "Link map of %s\r\n"
-  mijo::print(stream, "Link map of {:s}\r\n", m_entry_point_name);
+  Mijo::Print(stream, "Link map of {:s}\r\n", m_entry_point_name);
   line_number = 2;
   if (m_normal_symbol_closure)
     m_normal_symbol_closure->Print(stream, unresolved_head, unresolved_tail, line_number);
@@ -539,7 +536,7 @@ void Map::PrintUnresolvedSymbols(  //
   while (head != tail && head->first == line_number)
   {
     // ">>> SYMBOL NOT FOUND: %s\r\n"
-    mijo::print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", (head++)->second);
+    Mijo::Print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", (head++)->second);
     line_number += 1u;
   }
 }
@@ -1051,20 +1048,19 @@ Map::Error Map::SymbolClosure::Scan(  //
     if (std::regex_search(head, tail, match, re_symbol_closure_node_normal,
                           std::regex_constants::match_continuous))
     {
-      const int next_hierarchy_level = mijo::smto<int>(match[1]);
+      const int next_hierarchy_level = Mijo::SMTo<int>(match[1]);
       if (next_hierarchy_level <= 0)
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
-      const std::string_view type = mijo::to_string_view(match[3]),
-                             bind = mijo::to_string_view(match[4]);
+      const std::string_view type = Mijo::SMToSV(match[3]), bind = Mijo::SMToSV(match[4]);
       if (!map_symbol_closure_st_type.contains(type))
         return Error::SymbolClosureInvalidSymbolType;
       if (!map_symbol_closure_st_bind.contains(bind))
         return Error::SymbolClosureInvalidSymbolBind;
-      const std::string_view symbol_name = mijo::to_string_view(match[2]),
-                             module_name = mijo::to_string_view(match[5]),
-                             source_name = mijo::to_string_view(match[6]);
+      const std::string_view symbol_name = Mijo::SMToSV(match[2]),
+                             module_name = Mijo::SMToSV(match[5]),
+                             source_name = Mijo::SMToSV(match[6]);
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->m_parent;
@@ -1079,26 +1075,26 @@ Map::Error Map::SymbolClosure::Scan(  //
       if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
                             std::regex_constants::match_continuous))
       {
-        if (mijo::smto<int>(match[1]) != curr_hierarchy_level)
+        if (Mijo::SMTo<int>(match[1]) != curr_hierarchy_level)
           return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-        if (mijo::to_string_view(match[2]) != symbol_name)
+        if (Mijo::SMToSV(match[2]) != symbol_name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
         line_number += 1u;
         head = match[0].second;
         while (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                  std::regex_constants::match_continuous))
         {
-          if (mijo::smto<int>(match[1]) != curr_hierarchy_level)
+          if (Mijo::SMTo<int>(match[1]) != curr_hierarchy_level)
             return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-          const std::string_view unref_dup_type = mijo::to_string_view(match[2]),
-                                 unref_dup_bind = mijo::to_string_view(match[3]);
+          const std::string_view unref_dup_type = Mijo::SMToSV(match[2]),
+                                 unref_dup_bind = Mijo::SMToSV(match[3]);
           if (!map_symbol_closure_st_type.contains(unref_dup_type))
             return Error::SymbolClosureInvalidSymbolType;
           if (!map_symbol_closure_st_bind.contains(unref_dup_bind))
             return Error::SymbolClosureInvalidSymbolBind;
           unref_dups.emplace_back(map_symbol_closure_st_type.at(unref_dup_type),
                                   map_symbol_closure_st_bind.at(unref_dup_bind),
-                                  mijo::to_string_view(match[4]), mijo::to_string_view(match[5]));
+                                  Mijo::SMToSV(match[4]), Mijo::SMToSV(match[5]));
           line_number += 1u;
           head = match[0].second;
         }
@@ -1139,7 +1135,7 @@ Map::Error Map::SymbolClosure::Scan(  //
     if (std::regex_search(head, tail, match, re_symbol_closure_node_linker_generated,
                           std::regex_constants::match_continuous))
     {
-      const int next_hierarchy_level = mijo::smto<int>(match[1]);
+      const int next_hierarchy_level = Mijo::SMTo<int>(match[1]);
       if (next_hierarchy_level <= 0)
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
@@ -1150,7 +1146,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       curr_hierarchy_level = next_hierarchy_level;
 
       // clang-format off
-      curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeLinkerGenerated>(curr_node, mijo::to_string_view(match[2]))).get();
+      curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeLinkerGenerated>(curr_node, Mijo::SMToSV(match[2]))).get();
       // clang-format on
 
       line_number += 1u;
@@ -1195,7 +1191,7 @@ void Map::SymbolClosure::NodeBase::PrintPrefix(std::ostream& stream, const int h
     for (int i = 0; i <= hierarchy_level; ++i)
       stream.put(' ');
   // "%i] "
-  mijo::print(stream, "{:d}] ", hierarchy_level);
+  Mijo::Print(stream, "{:d}] ", hierarchy_level);
 }
 
 constexpr std::string_view Map::SymbolClosure::NodeBase::ToName(const Type st_type) noexcept
@@ -1255,14 +1251,14 @@ void Map::SymbolClosure::NodeReal::Print(std::ostream& stream, const int hierarc
 {
   PrintPrefix(stream, hierarchy_level);
   // "%s (%s,%s) found in %s %s\r\n"
-  mijo::print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", m_name, ToName(m_type),
+  Mijo::Print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", m_name, ToName(m_type),
               ToName(m_bind), m_module_name, m_source_name);
   line_number += 1u;
   if (!m_unref_dups.empty())
   {
     PrintPrefix(stream, hierarchy_level);
     // ">>> UNREFERENCED DUPLICATE %s\r\n"
-    mijo::print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", m_name);
+    Mijo::Print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", m_name);
     line_number += 1u;
     for (const auto& unref_dup : m_unref_dups)
       unref_dup.Print(stream, hierarchy_level, line_number);
@@ -1277,7 +1273,7 @@ void Map::SymbolClosure::NodeLinkerGenerated::Print(
 {
   PrintPrefix(stream, hierarchy_level);
   // "%s found as linker generated symbol\r\n"
-  mijo::print(stream, "{:s} found as linker generated symbol\r\n", m_name);
+  Mijo::Print(stream, "{:s} found as linker generated symbol\r\n", m_name);
   line_number += 1u;
   NodeBase::Print(stream, hierarchy_level, unresolved_head, unresolved_tail, line_number);
 }
@@ -1287,7 +1283,7 @@ void Map::SymbolClosure::NodeReal::UnreferencedDuplicate::Print(  //
 {
   PrintPrefix(stream, hierarchy_level);
   // ">>> (%s,%s) found in %s %s\r\n"
-  mijo::print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", ToName(m_type), ToName(m_bind),
+  Mijo::Print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", ToName(m_type), ToName(m_bind),
               m_module_name, m_source_name);
   line_number += 1u;
 }
@@ -1326,17 +1322,17 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                           std::regex_constants::match_continuous))
     {
-      const std::string_view first_name = mijo::to_string_view(match[1]),
-                             second_name = mijo::to_string_view(match[2]);
-      const Elf32_Word size = mijo::smto<Elf32_Word>(match[3]);
+      const std::string_view first_name = Mijo::SMToSV(match[1]),
+                             second_name = Mijo::SMToSV(match[2]);
+      const Elf32_Word size = Mijo::SMTo<Elf32_Word>(match[3]);
       line_number += 2u;
       head = match[0].second;
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
-        if (mijo::to_string_view(match[1]) != first_name)
+        if (Mijo::SMToSV(match[1]) != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
-        if (mijo::to_string_view(match[2]) != second_name)
+        if (Mijo::SMToSV(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
         will_be_replaced = true;
         line_number += 3u;
@@ -1352,18 +1348,18 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_code_merging_was_interchanged,
                           std::regex_constants::match_continuous))
     {
-      const std::string_view first_name = mijo::to_string_view(match[1]),
-                             second_name = mijo::to_string_view(match[2]);
-      const Elf32_Word size = mijo::smto<Elf32_Word>(match[3]);
+      const std::string_view first_name = Mijo::SMToSV(match[1]),
+                             second_name = Mijo::SMToSV(match[2]);
+      const Elf32_Word size = Mijo::SMTo<Elf32_Word>(match[3]);
       was_interchanged = true;
       line_number += 1u;
       head = match[0].second;
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
-        if (mijo::to_string_view(match[1]) != first_name)
+        if (Mijo::SMToSV(match[1]) != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
-        if (mijo::to_string_view(match[2]) != second_name)
+        if (Mijo::SMToSV(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
         will_be_replaced = true;
         line_number += 3u;
@@ -1372,11 +1368,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                             std::regex_constants::match_continuous))
       {
-        if (mijo::to_string_view(match[1]) != first_name)
+        if (Mijo::SMToSV(match[1]) != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
-        if (mijo::to_string_view(match[2]) != second_name)
+        if (Mijo::SMToSV(match[2]) != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
-        if (mijo::smto<Elf32_Word>(match[3]) != size)
+        if (Mijo::SMTo<Elf32_Word>(match[3]) != size)
           return Error::EPPC_PatternMatchingMergingSizeMismatch;
         line_number += 2u;
         head = match[0].second;
@@ -1398,7 +1394,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
   while (std::regex_search(head, tail, match, re_code_folding_header,
                            std::regex_constants::match_continuous))
   {
-    const std::string_view object_name = mijo::to_string_view(match[1]);
+    const std::string_view object_name = Mijo::SMToSV(match[1]);
     if (m_folding_lookup.contains(object_name))
       Warn::FoldingRepeatObject(line_number + 3u, object_name);
     FoldingUnit& folding_unit = m_folding_units.emplace_back(object_name);
@@ -1411,11 +1407,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
                             std::regex_constants::match_continuous))
       {
-        const std::string_view first_name = mijo::to_string_view(match[1]);
+        const std::string_view first_name = Mijo::SMToSV(match[1]);
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         const FoldingUnit::Unit& unit = folding_unit.m_units.emplace_back(
-            first_name, mijo::to_string_view(match[2]), mijo::smto<Elf32_Word>(match[3]), false);
+            first_name, Mijo::SMToSV(match[2]), Mijo::SMTo<Elf32_Word>(match[3]), false);
         curr_unit_lookup.emplace(unit.m_first_name, unit);
         line_number += 2u;
         head = match[0].second;
@@ -1424,14 +1420,14 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
                             std::regex_constants::match_continuous))
       {
-        const std::string_view first_name = mijo::to_string_view(match[1]);
+        const std::string_view first_name = Mijo::SMToSV(match[1]);
         // It is my assumption that these will always match.
-        if (first_name != mijo::to_string_view(match[4]))
+        if (first_name != Mijo::SMToSV(match[4]))
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         const FoldingUnit::Unit& unit = folding_unit.m_units.emplace_back(
-            first_name, mijo::to_string_view(match[2]), mijo::smto<Elf32_Word>(match[3]), true);
+            first_name, Mijo::SMToSV(match[2]), Mijo::SMTo<Elf32_Word>(match[3]), true);
         curr_unit_lookup.emplace(unit.m_first_name, unit);
         line_number += 2u;
         head = match[0].second;
@@ -1457,18 +1453,18 @@ void Map::EPPC_PatternMatching::MergingUnit::Print(std::ostream& stream,
   if (m_was_interchanged)
   {
     // "--> the function %s was interchanged with %s, size=%d \r\n"
-    mijo::print(stream, "--> the function {:s} was interchanged with {:s}, size={:d} \r\n",
+    Mijo::Print(stream, "--> the function {:s} was interchanged with {:s}, size={:d} \r\n",
                 m_first_name, m_second_name, m_size);
     line_number += 1u;
     if (m_will_be_replaced)
     {
       // "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
-      mijo::print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
+      Mijo::Print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
                   m_first_name, m_second_name);
       line_number += 3u;
     }
     // "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
-    mijo::print(stream,
+    Mijo::Print(stream,
                 "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
                 m_first_name, m_second_name, m_size);
     line_number += 2u;
@@ -1476,14 +1472,14 @@ void Map::EPPC_PatternMatching::MergingUnit::Print(std::ostream& stream,
   else
   {
     // "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
-    mijo::print(stream,
+    Mijo::Print(stream,
                 "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
                 m_first_name, m_second_name, m_size);
     line_number += 2u;
     if (m_will_be_replaced)
     {
       // "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
-      mijo::print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
+      Mijo::Print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
                   m_first_name, m_second_name);
       line_number += 3u;
     }
@@ -1494,7 +1490,7 @@ void Map::EPPC_PatternMatching::FoldingUnit::Print(std::ostream& stream,
                                                    std::size_t& line_number) const
 {
   // "\r\n\r\n\r\nCode folded in file: %s \r\n"
-  mijo::print(stream, "\r\n\r\n\r\nCode folded in file: {:s} \r\n", m_object_name);
+  Mijo::Print(stream, "\r\n\r\n\r\nCode folded in file: {:s} \r\n", m_object_name);
   line_number += 4u;
   for (const auto& unit : m_units)
     unit.Print(stream, line_number);
@@ -1506,7 +1502,7 @@ void Map::EPPC_PatternMatching::FoldingUnit::Unit::Print(std::ostream& stream,
   if (m_new_branch_function)
   {
     // "--> %s is duplicated by %s, size = %d, new branch function %s \r\n\r\n"
-    mijo::print(stream,
+    Mijo::Print(stream,
                 "--> {:s} is duplicated by {:s}, size = {:d}, new branch function {:s} \r\n\r\n",
                 m_first_name, m_second_name, m_size, m_first_name);
     line_number += 2u;
@@ -1514,7 +1510,7 @@ void Map::EPPC_PatternMatching::FoldingUnit::Unit::Print(std::ostream& stream,
   else
   {
     // "--> %s is duplicated by %s, size = %d \r\n\r\n"
-    mijo::print(stream, "--> {:s} is duplicated by {:s}, size = {:d} \r\n\r\n", m_first_name,
+    Mijo::Print(stream, "--> {:s} is duplicated by {:s}, size = {:d} \r\n\r\n", m_first_name,
                 m_second_name, m_size);
     line_number += 2u;
   }
@@ -1546,8 +1542,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_not_near,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Unit::Kind::NotNear, mijo::to_string_view(match[1]),
-                           mijo::to_string_view(match[2]), mijo::to_string_view(match[3]));
+      m_units.emplace_back(Unit::Kind::NotNear, Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]),
+                           Mijo::SMToSV(match[3]));
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1555,7 +1551,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_disassemble_error,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]));
+      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]));
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1563,8 +1559,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_address_not_computed,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Unit::Kind::NotComputed, mijo::to_string_view(match[1]),
-                           mijo::to_string_view(match[2]), mijo::to_string_view(match[3]));
+      m_units.emplace_back(Unit::Kind::NotComputed, Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]),
+                           Mijo::SMToSV(match[3]));
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1573,8 +1569,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_optimized,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Unit::Kind::Optimized, mijo::to_string_view(match[1]),
-                           mijo::to_string_view(match[2]), mijo::to_string_view(match[3]));
+      m_units.emplace_back(Unit::Kind::Optimized, Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]),
+                           Mijo::SMToSV(match[3]));
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1596,25 +1592,25 @@ void Map::LinkerOpts::Unit::Print(std::ostream& stream, std::size_t& line_number
   {
   case Kind::NotNear:
     // "  %s/ %s()/ %s - address not in near addressing range \r\n"
-    mijo::print(stream, "  {:s}/ {:s}()/ {:s} - address not in near addressing range \r\n",
+    Mijo::Print(stream, "  {:s}/ {:s}()/ {:s} - address not in near addressing range \r\n",
                 m_module_name, m_name, m_reference_name);
     line_number += 1u;
     return;
   case Kind::NotComputed:
     // "  %s/ %s()/ %s - final address not yet computed \r\n"
-    mijo::print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", m_module_name,
+    Mijo::Print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", m_module_name,
                 m_name, m_reference_name);
     line_number += 1u;
     return;
   case Kind::Optimized:
     // "! %s/ %s()/ %s - optimized addressing \r\n"
-    mijo::print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", m_module_name, m_name,
+    Mijo::Print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", m_module_name, m_name,
                 m_reference_name);
     line_number += 1u;
     return;
   case Kind::DisassembleError:
     // "  %s/ %s() - error disassembling function \r\n"
-    mijo::print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", m_module_name,
+    Mijo::Print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", m_module_name,
                 m_name);
     line_number += 1u;
     return;
@@ -1642,7 +1638,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]), false);
+      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]), false);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1650,7 +1646,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]), true);
+      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]), true);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1662,7 +1658,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
 
 void Map::MixedModeIslands::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  mijo::print(stream, "\r\nMixed Mode Islands\r\n");
+  Mijo::Print(stream, "\r\nMixed Mode Islands\r\n");
   line_number += 2u;
   for (const auto& unit : m_units)
     unit.Print(stream, line_number);
@@ -1672,14 +1668,14 @@ void Map::MixedModeIslands::Unit::Print(std::ostream& stream, std::size_t& line_
   if (m_is_safe)
   {
     // "  safe mixed mode island %s created for %s\r\n"
-    mijo::print(stream, "  safe mixed mode island {:s} created for {:s}\r\n", m_first_name,
+    Mijo::Print(stream, "  safe mixed mode island {:s} created for {:s}\r\n", m_first_name,
                 m_second_name);
     line_number += 1u;
   }
   else
   {
     // "  mixed mode island %s created for %s\r\n"
-    mijo::print(stream, "  mixed mode island {:s} created for {:s}\r\n", m_first_name,
+    Mijo::Print(stream, "  mixed mode island {:s} created for {:s}\r\n", m_first_name,
                 m_second_name);
     line_number += 1u;
   }
@@ -1706,7 +1702,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_branch_islands_created,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]), false);
+      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]), false);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1714,7 +1710,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_branch_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(mijo::to_string_view(match[1]), mijo::to_string_view(match[2]), true);
+      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]), true);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1726,7 +1722,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
 
 void Map::BranchIslands::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  mijo::print(stream, "\r\nBranch Islands\r\n");
+  Mijo::Print(stream, "\r\nBranch Islands\r\n");
   line_number += 2u;
   for (const auto& unit : m_units)
     unit.Print(stream, line_number);
@@ -1736,14 +1732,14 @@ void Map::BranchIslands::Unit::Print(std::ostream& stream, std::size_t& line_num
   if (m_is_safe)
   {
     //  "  safe branch island %s created for %s\r\n"
-    mijo::print(stream, "  safe branch island {:s} created for {:s}\r\n", m_first_name,
+    Mijo::Print(stream, "  safe branch island {:s} created for {:s}\r\n", m_first_name,
                 m_second_name);
     line_number += 1u;
   }
   else
   {
     //  "  branch island %s created for %s\r\n"
-    mijo::print(stream, "  branch island {:s} created for {:s}\r\n", m_first_name, m_second_name);
+    Mijo::Print(stream, "  branch island {:s} created for {:s}\r\n", m_first_name, m_second_name);
     line_number += 1u;
   }
 }
@@ -1758,7 +1754,7 @@ Map::Error Map::LinktimeSizeDecreasingOptimizations::Scan(const char*&, const ch
 void Map::LinktimeSizeDecreasingOptimizations::Print(std::ostream& stream,
                                                      std::size_t& line_number) const
 {
-  mijo::print(stream, "\r\nLinktime size-decreasing optimizations\r\n");
+  Mijo::Print(stream, "\r\nLinktime size-decreasing optimizations\r\n");
   line_number += 2u;
 }
 
@@ -1772,7 +1768,7 @@ Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(const char*&, const ch
 void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream,
                                                      std::size_t& line_number) const
 {
-  mijo::print(stream, "\r\nLinktime size-increasing optimizations\r\n");
+  Mijo::Print(stream, "\r\nLinktime size-increasing optimizations\r\n");
   line_number += 2u;
 }
 
@@ -1948,10 +1944,9 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = m_units.emplace_back(
-          mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-          mijo::xsmto<Elf32_Addr>(match[3]), mijo::smto<int>(match[4]),
-          mijo::to_string_view(match[5]), mijo::to_string_view(match[6]),
-          mijo::to_string_view(match[7]), scanning_context);
+          Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
+          Mijo::XSMTo<Elf32_Addr>(match[3]), Mijo::SMTo<int>(match[4]), Mijo::SMToSV(match[5]),
+          Mijo::SMToSV(match[6]), Mijo::SMToSV(match[7]), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -1960,9 +1955,9 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = m_units.emplace_back(
-          mijo::xsmto<Elf32_Word>(match[1]), mijo::to_string_view(match[2]),
-          mijo::to_string_view(match[3]), mijo::to_string_view(match[4]), scanning_context);
+      const Unit& unit = m_units.emplace_back(  //
+          Mijo::XSMTo<Elf32_Word>(match[1]), Mijo::SMToSV(match[2]), Mijo::SMToSV(match[3]),
+          Mijo::SMToSV(match[4]), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -1971,10 +1966,10 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      const std::string_view symbol_name = mijo::to_string_view(match[4]),
-                             entry_parent_name = mijo::to_string_view(match[5]),
-                             module_name = mijo::to_string_view(match[6]),
-                             source_name = mijo::to_string_view(match[7]);
+      const std::string_view symbol_name = Mijo::SMToSV(match[4]),
+                             entry_parent_name = Mijo::SMToSV(match[5]),
+                             module_name = Mijo::SMToSV(match[6]),
+                             source_name = Mijo::SMToSV(match[7]);
       // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
       for (auto parent_unit = m_units.rbegin(); parent_unit != m_units.rend(); ++parent_unit)
       {
@@ -1983,8 +1978,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         if (entry_parent_name != parent_unit->m_name)
           continue;
         const Unit& unit = m_units.emplace_back(
-            mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-            mijo::xsmto<Elf32_Addr>(match[3]), symbol_name, &parent_unit.operator*(), module_name,
+            Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
+            Mijo::XSMTo<Elf32_Addr>(match[3]), symbol_name, &parent_unit.operator*(), module_name,
             source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
         parent_unit->m_entry_children.push_back(&unit);
@@ -2028,10 +2023,10 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = m_units.emplace_back(
-          mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-          mijo::xsmto<Elf32_Addr>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-          mijo::smto<int>(match[5]), mijo::to_string_view(match[6]), mijo::to_string_view(match[7]),
-          mijo::to_string_view(match[8]), scanning_context);
+          Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
+          Mijo::XSMTo<Elf32_Addr>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
+          Mijo::SMTo<int>(match[5]), Mijo::SMToSV(match[6]), Mijo::SMToSV(match[7]),
+          Mijo::SMToSV(match[8]), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -2040,9 +2035,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = m_units.emplace_back(
-          mijo::xsmto<Elf32_Word>(match[1]), mijo::to_string_view(match[2]),
-          mijo::to_string_view(match[3]), mijo::to_string_view(match[4]), scanning_context);
+      const Unit& unit = m_units.emplace_back(  //
+          Mijo::XSMTo<Elf32_Word>(match[1]), Mijo::SMToSV(match[2]), Mijo::SMToSV(match[3]),
+          Mijo::SMToSV(match[4]), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -2051,10 +2046,10 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      const std::string_view symbol_name = mijo::to_string_view(match[5]),
-                             entry_parent_name = mijo::to_string_view(match[6]),
-                             module_name = mijo::to_string_view(match[7]),
-                             source_name = mijo::to_string_view(match[8]);
+      const std::string_view symbol_name = Mijo::SMToSV(match[5]),
+                             entry_parent_name = Mijo::SMToSV(match[6]),
+                             module_name = Mijo::SMToSV(match[7]),
+                             source_name = Mijo::SMToSV(match[8]);
       // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
       for (auto parent_unit = m_units.rbegin(); parent_unit != m_units.rend(); ++parent_unit)
       {
@@ -2063,8 +2058,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         if (entry_parent_name != parent_unit->m_name)
           continue;
         const Unit& unit = m_units.emplace_back(
-            mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-            mijo::xsmto<Elf32_Addr>(match[3]), mijo::xsmto<std::uint32_t>(match[4]), symbol_name,
+            Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
+            Mijo::XSMTo<Elf32_Addr>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]), symbol_name,
             &parent_unit.operator*(), module_name, source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
         parent_unit->m_entry_children.push_back(&unit);
@@ -2080,12 +2075,12 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
-      const std::string_view special_name = mijo::to_string_view(match[6]);
+      const std::string_view special_name = Mijo::SMToSV(match[6]);
       if (special_name == "*fill*")
       {
-        m_units.emplace_back(mijo::xsmto<std::uint32_t>(match[1]),
-                             mijo::xsmto<Elf32_Word>(match[2]), mijo::xsmto<Elf32_Addr>(match[3]),
-                             mijo::xsmto<std::uint32_t>(match[4]), mijo::smto<int>(match[5]),
+        m_units.emplace_back(Mijo::XSMTo<std::uint32_t>(match[1]),
+                             Mijo::XSMTo<Elf32_Word>(match[2]), Mijo::XSMTo<Elf32_Addr>(match[3]),
+                             Mijo::XSMTo<std::uint32_t>(match[4]), Mijo::SMTo<int>(match[5]),
                              Unit::Trait::Fill1);
         line_number += 1u;
         head = match[0].second;
@@ -2093,9 +2088,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
       }
       if (special_name == "**fill**")
       {
-        m_units.emplace_back(mijo::xsmto<std::uint32_t>(match[1]),
-                             mijo::xsmto<Elf32_Word>(match[2]), mijo::xsmto<Elf32_Addr>(match[3]),
-                             mijo::xsmto<std::uint32_t>(match[4]), mijo::smto<int>(match[5]),
+        m_units.emplace_back(Mijo::XSMTo<std::uint32_t>(match[1]),
+                             Mijo::XSMTo<Elf32_Word>(match[2]), Mijo::XSMTo<Elf32_Addr>(match[3]),
+                             Mijo::XSMTo<std::uint32_t>(match[4]), Mijo::SMTo<int>(match[5]),
                              Unit::Trait::Fill2);
         line_number += 1u;
         head = match[0].second;
@@ -2127,10 +2122,9 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = m_units.emplace_back(
-          mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-          mijo::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, mijo::smto<int>(match[4]),
-          mijo::to_string_view(match[5]), mijo::to_string_view(match[6]),
-          mijo::to_string_view(match[7]), scanning_context);
+          Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
+          Mijo::XSMTo<Elf32_Addr>(match[3]), std::uint32_t{0}, Mijo::SMTo<int>(match[4]),
+          Mijo::SMToSV(match[5]), Mijo::SMToSV(match[6]), Mijo::SMToSV(match[7]), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -2139,10 +2133,9 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string_view symbol_name = mijo::to_string_view(match[4]),
-                       entry_parent_name = mijo::to_string_view(match[5]),
-                       module_name = mijo::to_string_view(match[6]),
-                       source_name = mijo::to_string_view(match[7]);
+      std::string_view symbol_name = Mijo::SMToSV(match[4]),
+                       entry_parent_name = Mijo::SMToSV(match[5]),
+                       module_name = Mijo::SMToSV(match[6]), source_name = Mijo::SMToSV(match[7]);
       // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
       for (auto parent_unit = m_units.rbegin(); parent_unit != m_units.rend(); ++parent_unit)
       {
@@ -2151,8 +2144,8 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         if (entry_parent_name != parent_unit->m_name)
           continue;
         const Unit& unit = m_units.emplace_back(
-            mijo::xsmto<std::uint32_t>(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-            mijo::xsmto<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name,
+            Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
+            Mijo::XSMTo<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name,
             &parent_unit.operator*(), module_name, source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
         parent_unit->m_entry_children.push_back(&unit);
@@ -2168,21 +2161,21 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                           std::regex_constants::match_continuous))
     {
       // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
-      std::string_view special_name = mijo::to_string_view(match[5]);
+      std::string_view special_name = Mijo::SMToSV(match[5]);
       if (special_name == "*fill*")
       {
-        m_units.emplace_back(mijo::xsmto<std::uint32_t>(match[1]),
-                             mijo::xsmto<Elf32_Word>(match[2]), mijo::xsmto<Elf32_Addr>(match[3]),
-                             std::uint32_t{0}, mijo::smto<int>(match[4]), Unit::Trait::Fill1);
+        m_units.emplace_back(Mijo::XSMTo<std::uint32_t>(match[1]),
+                             Mijo::XSMTo<Elf32_Word>(match[2]), Mijo::XSMTo<Elf32_Addr>(match[3]),
+                             std::uint32_t{0}, Mijo::SMTo<int>(match[4]), Unit::Trait::Fill1);
         line_number += 1u;
         head = match[0].second;
         continue;
       }
       if (special_name == "**fill**")
       {
-        m_units.emplace_back(mijo::xsmto<std::uint32_t>(match[1]),
-                             mijo::xsmto<Elf32_Word>(match[2]), mijo::xsmto<Elf32_Addr>(match[3]),
-                             std::uint32_t{0}, mijo::smto<int>(match[4]), Unit::Trait::Fill2);
+        m_units.emplace_back(Mijo::XSMTo<std::uint32_t>(match[1]),
+                             Mijo::XSMTo<Elf32_Word>(match[2]), Mijo::XSMTo<Elf32_Addr>(match[3]),
+                             std::uint32_t{0}, Mijo::SMTo<int>(match[4]), Unit::Trait::Fill2);
         line_number += 1u;
         head = match[0].second;
         continue;
@@ -2197,10 +2190,10 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
 void Map::SectionLayout::Print(std::ostream& stream, std::size_t& line_number) const
 {
   // "\r\n\r\n%s section layout\r\n"
-  mijo::print(stream, "\r\n\r\n{:s} section layout\r\n", m_name);
+  Mijo::Print(stream, "\r\n\r\n{:s} section layout\r\n", m_name);
   if (GetMinVersion() < Version::version_3_0_4)
   {
-    mijo::print(stream, "  Starting        Virtual\r\n"
+    Mijo::Print(stream, "  Starting        Virtual\r\n"
                         "  address  Size   address\r\n"
                         "  -----------------------\r\n");
     line_number += 6u;
@@ -2209,7 +2202,7 @@ void Map::SectionLayout::Print(std::ostream& stream, std::size_t& line_number) c
   }
   else
   {
-    mijo::print(stream, "  Starting        Virtual  File\r\n"
+    Mijo::Print(stream, "  Starting        Virtual  File\r\n"
                         "  address  Size   address  offset\r\n"
                         "  ---------------------------------\r\n");
     line_number += 6u;
@@ -2224,19 +2217,19 @@ void Map::SectionLayout::Unit::Print3Column(std::ostream& stream, std::size_t& l
   {
   case Kind::Normal:
     // "  %08x %06x %08x %2i %s \t%s %s\r\n"
-    mijo::print(stream, "  {:08x} {:06x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n", m_starting_address,
+    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n", m_starting_address,
                 m_size, m_virtual_address, m_alignment, m_name, m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Unused:
     // "  UNUSED   %06x ........ %s %s %s\r\n"
-    mijo::print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", m_size, m_name,
+    Mijo::Print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", m_size, m_name,
                 m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Entry:
     // "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
-    mijo::print(stream, "  {:08x} {:06x} {:08x} {:s} (entry of {:s}) \t{:s} {:s}\r\n",
+    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:s} (entry of {:s}) \t{:s} {:s}\r\n",
                 m_starting_address, m_size, m_virtual_address, m_name, m_entry_parent->m_name,
                 m_module_name, m_source_name);
     line_number += 1u;
@@ -2253,27 +2246,27 @@ void Map::SectionLayout::Unit::Print4Column(std::ostream& stream, std::size_t& l
   {
   case Kind::Normal:
     // "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
-    mijo::print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n",
+    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n",
                 m_starting_address, m_size, m_virtual_address, m_file_offset, m_alignment, m_name,
                 m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Unused:
     // "  UNUSED   %06x ........ ........    %s %s %s\r\n"
-    mijo::print(stream, "  UNUSED   {:06x} ........ ........    {:s} {:s} {:s}\r\n", m_size, m_name,
+    Mijo::Print(stream, "  UNUSED   {:06x} ........ ........    {:s} {:s} {:s}\r\n", m_size, m_name,
                 m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Entry:
     // "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
-    mijo::print(stream, "  {:08x} {:06x} {:08x} {:08x}    {:s} (entry of {:s}) \t{:s} {:s}\r\n",
+    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:08x}    {:s} (entry of {:s}) \t{:s} {:s}\r\n",
                 m_starting_address, m_size, m_virtual_address, m_file_offset, m_name,
                 m_entry_parent->m_name, m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Special:
     // "  %08x %06x %08x %08x %2i %s\r\n"
-    mijo::print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s}\r\n", m_starting_address, m_size,
+    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s}\r\n", m_starting_address, m_size,
                 m_virtual_address, m_file_offset, m_alignment, ToSpecialName(m_unit_trait));
     line_number += 1u;
     return;
@@ -2304,9 +2297,9 @@ Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const t
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple_old,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-                                mijo::xsmto<Elf32_Word>(match[3]),
-                                mijo::xsmto<std::uint32_t>(match[4]));
+    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+                                Mijo::XSMTo<Elf32_Word>(match[3]),
+                                Mijo::XSMTo<std::uint32_t>(match[4]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2328,9 +2321,9 @@ Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const t
                            std::regex_constants::match_continuous))
   {
     m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-        mijo::xsmto<std::uint32_t>(match[5]), mijo::xsmto<std::uint32_t>(match[6]));
+        Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+        Mijo::XSMTo<Elf32_Word>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
+        Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::XSMTo<std::uint32_t>(match[6]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2355,8 +2348,8 @@ Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const ta
     const std::csub_match& size = match[2];
     if (size.length() == 8 && *size.first == '0')  // Make sure it's not just an overflowed value
       SetVersionRange(Version::version_3_0_4, Version::Latest);
-    m_debug_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Word>(size),
-                               mijo::xsmto<std::uint32_t>(match[3]));
+    m_debug_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Word>(size),
+                               Mijo::XSMTo<std::uint32_t>(match[3]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2377,9 +2370,9 @@ Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-                                mijo::xsmto<Elf32_Word>(match[3]),
-                                mijo::xsmto<std::uint32_t>(match[4]));
+    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+                                Mijo::XSMTo<Elf32_Word>(match[3]),
+                                Mijo::XSMTo<std::uint32_t>(match[4]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2401,9 +2394,9 @@ Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
                            std::regex_constants::match_continuous))
   {
     m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-        mijo::xsmto<std::uint32_t>(match[5]), mijo::xsmto<std::uint32_t>(match[6]));
+        Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+        Mijo::XSMTo<Elf32_Word>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
+        Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::XSMTo<std::uint32_t>(match[6]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2424,9 +2417,9 @@ Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-                                mijo::xsmto<Elf32_Word>(match[3]),
-                                mijo::xsmto<std::uint32_t>(match[4]), mijo::smto<int>(match[5]));
+    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+                                Mijo::XSMTo<Elf32_Word>(match[3]),
+                                Mijo::XSMTo<std::uint32_t>(match[4]), Mijo::SMTo<int>(match[5]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2447,10 +2440,10 @@ Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_binfile,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-        mijo::xsmto<std::uint32_t>(match[5]), mijo::to_string_view(match[6]));
+    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+                                Mijo::XSMTo<Elf32_Word>(match[3]),
+                                Mijo::XSMTo<std::uint32_t>(match[4]),
+                                Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::SMToSV(match[6]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2471,11 +2464,11 @@ Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-                                mijo::xsmto<Elf32_Word>(match[3]),
-                                mijo::xsmto<std::uint32_t>(match[4]),
-                                mijo::xsmto<std::uint32_t>(match[5]),
-                                mijo::xsmto<std::uint32_t>(match[6]), mijo::smto<int>(match[7]));
+    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+                                Mijo::XSMTo<Elf32_Word>(match[3]),
+                                Mijo::XSMTo<std::uint32_t>(match[4]),
+                                Mijo::XSMTo<std::uint32_t>(match[5]),
+                                Mijo::XSMTo<std::uint32_t>(match[6]), Mijo::SMTo<int>(match[7]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2497,10 +2490,10 @@ Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* cons
                            std::regex_constants::match_continuous))
   {
     m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-        mijo::xsmto<std::uint32_t>(match[5]), mijo::xsmto<std::uint32_t>(match[6]),
-        mijo::xsmto<std::uint32_t>(match[7]), mijo::to_string_view(match[8]));
+        Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+        Mijo::XSMTo<Elf32_Word>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
+        Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::XSMTo<std::uint32_t>(match[6]),
+        Mijo::XSMTo<std::uint32_t>(match[7]), Mijo::SMToSV(match[8]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2521,11 +2514,10 @@ Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* con
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-                                mijo::xsmto<Elf32_Word>(match[3]),
-                                mijo::xsmto<std::uint32_t>(match[4]), mijo::smto<int>(match[5]),
-                                mijo::xsmto<std::uint32_t>(match[6]),
-                                mijo::to_string_view(match[7]));
+    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+                                Mijo::XSMTo<Elf32_Word>(match[3]),
+                                Mijo::XSMTo<std::uint32_t>(match[4]), Mijo::SMTo<int>(match[5]),
+                                Mijo::XSMTo<std::uint32_t>(match[6]), Mijo::SMToSV(match[7]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2547,11 +2539,10 @@ Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const cha
                            std::regex_constants::match_continuous))
   {
     m_normal_units.emplace_back(
-        mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]),
-        mijo::xsmto<Elf32_Word>(match[3]), mijo::xsmto<std::uint32_t>(match[4]),
-        mijo::xsmto<std::uint32_t>(match[5]), mijo::xsmto<std::uint32_t>(match[6]),
-        mijo::smto<int>(match[7]), mijo::xsmto<std::uint32_t>(match[8]),
-        mijo::to_string_view(match[9]));
+        Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
+        Mijo::XSMTo<Elf32_Word>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
+        Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::XSMTo<std::uint32_t>(match[6]),
+        Mijo::SMTo<int>(match[7]), Mijo::XSMTo<std::uint32_t>(match[8]), Mijo::SMToSV(match[9]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2572,8 +2563,8 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
                            std::regex_constants::match_continuous))
   {
-    m_debug_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Word>(match[2]),
-                               mijo::xsmto<std::uint32_t>(match[3]));
+    m_debug_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
+                               Mijo::XSMTo<std::uint32_t>(match[3]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2582,7 +2573,7 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
 
 void Map::MemoryMap::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  mijo::print(stream, "\r\n\r\nMemory map:\r\n");
+  Mijo::Print(stream, "\r\n\r\nMemory map:\r\n");
   line_number += 3u;
   if (GetMinVersion() < Version::version_4_2_build_142)
   {
@@ -2620,7 +2611,7 @@ void Map::MemoryMap::Print(std::ostream& stream, std::size_t& line_number) const
 void Map::MemoryMap::PrintSimple_old(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                   Starting Size     File\r\n"
+  Mijo::Print(stream, "                   Starting Size     File\r\n"
                       "                   address           Offset\r\n");
   // clang-format on
   line_number += 2u;
@@ -2631,7 +2622,7 @@ void Map::MemoryMap::UnitNormal::PrintSimple_old(std::ostream& stream,
                                                  std::size_t& line_number) const
 {
   // "  %15s  %08x %08x %08x\r\n"
-  mijo::print(stream, "  {:>15s}  {:08x} {:08x} {:08x}\r\n", m_name, m_starting_address, m_size,
+  Mijo::Print(stream, "  {:>15s}  {:08x} {:08x} {:08x}\r\n", m_name, m_starting_address, m_size,
               m_file_offset);
   line_number += 1u;
 }
@@ -2639,7 +2630,7 @@ void Map::MemoryMap::UnitNormal::PrintSimple_old(std::ostream& stream,
 void Map::MemoryMap::PrintRomRam_old(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                   Starting Size     File     ROM      RAM Buffer\r\n"
+  Mijo::Print(stream, "                   Starting Size     File     ROM      RAM Buffer\r\n"
                       "                   address           Offset   Address  Address\r\n");
   // clang-format on
   line_number += 2u;
@@ -2650,7 +2641,7 @@ void Map::MemoryMap::UnitNormal::PrintRomRam_old(std::ostream& stream,
                                                  std::size_t& line_number) const
 {
   // "  %15s  %08x %08x %08x %08x %08x\r\n"
-  mijo::print(stream, "  {:>15s}  {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", m_name,
+  Mijo::Print(stream, "  {:>15s}  {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", m_name,
               m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address);
   line_number += 1u;
 }
@@ -2667,20 +2658,20 @@ void Map::MemoryMap::PrintDebug_old(std::ostream& stream, std::size_t& line_numb
 void Map::MemoryMap::UnitDebug::Print_older(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %15s           %06x %08x\r\n"
-  mijo::print(stream, "  {:>15s}           {:06x} {:08x}\r\n", m_name, m_size, m_file_offset);
+  Mijo::Print(stream, "  {:>15s}           {:06x} {:08x}\r\n", m_name, m_size, m_file_offset);
   line_number += 1u;
 }
 void Map::MemoryMap::UnitDebug::Print_old(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %15s           %08x %08x\r\n"
-  mijo::print(stream, "  {:>15s}           {:08x} {:08x}\r\n", m_name, m_size, m_file_offset);
+  Mijo::Print(stream, "  {:>15s}           {:08x} {:08x}\r\n", m_name, m_size, m_file_offset);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintSimple(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                       Starting Size     File\r\n"
+  Mijo::Print(stream, "                       Starting Size     File\r\n"
                       "                       address           Offset\r\n");
   // clang-format on
   line_number += 2u;
@@ -2690,7 +2681,7 @@ void Map::MemoryMap::PrintSimple(std::ostream& stream, std::size_t& line_number)
 void Map::MemoryMap::UnitNormal::PrintSimple(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x\r\n"
-  mijo::print(stream, "  {:>20s} {:08x} {:08x} {:08x}\r\n", m_name, m_starting_address, m_size,
+  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x}\r\n", m_name, m_starting_address, m_size,
               m_file_offset);
   line_number += 1u;
 }
@@ -2698,7 +2689,7 @@ void Map::MemoryMap::UnitNormal::PrintSimple(std::ostream& stream, std::size_t& 
 void Map::MemoryMap::PrintRomRam(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                       Starting Size     File     ROM      RAM Buffer\r\n"
+  Mijo::Print(stream, "                       Starting Size     File     ROM      RAM Buffer\r\n"
                       "                       address           Offset   Address  Address\r\n");
   // clang-format on
   line_number += 2u;
@@ -2708,7 +2699,7 @@ void Map::MemoryMap::PrintRomRam(std::ostream& stream, std::size_t& line_number)
 void Map::MemoryMap::UnitNormal::PrintRomRam(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x\r\n"
-  mijo::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", m_name,
+  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", m_name,
               m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address);
   line_number += 1u;
 }
@@ -2716,7 +2707,7 @@ void Map::MemoryMap::UnitNormal::PrintRomRam(std::ostream& stream, std::size_t& 
 void Map::MemoryMap::PrintSRecord(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                       Starting Size     File       S-Record\r\n"
+  Mijo::Print(stream, "                       Starting Size     File       S-Record\r\n"
                       "                       address           Offset     Line\r\n");
   // clang-format on
   line_number += 2u;
@@ -2726,7 +2717,7 @@ void Map::MemoryMap::PrintSRecord(std::ostream& stream, std::size_t& line_number
 void Map::MemoryMap::UnitNormal::PrintSRecord(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %10i\r\n"
-  mijo::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:10d}\r\n", m_name, m_starting_address,
+  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:10d}\r\n", m_name, m_starting_address,
               m_size, m_file_offset, m_srecord_line);
   line_number += 1u;
 }
@@ -2734,7 +2725,7 @@ void Map::MemoryMap::UnitNormal::PrintSRecord(std::ostream& stream, std::size_t&
 void Map::MemoryMap::PrintBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                       Starting Size     File     Bin File Bin File\r\n"
+  Mijo::Print(stream, "                       Starting Size     File     Bin File Bin File\r\n"
                       "                       address           Offset   Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
@@ -2744,7 +2735,7 @@ void Map::MemoryMap::PrintBinFile(std::ostream& stream, std::size_t& line_number
 void Map::MemoryMap::UnitNormal::PrintBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %s\r\n"
-  mijo::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:s}\r\n", m_name, m_starting_address,
+  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:s}\r\n", m_name, m_starting_address,
               m_size, m_file_offset, m_bin_file_offset, m_bin_file_name);
   line_number += 1u;
 }
@@ -2752,7 +2743,7 @@ void Map::MemoryMap::UnitNormal::PrintBinFile(std::ostream& stream, std::size_t&
 void Map::MemoryMap::PrintRomRamSRecord(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n"
+  Mijo::Print(stream, "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n"
                       "                       address           Offset   Address  Address     Line\r\n");
   // clang-format on
   line_number += 2u;
@@ -2763,7 +2754,7 @@ void Map::MemoryMap::UnitNormal::PrintRomRamSRecord(std::ostream& stream,
                                                     std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x %10i\r\n"
-  mijo::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x} {:10d}\r\n", m_name,
+  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x} {:10d}\r\n", m_name,
               m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address,
               m_srecord_line);
   line_number += 1u;
@@ -2772,7 +2763,7 @@ void Map::MemoryMap::UnitNormal::PrintRomRamSRecord(std::ostream& stream,
 void Map::MemoryMap::PrintRomRamBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n"
+  Mijo::Print(stream, "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n"
                       "                       address           Offset   Address  Address    Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
@@ -2783,7 +2774,7 @@ void Map::MemoryMap::UnitNormal::PrintRomRamBinFile(std::ostream& stream,
                                                     std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x   %08x %s\r\n"
-  mijo::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}   {:08x} {:s}\r\n", m_name,
+  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}   {:08x} {:s}\r\n", m_name,
               m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address,
               m_bin_file_offset, m_bin_file_name);
   line_number += 1u;
@@ -2792,7 +2783,7 @@ void Map::MemoryMap::UnitNormal::PrintRomRamBinFile(std::ostream& stream,
 void Map::MemoryMap::PrintSRecordBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                       Starting Size     File        S-Record Bin File Bin File\r\n"
+  Mijo::Print(stream, "                       Starting Size     File        S-Record Bin File Bin File\r\n"
                       "                       address           Offset      Line     Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
@@ -2803,7 +2794,7 @@ void Map::MemoryMap::UnitNormal::PrintSRecordBinFile(std::ostream& stream,
                                                      std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x  %10i %08x %s\r\n"
-  mijo::print(stream, "  {:>20s} {:08x} {:08x} {:08x}  {:10d} {:08x} {:s}\r\n", m_name,
+  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x}  {:10d} {:08x} {:s}\r\n", m_name,
               m_starting_address, m_size, m_file_offset, m_srecord_line, m_bin_file_offset,
               m_bin_file_name);
   line_number += 1u;
@@ -2812,7 +2803,7 @@ void Map::MemoryMap::UnitNormal::PrintSRecordBinFile(std::ostream& stream,
 void Map::MemoryMap::PrintRomRamSRecordBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  mijo::print(stream, "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n"
+  Mijo::Print(stream, "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n"
                       "                       address           Offset   Address  Address       Line     Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
@@ -2823,7 +2814,7 @@ void Map::MemoryMap::UnitNormal::PrintRomRamSRecordBinFile(std::ostream& stream,
                                                            std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x    %10i %08x %s\r\n"
-  mijo::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}    {:10d} {:08x} {:s}\r\n",
+  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}    {:10d} {:08x} {:s}\r\n",
               m_name, m_starting_address, m_size, m_file_offset, m_rom_address,
               m_ram_buffer_address, m_srecord_line, m_bin_file_offset, m_bin_file_name);
   line_number += 1u;
@@ -2837,7 +2828,7 @@ void Map::MemoryMap::PrintDebug(std::ostream& stream, std::size_t& line_number) 
 void Map::MemoryMap::UnitDebug::Print(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s          %08x %08x\r\n"
-  mijo::print(stream, "  {:>20s}          {:08x} {:08x}\r\n", m_name, m_size, m_file_offset);
+  Mijo::Print(stream, "  {:>20s}          {:08x} {:08x}\r\n", m_name, m_size, m_file_offset);
   line_number += 1u;
 }
 
@@ -2855,7 +2846,7 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
   while (std::regex_search(head, tail, match, re_linker_generated_symbols_unit,
                            std::regex_constants::match_continuous))
   {
-    m_units.emplace_back(mijo::to_string_view(match[1]), mijo::xsmto<Elf32_Addr>(match[2]));
+    m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2864,7 +2855,7 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
 
 void Map::LinkerGeneratedSymbols::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  mijo::print(stream, "\r\n\r\nLinker generated symbols:\r\n");
+  Mijo::Print(stream, "\r\n\r\nLinker generated symbols:\r\n");
   line_number += 3u;
   for (const auto& unit : m_units)
     unit.Print(stream, line_number);
@@ -2873,7 +2864,7 @@ void Map::LinkerGeneratedSymbols::Print(std::ostream& stream, std::size_t& line_
 void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream, std::size_t& line_number) const
 {
   // "%25s %08x\r\n"
-  mijo::print(stream, "{:>25s} {:08x}\r\n", m_name, m_value);
+  Mijo::Print(stream, "{:>25s} {:08x}\r\n", m_name, m_value);
   line_number += 1u;
 }
 }  // namespace MWLinker
