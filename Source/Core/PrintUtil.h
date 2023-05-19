@@ -16,14 +16,12 @@ namespace Mijo
 template <class... Args>
 void Print(std::ostream& os, fmt::format_string<Args...> fmt, Args&&... args)
 {
-  fmt::memory_buffer buffer;
-  fmt::format_to(std::back_inserter(buffer), std::move(fmt), std::forward<Args>(args)...);
-  os.write(buffer.data(), std::ssize(buffer));
+  fmt::format_to(std::ostreambuf_iterator<char>(os), std::move(fmt), std::forward<Args>(args)...);
 }
 template <class... Args>
 void Println(std::ostream& os, fmt::format_string<Args...> fmt, Args&&... args)
 {
   Mijo::Print(os, std::move(fmt), std::forward<Args>(args)...);
-  std::endl(os);
+  os.put('\n');
 }
 }  // namespace Mijo
