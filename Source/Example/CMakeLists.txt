@@ -1,6 +1,6 @@
-add_executable(lib-mwlinkermap-example
+add_executable(mwlinkermap-example
   main.cpp
 )
 
-target_link_libraries(lib-mwlinkermap-example lib-mwlinkermap)
-target_link_libraries(lib-mwlinkermap-example fmt::fmt)
+target_link_libraries(mwlinkermap-example mwlinkermap)
+target_link_libraries(mwlinkermap-example fmt::fmt)
