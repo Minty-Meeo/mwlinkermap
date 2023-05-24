@@ -5,4 +5,4 @@ add_library(mwlinkermap
   RegexUtil.h
 )
 
-target_link_libraries(mwlinkermap fmt::fmt)
+target_link_libraries(mwlinkermap PRIVATE fmt::fmt)
