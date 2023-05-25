@@ -1970,13 +1970,16 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                              entry_parent_name = Mijo::SMToSV(match[5]),
                              module_name = Mijo::SMToSV(match[6]),
                              source_name = Mijo::SMToSV(match[7]);
-      // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
-      for (auto parent_unit = m_units.rbegin(); parent_unit != m_units.rend(); ++parent_unit)
+      for (auto parent_unit = m_units.rbegin(), parent_unit_iter_end = m_units.rend();;)
       {
         if (source_name != parent_unit->m_source_name || module_name != parent_unit->m_module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
+        {
+          if (++parent_unit == parent_unit_iter_end)
+            return Error::SectionLayoutOrphanedEntry;
           continue;
+        }
         const Unit& unit = m_units.emplace_back(
             Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
             Mijo::XSMTo<Elf32_Addr>(match[3]), symbol_name, &parent_unit.operator*(), module_name,
@@ -1985,10 +1988,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
         parent_unit->m_entry_children.push_back(&unit);
         line_number += 1u;
         head = match[0].second;
-        goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
+        break;
       }
-      return Error::SectionLayoutOrphanedEntry;
-    ENTRY_PARENT_FOUND:
       continue;
     }
     break;
@@ -2050,13 +2051,16 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                              entry_parent_name = Mijo::SMToSV(match[6]),
                              module_name = Mijo::SMToSV(match[7]),
                              source_name = Mijo::SMToSV(match[8]);
-      // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
-      for (auto parent_unit = m_units.rbegin(); parent_unit != m_units.rend(); ++parent_unit)
+      for (auto parent_unit = m_units.rbegin(), parent_unit_iter_end = m_units.rend();;)
       {
         if (source_name != parent_unit->m_source_name || module_name != parent_unit->m_module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
+        {
+          if (++parent_unit == parent_unit_iter_end)
+            return Error::SectionLayoutOrphanedEntry;
           continue;
+        }
         const Unit& unit = m_units.emplace_back(
             Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
             Mijo::XSMTo<Elf32_Addr>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]), symbol_name,
@@ -2065,10 +2069,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         parent_unit->m_entry_children.push_back(&unit);
         line_number += 1u;
         head = match[0].second;
-        goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
+        break;
       }
-      return Error::SectionLayoutOrphanedEntry;
-    ENTRY_PARENT_FOUND:
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_special,
@@ -2136,13 +2138,16 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       std::string_view symbol_name = Mijo::SMToSV(match[4]),
                        entry_parent_name = Mijo::SMToSV(match[5]),
                        module_name = Mijo::SMToSV(match[6]), source_name = Mijo::SMToSV(match[7]);
-      // TODO: I want to use std::ranges::reverse_view, but it Clang doesn't support it yet.
-      for (auto parent_unit = m_units.rbegin(); parent_unit != m_units.rend(); ++parent_unit)
+      for (auto parent_unit = m_units.rbegin(), parent_unit_iter_end = m_units.rend();;)
       {
         if (source_name != parent_unit->m_source_name || module_name != parent_unit->m_module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
+        {
+          if (++parent_unit == parent_unit_iter_end)
+            return Error::SectionLayoutOrphanedEntry;
           continue;
+        }
         const Unit& unit = m_units.emplace_back(
             Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
             Mijo::XSMTo<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name,
@@ -2151,10 +2156,8 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         parent_unit->m_entry_children.push_back(&unit);
         line_number += 1u;
         head = match[0].second;
-        goto ENTRY_PARENT_FOUND;  // I wish C++ had for-else clauses.
+        break;
       }
-      return Error::SectionLayoutOrphanedEntry;
-    ENTRY_PARENT_FOUND:
       continue;
     }
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_special,
