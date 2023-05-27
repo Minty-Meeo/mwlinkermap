@@ -1970,16 +1970,14 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                              entry_parent_name = Mijo::SMToSV(match[5]),
                              module_name = Mijo::SMToSV(match[6]),
                              source_name = Mijo::SMToSV(match[7]);
-      for (auto parent_unit = m_units.rbegin(), parent_unit_iter_end = m_units.rend();;)
+      for (auto parent_unit = m_units.rbegin(), iter_end = m_units.rend();; ++parent_unit)
       {
+        if (parent_unit == iter_end)
+          return Error::SectionLayoutOrphanedEntry;
         if (source_name != parent_unit->m_source_name || module_name != parent_unit->m_module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
-        {
-          if (++parent_unit == parent_unit_iter_end)
-            return Error::SectionLayoutOrphanedEntry;
           continue;
-        }
         const Unit& unit = m_units.emplace_back(
             Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
             Mijo::XSMTo<Elf32_Addr>(match[3]), symbol_name, &parent_unit.operator*(), module_name,
@@ -2051,16 +2049,14 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                              entry_parent_name = Mijo::SMToSV(match[6]),
                              module_name = Mijo::SMToSV(match[7]),
                              source_name = Mijo::SMToSV(match[8]);
-      for (auto parent_unit = m_units.rbegin(), parent_unit_iter_end = m_units.rend();;)
+      for (auto parent_unit = m_units.rbegin(), iter_end = m_units.rend();; ++parent_unit)
       {
+        if (parent_unit == iter_end)
+          return Error::SectionLayoutOrphanedEntry;
         if (source_name != parent_unit->m_source_name || module_name != parent_unit->m_module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
-        {
-          if (++parent_unit == parent_unit_iter_end)
-            return Error::SectionLayoutOrphanedEntry;
           continue;
-        }
         const Unit& unit = m_units.emplace_back(
             Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
             Mijo::XSMTo<Elf32_Addr>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]), symbol_name,
@@ -2138,16 +2134,14 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
       std::string_view symbol_name = Mijo::SMToSV(match[4]),
                        entry_parent_name = Mijo::SMToSV(match[5]),
                        module_name = Mijo::SMToSV(match[6]), source_name = Mijo::SMToSV(match[7]);
-      for (auto parent_unit = m_units.rbegin(), parent_unit_iter_end = m_units.rend();;)
+      for (auto parent_unit = m_units.rbegin(), iter_end = m_units.rend();; ++parent_unit)
       {
+        if (parent_unit == iter_end)
+          return Error::SectionLayoutOrphanedEntry;
         if (source_name != parent_unit->m_source_name || module_name != parent_unit->m_module_name)
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
-        {
-          if (++parent_unit == parent_unit_iter_end)
-            return Error::SectionLayoutOrphanedEntry;
           continue;
-        }
         const Unit& unit = m_units.emplace_back(
             Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
             Mijo::XSMTo<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name,
