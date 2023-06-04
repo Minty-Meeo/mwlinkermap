@@ -17,7 +17,9 @@
 #include <string_view>
 #include <utility>
 
-#include "PrintUtil.h"
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include "RegexUtil.h"
 
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
@@ -38,8 +40,8 @@ void Map::SymbolClosure::Warn::OneDefinitionRuleViolation(
   // For legal linker maps, this should only ever happen in repeat-name compilation units.
   if (!do_warn_odr_violation)
     return;
-  Mijo::Println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
-                compilation_unit_name);
+  fmt::print(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"\n", line_number, symbol_name,
+             compilation_unit_name);
 }
 
 bool Map::SymbolClosure::Warn::do_warn_sym_on_flag_detected = true;
@@ -51,8 +53,8 @@ void Map::SymbolClosure::Warn::SymOnFlagDetected(const std::size_t line_number,
   // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
   if (!do_warn_sym_on_flag_detected)
     return;
-  Mijo::Println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" (.text)", line_number,
-                compilation_unit_name);
+  fmt::print(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" (.text)\n", line_number,
+             compilation_unit_name);
 }
 
 bool Map::EPPC_PatternMatching::Warn::do_warn_merging_odr_violation = true;
@@ -63,7 +65,7 @@ void Map::EPPC_PatternMatching::Warn::MergingOneDefinitionRuleViolation(
   // Could be a false positive, as code merging has no information about where the symbol came from.
   if (!do_warn_merging_odr_violation)
     return;
-  Mijo::Println(std::cerr, "Line {:d}] \"{:s}\" seen again", line_number, symbol_name);
+  fmt::print(std::cerr, "Line {:d}] \"{:s}\" seen again\n", line_number, symbol_name);
 }
 
 bool Map::EPPC_PatternMatching::Warn::do_warn_folding_repeat_object = true;
@@ -73,8 +75,8 @@ void Map::EPPC_PatternMatching::Warn::FoldingRepeatObject(const std::size_t line
 {
   // This warning is pretty much the only one guaranteed to not produce false positives.
   if (!do_warn_folding_repeat_object)
-    Mijo::Println(std::cerr, "Line {:d}] Detected repeat-name object \"{:s}\"", line_number,
-                  object_name);
+    fmt::print(std::cerr, "Line {:d}] Detected repeat-name object \"{:s}\"\n", line_number,
+               object_name);
 }
 
 bool Map::EPPC_PatternMatching::Warn::do_warn_folding_odr_violation = true;
@@ -86,8 +88,8 @@ void Map::EPPC_PatternMatching::Warn::FoldingOneDefinitionRuleViolation(
   // For legal linker maps, this should only ever happen in repeat-name objects.
   if (!do_warn_folding_odr_violation)
     return;
-  Mijo::Println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
-                object_name);
+  fmt::print(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"\n", line_number, symbol_name,
+             object_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_repeat_compilation_unit = true;
@@ -98,8 +100,8 @@ void Map::SectionLayout::Warn::RepeatCompilationUnit(const std::size_t line_numb
 {
   if (!do_warn_repeat_compilation_unit)
     return;
-  Mijo::Println(std::cerr, "Line {:d}] Detected repeat-name compilation unit \"{:s}\" ({:s})",
-                line_number, compilation_unit_name, section_name);
+  fmt::print(std::cerr, "Line {:d}] Detected repeat-name compilation unit \"{:s}\" ({:s})\n",
+             line_number, compilation_unit_name, section_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_odr_violation = true;
@@ -111,8 +113,8 @@ void Map::SectionLayout::Warn::OneDefinitionRuleViolation(
   // For legal linker maps, this should only ever happen in repeat-name compilation units.
   if (!do_warn_odr_violation)
     return;
-  Mijo::Println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\" ({:s})", line_number,
-                symbol_name, compilation_unit_name, section_name);
+  fmt::print(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\" ({:s})\n", line_number,
+             symbol_name, compilation_unit_name, section_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_sym_on_flag_detected = true;
@@ -125,8 +127,8 @@ void Map::SectionLayout::Warn::SymOnFlagDetected(const std::size_t line_number,
   // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
   if (!do_warn_sym_on_flag_detected)
     return;
-  Mijo::Println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" ({:s})", line_number,
-                compilation_unit_name, section_name);
+  fmt::print(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" ({:s})\n", line_number,
+             compilation_unit_name, section_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_common_on_flag_detected = true;
@@ -137,8 +139,8 @@ void Map::SectionLayout::Warn::CommonOnFlagDetected(const std::size_t line_numbe
 {
   if (!do_warn_common_on_flag_detected)
     return;
-  Mijo::Println(std::cerr, "Line {:d}] Detected '-common on' flag in \"{:s}\" ({:s})", line_number,
-                compilation_unit_name, section_name);
+  fmt::print(std::cerr, "Line {:d}] Detected '-common on' flag in \"{:s}\" ({:s})\n", line_number,
+             compilation_unit_name, section_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_lcomm_after_comm = true;
@@ -147,7 +149,7 @@ void Map::SectionLayout::Warn::LCommAfterComm(const std::size_t line_number)
 {
   if (!do_warn_lcomm_after_comm)
     return;
-  Mijo::Println(std::cerr, "Line {:d}] .lcomm symbols found after .comm symbols.", line_number);
+  fmt::print(std::cerr, "Line {:d}] .lcomm symbols found after .comm symbols\n", line_number);
 }
 
 static constexpr std::string_view GetCompilationUnitName(const std::string& module_name,
@@ -501,7 +503,7 @@ void Map::Print(std::ostream& stream, std::size_t& line_number) const
   auto unresolved_head = m_unresolved_symbols.cbegin(),
        unresolved_tail = m_unresolved_symbols.cend();
   // "Link map of %s\r\n"
-  Mijo::Print(stream, "Link map of {:s}\r\n", m_entry_point_name);
+  fmt::print(stream, "Link map of {:s}\r\n", m_entry_point_name);
   line_number = 2;
   if (m_normal_symbol_closure)
     m_normal_symbol_closure->Print(stream, unresolved_head, unresolved_tail, line_number);
@@ -536,7 +538,7 @@ void Map::PrintUnresolvedSymbols(  //
   while (head != tail && head->first == line_number)
   {
     // ">>> SYMBOL NOT FOUND: %s\r\n"
-    Mijo::Print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", (head++)->second);
+    fmt::print(stream, ">>> SYMBOL NOT FOUND: {:s}\r\n", (head++)->second);
     line_number += 1u;
   }
 }
@@ -1191,7 +1193,7 @@ void Map::SymbolClosure::NodeBase::PrintPrefix(std::ostream& stream, const int h
     for (int i = 0; i <= hierarchy_level; ++i)
       stream.put(' ');
   // "%i] "
-  Mijo::Print(stream, "{:d}] ", hierarchy_level);
+  fmt::print(stream, "{:d}] ", hierarchy_level);
 }
 
 constexpr std::string_view Map::SymbolClosure::NodeBase::ToName(const Type st_type) noexcept
@@ -1251,14 +1253,14 @@ void Map::SymbolClosure::NodeReal::Print(std::ostream& stream, const int hierarc
 {
   PrintPrefix(stream, hierarchy_level);
   // "%s (%s,%s) found in %s %s\r\n"
-  Mijo::Print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", m_name, ToName(m_type),
-              ToName(m_bind), m_module_name, m_source_name);
+  fmt::print(stream, "{:s} ({:s},{:s}) found in {:s} {:s}\r\n", m_name, ToName(m_type),
+             ToName(m_bind), m_module_name, m_source_name);
   line_number += 1u;
   if (!m_unref_dups.empty())
   {
     PrintPrefix(stream, hierarchy_level);
     // ">>> UNREFERENCED DUPLICATE %s\r\n"
-    Mijo::Print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", m_name);
+    fmt::print(stream, ">>> UNREFERENCED DUPLICATE {:s}\r\n", m_name);
     line_number += 1u;
     for (const auto& unref_dup : m_unref_dups)
       unref_dup.Print(stream, hierarchy_level, line_number);
@@ -1273,7 +1275,7 @@ void Map::SymbolClosure::NodeLinkerGenerated::Print(
 {
   PrintPrefix(stream, hierarchy_level);
   // "%s found as linker generated symbol\r\n"
-  Mijo::Print(stream, "{:s} found as linker generated symbol\r\n", m_name);
+  fmt::print(stream, "{:s} found as linker generated symbol\r\n", m_name);
   line_number += 1u;
   NodeBase::Print(stream, hierarchy_level, unresolved_head, unresolved_tail, line_number);
 }
@@ -1283,8 +1285,8 @@ void Map::SymbolClosure::NodeReal::UnreferencedDuplicate::Print(  //
 {
   PrintPrefix(stream, hierarchy_level);
   // ">>> (%s,%s) found in %s %s\r\n"
-  Mijo::Print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", ToName(m_type), ToName(m_bind),
-              m_module_name, m_source_name);
+  fmt::print(stream, ">>> ({:s},{:s}) found in {:s} {:s}\r\n", ToName(m_type), ToName(m_bind),
+             m_module_name, m_source_name);
   line_number += 1u;
 }
 
@@ -1453,34 +1455,34 @@ void Map::EPPC_PatternMatching::MergingUnit::Print(std::ostream& stream,
   if (m_was_interchanged)
   {
     // "--> the function %s was interchanged with %s, size=%d \r\n"
-    Mijo::Print(stream, "--> the function {:s} was interchanged with {:s}, size={:d} \r\n",
-                m_first_name, m_second_name, m_size);
+    fmt::print(stream, "--> the function {:s} was interchanged with {:s}, size={:d} \r\n",
+               m_first_name, m_second_name, m_size);
     line_number += 1u;
     if (m_will_be_replaced)
     {
       // "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
-      Mijo::Print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
-                  m_first_name, m_second_name);
+      fmt::print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
+                 m_first_name, m_second_name);
       line_number += 3u;
     }
     // "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
-    Mijo::Print(stream,
-                "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
-                m_first_name, m_second_name, m_size);
+    fmt::print(stream,
+               "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
+               m_first_name, m_second_name, m_size);
     line_number += 2u;
   }
   else
   {
     // "--> duplicated code: symbol %s is duplicated by %s, size = %d \r\n\r\n"
-    Mijo::Print(stream,
-                "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
-                m_first_name, m_second_name, m_size);
+    fmt::print(stream,
+               "--> duplicated code: symbol {:s} is duplicated by {:s}, size = {:d} \r\n\r\n",
+               m_first_name, m_second_name, m_size);
     line_number += 2u;
     if (m_will_be_replaced)
     {
       // "--> the function %s will be replaced by a branch to %s\r\n\r\n\r\n"
-      Mijo::Print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
-                  m_first_name, m_second_name);
+      fmt::print(stream, "--> the function {:s} will be replaced by a branch to {:s}\r\n\r\n\r\n",
+                 m_first_name, m_second_name);
       line_number += 3u;
     }
   }
@@ -1490,7 +1492,7 @@ void Map::EPPC_PatternMatching::FoldingUnit::Print(std::ostream& stream,
                                                    std::size_t& line_number) const
 {
   // "\r\n\r\n\r\nCode folded in file: %s \r\n"
-  Mijo::Print(stream, "\r\n\r\n\r\nCode folded in file: {:s} \r\n", m_object_name);
+  fmt::print(stream, "\r\n\r\n\r\nCode folded in file: {:s} \r\n", m_object_name);
   line_number += 4u;
   for (const auto& unit : m_units)
     unit.Print(stream, line_number);
@@ -1502,16 +1504,16 @@ void Map::EPPC_PatternMatching::FoldingUnit::Unit::Print(std::ostream& stream,
   if (m_new_branch_function)
   {
     // "--> %s is duplicated by %s, size = %d, new branch function %s \r\n\r\n"
-    Mijo::Print(stream,
-                "--> {:s} is duplicated by {:s}, size = {:d}, new branch function {:s} \r\n\r\n",
-                m_first_name, m_second_name, m_size, m_first_name);
+    fmt::print(stream,
+               "--> {:s} is duplicated by {:s}, size = {:d}, new branch function {:s} \r\n\r\n",
+               m_first_name, m_second_name, m_size, m_first_name);
     line_number += 2u;
   }
   else
   {
     // "--> %s is duplicated by %s, size = %d \r\n\r\n"
-    Mijo::Print(stream, "--> {:s} is duplicated by {:s}, size = {:d} \r\n\r\n", m_first_name,
-                m_second_name, m_size);
+    fmt::print(stream, "--> {:s} is duplicated by {:s}, size = {:d} \r\n\r\n", m_first_name,
+               m_second_name, m_size);
     line_number += 2u;
   }
 }
@@ -1592,26 +1594,25 @@ void Map::LinkerOpts::Unit::Print(std::ostream& stream, std::size_t& line_number
   {
   case Kind::NotNear:
     // "  %s/ %s()/ %s - address not in near addressing range \r\n"
-    Mijo::Print(stream, "  {:s}/ {:s}()/ {:s} - address not in near addressing range \r\n",
-                m_module_name, m_name, m_reference_name);
+    fmt::print(stream, "  {:s}/ {:s}()/ {:s} - address not in near addressing range \r\n",
+               m_module_name, m_name, m_reference_name);
     line_number += 1u;
     return;
   case Kind::NotComputed:
     // "  %s/ %s()/ %s - final address not yet computed \r\n"
-    Mijo::Print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", m_module_name,
-                m_name, m_reference_name);
+    fmt::print(stream, "  {:s}/ {:s}()/ {:s} - final address not yet computed \r\n", m_module_name,
+               m_name, m_reference_name);
     line_number += 1u;
     return;
   case Kind::Optimized:
     // "! %s/ %s()/ %s - optimized addressing \r\n"
-    Mijo::Print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", m_module_name, m_name,
-                m_reference_name);
+    fmt::print(stream, "! {:s}/ {:s}()/ {:s} - optimized addressing \r\n", m_module_name, m_name,
+               m_reference_name);
     line_number += 1u;
     return;
   case Kind::DisassembleError:
     // "  %s/ %s() - error disassembling function \r\n"
-    Mijo::Print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", m_module_name,
-                m_name);
+    fmt::print(stream, "  {:s}/ {:s}() - error disassembling function \r\n", m_module_name, m_name);
     line_number += 1u;
     return;
   }
@@ -1658,7 +1659,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
 
 void Map::MixedModeIslands::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  Mijo::Print(stream, "\r\nMixed Mode Islands\r\n");
+  fmt::print(stream, "\r\nMixed Mode Islands\r\n");
   line_number += 2u;
   for (const auto& unit : m_units)
     unit.Print(stream, line_number);
@@ -1668,15 +1669,15 @@ void Map::MixedModeIslands::Unit::Print(std::ostream& stream, std::size_t& line_
   if (m_is_safe)
   {
     // "  safe mixed mode island %s created for %s\r\n"
-    Mijo::Print(stream, "  safe mixed mode island {:s} created for {:s}\r\n", m_first_name,
-                m_second_name);
+    fmt::print(stream, "  safe mixed mode island {:s} created for {:s}\r\n", m_first_name,
+               m_second_name);
     line_number += 1u;
   }
   else
   {
     // "  mixed mode island %s created for %s\r\n"
-    Mijo::Print(stream, "  mixed mode island {:s} created for {:s}\r\n", m_first_name,
-                m_second_name);
+    fmt::print(stream, "  mixed mode island {:s} created for {:s}\r\n", m_first_name,
+               m_second_name);
     line_number += 1u;
   }
 }
@@ -1722,7 +1723,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
 
 void Map::BranchIslands::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  Mijo::Print(stream, "\r\nBranch Islands\r\n");
+  fmt::print(stream, "\r\nBranch Islands\r\n");
   line_number += 2u;
   for (const auto& unit : m_units)
     unit.Print(stream, line_number);
@@ -1732,14 +1733,14 @@ void Map::BranchIslands::Unit::Print(std::ostream& stream, std::size_t& line_num
   if (m_is_safe)
   {
     //  "  safe branch island %s created for %s\r\n"
-    Mijo::Print(stream, "  safe branch island {:s} created for {:s}\r\n", m_first_name,
-                m_second_name);
+    fmt::print(stream, "  safe branch island {:s} created for {:s}\r\n", m_first_name,
+               m_second_name);
     line_number += 1u;
   }
   else
   {
     //  "  branch island %s created for %s\r\n"
-    Mijo::Print(stream, "  branch island {:s} created for {:s}\r\n", m_first_name, m_second_name);
+    fmt::print(stream, "  branch island {:s} created for {:s}\r\n", m_first_name, m_second_name);
     line_number += 1u;
   }
 }
@@ -1754,7 +1755,7 @@ Map::Error Map::LinktimeSizeDecreasingOptimizations::Scan(const char*&, const ch
 void Map::LinktimeSizeDecreasingOptimizations::Print(std::ostream& stream,
                                                      std::size_t& line_number) const
 {
-  Mijo::Print(stream, "\r\nLinktime size-decreasing optimizations\r\n");
+  fmt::print(stream, "\r\nLinktime size-decreasing optimizations\r\n");
   line_number += 2u;
 }
 
@@ -1768,7 +1769,7 @@ Map::Error Map::LinktimeSizeIncreasingOptimizations::Scan(const char*&, const ch
 void Map::LinktimeSizeIncreasingOptimizations::Print(std::ostream& stream,
                                                      std::size_t& line_number) const
 {
-  Mijo::Print(stream, "\r\nLinktime size-increasing optimizations\r\n");
+  fmt::print(stream, "\r\nLinktime size-increasing optimizations\r\n");
   line_number += 2u;
 }
 
@@ -2187,21 +2188,21 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
 void Map::SectionLayout::Print(std::ostream& stream, std::size_t& line_number) const
 {
   // "\r\n\r\n%s section layout\r\n"
-  Mijo::Print(stream, "\r\n\r\n{:s} section layout\r\n", m_name);
+  fmt::print(stream, "\r\n\r\n{:s} section layout\r\n", m_name);
   if (GetMinVersion() < Version::version_3_0_4)
   {
-    Mijo::Print(stream, "  Starting        Virtual\r\n"
-                        "  address  Size   address\r\n"
-                        "  -----------------------\r\n");
+    fmt::print(stream, "  Starting        Virtual\r\n"
+                       "  address  Size   address\r\n"
+                       "  -----------------------\r\n");
     line_number += 6u;
     for (const auto& unit : m_units)
       unit.Print3Column(stream, line_number);
   }
   else
   {
-    Mijo::Print(stream, "  Starting        Virtual  File\r\n"
-                        "  address  Size   address  offset\r\n"
-                        "  ---------------------------------\r\n");
+    fmt::print(stream, "  Starting        Virtual  File\r\n"
+                       "  address  Size   address  offset\r\n"
+                       "  ---------------------------------\r\n");
     line_number += 6u;
     for (const auto& unit : m_units)
       unit.Print4Column(stream, line_number);
@@ -2214,21 +2215,21 @@ void Map::SectionLayout::Unit::Print3Column(std::ostream& stream, std::size_t& l
   {
   case Kind::Normal:
     // "  %08x %06x %08x %2i %s \t%s %s\r\n"
-    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n", m_starting_address,
-                m_size, m_virtual_address, m_alignment, m_name, m_module_name, m_source_name);
+    fmt::print(stream, "  {:08x} {:06x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n", m_starting_address,
+               m_size, m_virtual_address, m_alignment, m_name, m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Unused:
     // "  UNUSED   %06x ........ %s %s %s\r\n"
-    Mijo::Print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", m_size, m_name,
-                m_module_name, m_source_name);
+    fmt::print(stream, "  UNUSED   {:06x} ........ {:s} {:s} {:s}\r\n", m_size, m_name,
+               m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Entry:
     // "  %08lx %06lx %08lx %s (entry of %s) \t%s %s\r\n"
-    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:s} (entry of {:s}) \t{:s} {:s}\r\n",
-                m_starting_address, m_size, m_virtual_address, m_name, m_entry_parent->m_name,
-                m_module_name, m_source_name);
+    fmt::print(stream, "  {:08x} {:06x} {:08x} {:s} (entry of {:s}) \t{:s} {:s}\r\n",
+               m_starting_address, m_size, m_virtual_address, m_name, m_entry_parent->m_name,
+               m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Special:
@@ -2243,28 +2244,28 @@ void Map::SectionLayout::Unit::Print4Column(std::ostream& stream, std::size_t& l
   {
   case Kind::Normal:
     // "  %08x %06x %08x %08x %2i %s \t%s %s\r\n"
-    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n",
-                m_starting_address, m_size, m_virtual_address, m_file_offset, m_alignment, m_name,
-                m_module_name, m_source_name);
+    fmt::print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s} \t{:s} {:s}\r\n",
+               m_starting_address, m_size, m_virtual_address, m_file_offset, m_alignment, m_name,
+               m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Unused:
     // "  UNUSED   %06x ........ ........    %s %s %s\r\n"
-    Mijo::Print(stream, "  UNUSED   {:06x} ........ ........    {:s} {:s} {:s}\r\n", m_size, m_name,
-                m_module_name, m_source_name);
+    fmt::print(stream, "  UNUSED   {:06x} ........ ........    {:s} {:s} {:s}\r\n", m_size, m_name,
+               m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Entry:
     // "  %08lx %06lx %08lx %08lx    %s (entry of %s) \t%s %s\r\n"
-    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:08x}    {:s} (entry of {:s}) \t{:s} {:s}\r\n",
-                m_starting_address, m_size, m_virtual_address, m_file_offset, m_name,
-                m_entry_parent->m_name, m_module_name, m_source_name);
+    fmt::print(stream, "  {:08x} {:06x} {:08x} {:08x}    {:s} (entry of {:s}) \t{:s} {:s}\r\n",
+               m_starting_address, m_size, m_virtual_address, m_file_offset, m_name,
+               m_entry_parent->m_name, m_module_name, m_source_name);
     line_number += 1u;
     return;
   case Kind::Special:
     // "  %08x %06x %08x %08x %2i %s\r\n"
-    Mijo::Print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s}\r\n", m_starting_address, m_size,
-                m_virtual_address, m_file_offset, m_alignment, ToSpecialName(m_unit_trait));
+    fmt::print(stream, "  {:08x} {:06x} {:08x} {:08x} {:2d} {:s}\r\n", m_starting_address, m_size,
+               m_virtual_address, m_file_offset, m_alignment, ToSpecialName(m_unit_trait));
     line_number += 1u;
     return;
   }
@@ -2570,7 +2571,7 @@ Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
 
 void Map::MemoryMap::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  Mijo::Print(stream, "\r\n\r\nMemory map:\r\n");
+  fmt::print(stream, "\r\n\r\nMemory map:\r\n");
   line_number += 3u;
   if (GetMinVersion() < Version::version_4_2_build_142)
   {
@@ -2608,7 +2609,7 @@ void Map::MemoryMap::Print(std::ostream& stream, std::size_t& line_number) const
 void Map::MemoryMap::PrintSimple_old(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                   Starting Size     File\r\n"
+  fmt::print(stream, "                   Starting Size     File\r\n"
                       "                   address           Offset\r\n");
   // clang-format on
   line_number += 2u;
@@ -2619,15 +2620,15 @@ void Map::MemoryMap::UnitNormal::PrintSimple_old(std::ostream& stream,
                                                  std::size_t& line_number) const
 {
   // "  %15s  %08x %08x %08x\r\n"
-  Mijo::Print(stream, "  {:>15s}  {:08x} {:08x} {:08x}\r\n", m_name, m_starting_address, m_size,
-              m_file_offset);
+  fmt::print(stream, "  {:>15s}  {:08x} {:08x} {:08x}\r\n", m_name, m_starting_address, m_size,
+             m_file_offset);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintRomRam_old(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                   Starting Size     File     ROM      RAM Buffer\r\n"
+  fmt::print(stream, "                   Starting Size     File     ROM      RAM Buffer\r\n"
                       "                   address           Offset   Address  Address\r\n");
   // clang-format on
   line_number += 2u;
@@ -2638,8 +2639,8 @@ void Map::MemoryMap::UnitNormal::PrintRomRam_old(std::ostream& stream,
                                                  std::size_t& line_number) const
 {
   // "  %15s  %08x %08x %08x %08x %08x\r\n"
-  Mijo::Print(stream, "  {:>15s}  {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", m_name,
-              m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address);
+  fmt::print(stream, "  {:>15s}  {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", m_name,
+             m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address);
   line_number += 1u;
 }
 
@@ -2655,20 +2656,20 @@ void Map::MemoryMap::PrintDebug_old(std::ostream& stream, std::size_t& line_numb
 void Map::MemoryMap::UnitDebug::Print_older(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %15s           %06x %08x\r\n"
-  Mijo::Print(stream, "  {:>15s}           {:06x} {:08x}\r\n", m_name, m_size, m_file_offset);
+  fmt::print(stream, "  {:>15s}           {:06x} {:08x}\r\n", m_name, m_size, m_file_offset);
   line_number += 1u;
 }
 void Map::MemoryMap::UnitDebug::Print_old(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %15s           %08x %08x\r\n"
-  Mijo::Print(stream, "  {:>15s}           {:08x} {:08x}\r\n", m_name, m_size, m_file_offset);
+  fmt::print(stream, "  {:>15s}           {:08x} {:08x}\r\n", m_name, m_size, m_file_offset);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintSimple(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                       Starting Size     File\r\n"
+  fmt::print(stream, "                       Starting Size     File\r\n"
                       "                       address           Offset\r\n");
   // clang-format on
   line_number += 2u;
@@ -2678,15 +2679,15 @@ void Map::MemoryMap::PrintSimple(std::ostream& stream, std::size_t& line_number)
 void Map::MemoryMap::UnitNormal::PrintSimple(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x\r\n"
-  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x}\r\n", m_name, m_starting_address, m_size,
-              m_file_offset);
+  fmt::print(stream, "  {:>20s} {:08x} {:08x} {:08x}\r\n", m_name, m_starting_address, m_size,
+             m_file_offset);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintRomRam(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                       Starting Size     File     ROM      RAM Buffer\r\n"
+  fmt::print(stream, "                       Starting Size     File     ROM      RAM Buffer\r\n"
                       "                       address           Offset   Address  Address\r\n");
   // clang-format on
   line_number += 2u;
@@ -2696,15 +2697,15 @@ void Map::MemoryMap::PrintRomRam(std::ostream& stream, std::size_t& line_number)
 void Map::MemoryMap::UnitNormal::PrintRomRam(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x\r\n"
-  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", m_name,
-              m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address);
+  fmt::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}\r\n", m_name, m_starting_address,
+             m_size, m_file_offset, m_rom_address, m_ram_buffer_address);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintSRecord(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                       Starting Size     File       S-Record\r\n"
+  fmt::print(stream, "                       Starting Size     File       S-Record\r\n"
                       "                       address           Offset     Line\r\n");
   // clang-format on
   line_number += 2u;
@@ -2714,15 +2715,15 @@ void Map::MemoryMap::PrintSRecord(std::ostream& stream, std::size_t& line_number
 void Map::MemoryMap::UnitNormal::PrintSRecord(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %10i\r\n"
-  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:10d}\r\n", m_name, m_starting_address,
-              m_size, m_file_offset, m_srecord_line);
+  fmt::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:10d}\r\n", m_name, m_starting_address,
+             m_size, m_file_offset, m_srecord_line);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                       Starting Size     File     Bin File Bin File\r\n"
+  fmt::print(stream, "                       Starting Size     File     Bin File Bin File\r\n"
                       "                       address           Offset   Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
@@ -2732,15 +2733,15 @@ void Map::MemoryMap::PrintBinFile(std::ostream& stream, std::size_t& line_number
 void Map::MemoryMap::UnitNormal::PrintBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %s\r\n"
-  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:s}\r\n", m_name, m_starting_address,
-              m_size, m_file_offset, m_bin_file_offset, m_bin_file_name);
+  fmt::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:s}\r\n", m_name, m_starting_address,
+             m_size, m_file_offset, m_bin_file_offset, m_bin_file_name);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintRomRamSRecord(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n"
+  fmt::print(stream, "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n"
                       "                       address           Offset   Address  Address     Line\r\n");
   // clang-format on
   line_number += 2u;
@@ -2751,16 +2752,16 @@ void Map::MemoryMap::UnitNormal::PrintRomRamSRecord(std::ostream& stream,
                                                     std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x %10i\r\n"
-  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x} {:10d}\r\n", m_name,
-              m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address,
-              m_srecord_line);
+  fmt::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x} {:10d}\r\n", m_name,
+             m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address,
+             m_srecord_line);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintRomRamBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n"
+  fmt::print(stream, "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n"
                       "                       address           Offset   Address  Address    Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
@@ -2771,16 +2772,16 @@ void Map::MemoryMap::UnitNormal::PrintRomRamBinFile(std::ostream& stream,
                                                     std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x   %08x %s\r\n"
-  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}   {:08x} {:s}\r\n", m_name,
-              m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address,
-              m_bin_file_offset, m_bin_file_name);
+  fmt::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}   {:08x} {:s}\r\n", m_name,
+             m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address,
+             m_bin_file_offset, m_bin_file_name);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintSRecordBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                       Starting Size     File        S-Record Bin File Bin File\r\n"
+  fmt::print(stream, "                       Starting Size     File        S-Record Bin File Bin File\r\n"
                       "                       address           Offset      Line     Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
@@ -2791,16 +2792,16 @@ void Map::MemoryMap::UnitNormal::PrintSRecordBinFile(std::ostream& stream,
                                                      std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x  %10i %08x %s\r\n"
-  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x}  {:10d} {:08x} {:s}\r\n", m_name,
-              m_starting_address, m_size, m_file_offset, m_srecord_line, m_bin_file_offset,
-              m_bin_file_name);
+  fmt::print(stream, "  {:>20s} {:08x} {:08x} {:08x}  {:10d} {:08x} {:s}\r\n", m_name,
+             m_starting_address, m_size, m_file_offset, m_srecord_line, m_bin_file_offset,
+             m_bin_file_name);
   line_number += 1u;
 }
 
 void Map::MemoryMap::PrintRomRamSRecordBinFile(std::ostream& stream, std::size_t& line_number) const
 {
   // clang-format off
-  Mijo::Print(stream, "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n"
+  fmt::print(stream, "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n"
                       "                       address           Offset   Address  Address       Line     Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
@@ -2811,9 +2812,9 @@ void Map::MemoryMap::UnitNormal::PrintRomRamSRecordBinFile(std::ostream& stream,
                                                            std::size_t& line_number) const
 {
   // "  %20s %08x %08x %08x %08x %08x    %10i %08x %s\r\n"
-  Mijo::Print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}    {:10d} {:08x} {:s}\r\n",
-              m_name, m_starting_address, m_size, m_file_offset, m_rom_address,
-              m_ram_buffer_address, m_srecord_line, m_bin_file_offset, m_bin_file_name);
+  fmt::print(stream, "  {:>20s} {:08x} {:08x} {:08x} {:08x} {:08x}    {:10d} {:08x} {:s}\r\n",
+             m_name, m_starting_address, m_size, m_file_offset, m_rom_address, m_ram_buffer_address,
+             m_srecord_line, m_bin_file_offset, m_bin_file_name);
   line_number += 1u;
 }
 
@@ -2825,7 +2826,7 @@ void Map::MemoryMap::PrintDebug(std::ostream& stream, std::size_t& line_number) 
 void Map::MemoryMap::UnitDebug::Print(std::ostream& stream, std::size_t& line_number) const
 {
   // "  %20s          %08x %08x\r\n"
-  Mijo::Print(stream, "  {:>20s}          {:08x} {:08x}\r\n", m_name, m_size, m_file_offset);
+  fmt::print(stream, "  {:>20s}          {:08x} {:08x}\r\n", m_name, m_size, m_file_offset);
   line_number += 1u;
 }
 
@@ -2852,7 +2853,7 @@ Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* cons
 
 void Map::LinkerGeneratedSymbols::Print(std::ostream& stream, std::size_t& line_number) const
 {
-  Mijo::Print(stream, "\r\n\r\nLinker generated symbols:\r\n");
+  fmt::print(stream, "\r\n\r\nLinker generated symbols:\r\n");
   line_number += 3u;
   for (const auto& unit : m_units)
     unit.Print(stream, line_number);
@@ -2861,7 +2862,7 @@ void Map::LinkerGeneratedSymbols::Print(std::ostream& stream, std::size_t& line_
 void Map::LinkerGeneratedSymbols::Unit::Print(std::ostream& stream, std::size_t& line_number) const
 {
   // "%25s %08x\r\n"
-  Mijo::Print(stream, "{:>25s} {:08x}\r\n", m_name, m_value);
+  fmt::print(stream, "{:>25s} {:08x}\r\n", m_name, m_value);
   line_number += 1u;
 }
 }  // namespace MWLinker

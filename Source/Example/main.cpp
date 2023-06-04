@@ -12,19 +12,21 @@
 #include <sstream>
 #include <string>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include "MWLinkerMap.h"
-#include "PrintUtil.h"
 
 #define TIME_ATTACK_COUNT 20
 
 static void tempfunc(const char* name, int choice)
 {
-  Mijo::Println(std::cout, "{:s}", name);
+  fmt::print(std::cout, "{:s}\n", name);
 
   std::ifstream infile(name);
   if (!infile.is_open())
   {
-    Mijo::Println(std::cerr, "Could not open!");
+    fmt::print(std::cerr, "Could not open!\n");
     return;
   }
   std::stringstream sstream;
@@ -53,7 +55,7 @@ static void tempfunc(const char* name, int choice)
       error = linker_map.ScanSMGalaxy(temp, scan_line_number);
       break;
     default:
-      Mijo::Println(std::cerr, "bad choice");
+      fmt::print(std::cerr, "bad choice\n");
       return;
     }
     const auto time_end = std::chrono::high_resolution_clock::now();
@@ -78,22 +80,22 @@ static void tempfunc(const char* name, int choice)
   // containing the string is meant to be the unit within the linker map portion / the value stored
   // by reference in the map.
   std::fill(temp.begin(), temp.end(), '\0');
-  Mijo::Println(
-      std::cout,
-      "scan line: {:d}   print line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}  "
-      "max_version: {:d}   time: {:d}ms",
-      scan_line_number, print_line_number, static_cast<int>(error), matches,
-      static_cast<int>(linker_map.GetMinVersion()), static_cast<int>(linker_map.GetMaxVersion()),
-      (std::accumulate(time_attack.begin(), time_attack.end(), std::chrono::milliseconds{}) /
-       time_attack.size())
-          .count());
+  fmt::print(std::cout,
+             "scan line: {:d}   print line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}  "
+             "max_version: {:d}   time: {:d}ms\n",
+             scan_line_number, print_line_number, static_cast<int>(error), matches,
+             static_cast<int>(linker_map.GetMinVersion()),
+             static_cast<int>(linker_map.GetMaxVersion()),
+             (std::accumulate(time_attack.begin(), time_attack.end(), std::chrono::milliseconds{}) /
+              time_attack.size())
+                 .count());
 }
 
 int main(const int argc, const char** argv)
 {
   if (argc < 2)
   {
-    Mijo::Println(std::cerr, "Provide the name");
+    fmt::print(std::cerr, "Provide the name\n");
     return EXIT_FAILURE;
   }
   if (argc < 3)
