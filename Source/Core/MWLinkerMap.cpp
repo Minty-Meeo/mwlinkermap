@@ -40,8 +40,8 @@ void Map::SymbolClosure::Warn::OneDefinitionRuleViolation(
   // For legal linker maps, this should only ever happen in repeat-name compilation units.
   if (!do_warn_odr_violation)
     return;
-  fmt::print(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"\n", line_number, symbol_name,
-             compilation_unit_name);
+  fmt::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
+               compilation_unit_name);
 }
 
 bool Map::SymbolClosure::Warn::do_warn_sym_on_flag_detected = true;
@@ -53,8 +53,8 @@ void Map::SymbolClosure::Warn::SymOnFlagDetected(const std::size_t line_number,
   // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
   if (!do_warn_sym_on_flag_detected)
     return;
-  fmt::print(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" (.text)\n", line_number,
-             compilation_unit_name);
+  fmt::println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" (.text)", line_number,
+               compilation_unit_name);
 }
 
 bool Map::EPPC_PatternMatching::Warn::do_warn_merging_odr_violation = true;
@@ -65,7 +65,7 @@ void Map::EPPC_PatternMatching::Warn::MergingOneDefinitionRuleViolation(
   // Could be a false positive, as code merging has no information about where the symbol came from.
   if (!do_warn_merging_odr_violation)
     return;
-  fmt::print(std::cerr, "Line {:d}] \"{:s}\" seen again\n", line_number, symbol_name);
+  fmt::println(std::cerr, "Line {:d}] \"{:s}\" seen again", line_number, symbol_name);
 }
 
 bool Map::EPPC_PatternMatching::Warn::do_warn_folding_repeat_object = true;
@@ -75,8 +75,8 @@ void Map::EPPC_PatternMatching::Warn::FoldingRepeatObject(const std::size_t line
 {
   // This warning is pretty much the only one guaranteed to not produce false positives.
   if (!do_warn_folding_repeat_object)
-    fmt::print(std::cerr, "Line {:d}] Detected repeat-name object \"{:s}\"\n", line_number,
-               object_name);
+    fmt::println(std::cerr, "Line {:d}] Detected repeat-name object \"{:s}\"", line_number,
+                 object_name);
 }
 
 bool Map::EPPC_PatternMatching::Warn::do_warn_folding_odr_violation = true;
@@ -88,8 +88,8 @@ void Map::EPPC_PatternMatching::Warn::FoldingOneDefinitionRuleViolation(
   // For legal linker maps, this should only ever happen in repeat-name objects.
   if (!do_warn_folding_odr_violation)
     return;
-  fmt::print(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"\n", line_number, symbol_name,
-             object_name);
+  fmt::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\"", line_number, symbol_name,
+               object_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_repeat_compilation_unit = true;
@@ -100,8 +100,8 @@ void Map::SectionLayout::Warn::RepeatCompilationUnit(const std::size_t line_numb
 {
   if (!do_warn_repeat_compilation_unit)
     return;
-  fmt::print(std::cerr, "Line {:d}] Detected repeat-name compilation unit \"{:s}\" ({:s})\n",
-             line_number, compilation_unit_name, section_name);
+  fmt::println(std::cerr, "Line {:d}] Detected repeat-name compilation unit \"{:s}\" ({:s})",
+               line_number, compilation_unit_name, section_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_odr_violation = true;
@@ -113,8 +113,8 @@ void Map::SectionLayout::Warn::OneDefinitionRuleViolation(
   // For legal linker maps, this should only ever happen in repeat-name compilation units.
   if (!do_warn_odr_violation)
     return;
-  fmt::print(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\" ({:s})\n", line_number,
-             symbol_name, compilation_unit_name, section_name);
+  fmt::println(std::cerr, "Line {:d}] \"{:s}\" seen again in \"{:s}\" ({:s})", line_number,
+               symbol_name, compilation_unit_name, section_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_sym_on_flag_detected = true;
@@ -127,8 +127,8 @@ void Map::SectionLayout::Warn::SymOnFlagDetected(const std::size_t line_number,
   // a false positive, and in turn would be a false negative for a RepeatCompilationUnit warning.
   if (!do_warn_sym_on_flag_detected)
     return;
-  fmt::print(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" ({:s})\n", line_number,
-             compilation_unit_name, section_name);
+  fmt::println(std::cerr, "Line {:d}] Detected '-sym on' flag in \"{:s}\" ({:s})", line_number,
+               compilation_unit_name, section_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_common_on_flag_detected = true;
@@ -139,8 +139,8 @@ void Map::SectionLayout::Warn::CommonOnFlagDetected(const std::size_t line_numbe
 {
   if (!do_warn_common_on_flag_detected)
     return;
-  fmt::print(std::cerr, "Line {:d}] Detected '-common on' flag in \"{:s}\" ({:s})\n", line_number,
-             compilation_unit_name, section_name);
+  fmt::println(std::cerr, "Line {:d}] Detected '-common on' flag in \"{:s}\" ({:s})", line_number,
+               compilation_unit_name, section_name);
 }
 
 bool Map::SectionLayout::Warn::do_warn_lcomm_after_comm = true;
@@ -149,7 +149,7 @@ void Map::SectionLayout::Warn::LCommAfterComm(const std::size_t line_number)
 {
   if (!do_warn_lcomm_after_comm)
     return;
-  fmt::print(std::cerr, "Line {:d}] .lcomm symbols found after .comm symbols\n", line_number);
+  fmt::println(std::cerr, "Line {:d}] .lcomm symbols found after .comm symbols", line_number);
 }
 
 static constexpr std::string_view GetCompilationUnitName(const std::string& module_name,
@@ -2608,10 +2608,8 @@ void Map::MemoryMap::Print(std::ostream& stream, std::size_t& line_number) const
 
 void Map::MemoryMap::PrintSimple_old(std::ostream& stream, std::size_t& line_number) const
 {
-  // clang-format off
   fmt::print(stream, "                   Starting Size     File\r\n"
-                      "                   address           Offset\r\n");
-  // clang-format on
+                     "                   address           Offset\r\n");
   line_number += 2u;
   for (const auto& unit : m_normal_units)
     unit.PrintSimple_old(stream, line_number);
@@ -2627,10 +2625,8 @@ void Map::MemoryMap::UnitNormal::PrintSimple_old(std::ostream& stream,
 
 void Map::MemoryMap::PrintRomRam_old(std::ostream& stream, std::size_t& line_number) const
 {
-  // clang-format off
   fmt::print(stream, "                   Starting Size     File     ROM      RAM Buffer\r\n"
-                      "                   address           Offset   Address  Address\r\n");
-  // clang-format on
+                     "                   address           Offset   Address  Address\r\n");
   line_number += 2u;
   for (const auto& unit : m_normal_units)
     unit.PrintRomRam_old(stream, line_number);
@@ -2668,10 +2664,8 @@ void Map::MemoryMap::UnitDebug::Print_old(std::ostream& stream, std::size_t& lin
 
 void Map::MemoryMap::PrintSimple(std::ostream& stream, std::size_t& line_number) const
 {
-  // clang-format off
   fmt::print(stream, "                       Starting Size     File\r\n"
-                      "                       address           Offset\r\n");
-  // clang-format on
+                     "                       address           Offset\r\n");
   line_number += 2u;
   for (const auto& unit : m_normal_units)
     unit.PrintSimple(stream, line_number);
@@ -2686,10 +2680,8 @@ void Map::MemoryMap::UnitNormal::PrintSimple(std::ostream& stream, std::size_t& 
 
 void Map::MemoryMap::PrintRomRam(std::ostream& stream, std::size_t& line_number) const
 {
-  // clang-format off
   fmt::print(stream, "                       Starting Size     File     ROM      RAM Buffer\r\n"
-                      "                       address           Offset   Address  Address\r\n");
-  // clang-format on
+                     "                       address           Offset   Address  Address\r\n");
   line_number += 2u;
   for (const auto& unit : m_normal_units)
     unit.PrintRomRam(stream, line_number);
@@ -2704,10 +2696,8 @@ void Map::MemoryMap::UnitNormal::PrintRomRam(std::ostream& stream, std::size_t& 
 
 void Map::MemoryMap::PrintSRecord(std::ostream& stream, std::size_t& line_number) const
 {
-  // clang-format off
   fmt::print(stream, "                       Starting Size     File       S-Record\r\n"
-                      "                       address           Offset     Line\r\n");
-  // clang-format on
+                     "                       address           Offset     Line\r\n");
   line_number += 2u;
   for (const auto& unit : m_normal_units)
     unit.PrintSRecord(stream, line_number);
@@ -2722,10 +2712,8 @@ void Map::MemoryMap::UnitNormal::PrintSRecord(std::ostream& stream, std::size_t&
 
 void Map::MemoryMap::PrintBinFile(std::ostream& stream, std::size_t& line_number) const
 {
-  // clang-format off
   fmt::print(stream, "                       Starting Size     File     Bin File Bin File\r\n"
-                      "                       address           Offset   Offset   Name\r\n");
-  // clang-format on
+                     "                       address           Offset   Offset   Name\r\n");
   line_number += 2u;
   for (const auto& unit : m_normal_units)
     unit.PrintBinFile(stream, line_number);
@@ -2742,7 +2730,7 @@ void Map::MemoryMap::PrintRomRamSRecord(std::ostream& stream, std::size_t& line_
 {
   // clang-format off
   fmt::print(stream, "                       Starting Size     File     ROM      RAM Buffer  S-Record\r\n"
-                      "                       address           Offset   Address  Address     Line\r\n");
+                     "                       address           Offset   Address  Address     Line\r\n");
   // clang-format on
   line_number += 2u;
   for (const auto& unit : m_normal_units)
@@ -2762,7 +2750,7 @@ void Map::MemoryMap::PrintRomRamBinFile(std::ostream& stream, std::size_t& line_
 {
   // clang-format off
   fmt::print(stream, "                       Starting Size     File     ROM      RAM Buffer Bin File Bin File\r\n"
-                      "                       address           Offset   Address  Address    Offset   Name\r\n");
+                     "                       address           Offset   Address  Address    Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
   for (const auto& unit : m_normal_units)
@@ -2782,7 +2770,7 @@ void Map::MemoryMap::PrintSRecordBinFile(std::ostream& stream, std::size_t& line
 {
   // clang-format off
   fmt::print(stream, "                       Starting Size     File        S-Record Bin File Bin File\r\n"
-                      "                       address           Offset      Line     Offset   Name\r\n");
+                     "                       address           Offset      Line     Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
   for (const auto& unit : m_normal_units)
@@ -2802,7 +2790,7 @@ void Map::MemoryMap::PrintRomRamSRecordBinFile(std::ostream& stream, std::size_t
 {
   // clang-format off
   fmt::print(stream, "                       Starting Size     File     ROM      RAM Buffer    S-Record Bin File Bin File\r\n"
-                      "                       address           Offset   Address  Address       Line     Offset   Name\r\n");
+                     "                       address           Offset   Address  Address       Line     Offset   Name\r\n");
   // clang-format on
   line_number += 2u;
   for (const auto& unit : m_normal_units)

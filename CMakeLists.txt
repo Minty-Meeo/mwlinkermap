@@ -7,7 +7,7 @@ if(NOT CMAKE_BUILD_TYPE)
       "Build type (Release/Debug/RelWithDebInfo/MinSizeRel)" FORCE)
 endif()
 
-find_package(fmt 8)
+find_package(fmt 10)
 if(fmt_FOUND)
   message(STATUS "Using shared fmt ${fmt_VERSION}")
 else()

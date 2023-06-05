@@ -21,12 +21,12 @@
 
 static void tempfunc(const char* name, int choice)
 {
-  fmt::print(std::cout, "{:s}\n", name);
+  fmt::println(std::cout, "{:s}", name);
 
   std::ifstream infile(name);
   if (!infile.is_open())
   {
-    fmt::print(std::cerr, "Could not open!\n");
+    fmt::println(std::cerr, "Could not open!");
     return;
   }
   std::stringstream sstream;
@@ -55,7 +55,7 @@ static void tempfunc(const char* name, int choice)
       error = linker_map.ScanSMGalaxy(temp, scan_line_number);
       break;
     default:
-      fmt::print(std::cerr, "bad choice\n");
+      fmt::println(std::cerr, "bad choice");
       return;
     }
     const auto time_end = std::chrono::high_resolution_clock::now();
@@ -80,22 +80,22 @@ static void tempfunc(const char* name, int choice)
   // containing the string is meant to be the unit within the linker map portion / the value stored
   // by reference in the map.
   std::fill(temp.begin(), temp.end(), '\0');
-  fmt::print(std::cout,
-             "scan line: {:d}   print line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}  "
-             "max_version: {:d}   time: {:d}ms\n",
-             scan_line_number, print_line_number, static_cast<int>(error), matches,
-             static_cast<int>(linker_map.GetMinVersion()),
-             static_cast<int>(linker_map.GetMaxVersion()),
-             (std::accumulate(time_attack.begin(), time_attack.end(), std::chrono::milliseconds{}) /
-              time_attack.size())
-                 .count());
+  fmt::println(
+      std::cout,
+      "scan line: {:d}   print line: {:d}   err: {:d}   matches: {:s}   min_version: {:d}  "
+      "max_version: {:d}   time: {:d}ms",
+      scan_line_number, print_line_number, static_cast<int>(error), matches,
+      static_cast<int>(linker_map.GetMinVersion()), static_cast<int>(linker_map.GetMaxVersion()),
+      (std::accumulate(time_attack.begin(), time_attack.end(), std::chrono::milliseconds{}) /
+       time_attack.size())
+          .count());
 }
 
 int main(const int argc, const char** argv)
 {
   if (argc < 2)
   {
-    fmt::print(std::cerr, "Provide the name\n");
+    fmt::println(std::cerr, "Provide the name");
     return EXIT_FAILURE;
   }
   if (argc < 3)
