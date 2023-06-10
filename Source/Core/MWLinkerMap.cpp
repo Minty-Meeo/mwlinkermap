@@ -254,7 +254,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
 
-  std::cmatch match;
+  Mijo::CMatchResults match;
   line_number = 1u;
 
   // Linker maps from Animal Crossing (foresta.map and static.map) and Doubutsu no Mori e+
@@ -266,7 +266,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 2u;
     head = match[0].second;
-    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, Mijo::SMToSV(match[1]));
+    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, match[1].view());
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -282,7 +282,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 1u;
     head = match[0].second;
-    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, Mijo::SMToSV(match[1]));
+    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, match[1].view());
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -390,7 +390,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   {
     line_number += 3u;
     head = match[0].second;
-    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, Mijo::SMToSV(match[1]));
+    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, match[1].view());
     if (error != Error::None)
       return error;
   }
@@ -427,7 +427,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
   if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
 
-  std::cmatch match;
+  Mijo::CMatchResults match;
   line_number = 1u;
 
   m_entry_point_name = "__start";
@@ -439,7 +439,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
   while (std::regex_search(head, tail, match, re_section_layout_header_modified_b,
                            std::regex_constants::match_continuous))
   {
-    const std::string_view section_name = Mijo::SMToSV(match[1]);
+    const std::string_view section_name = match[1].view();
     line_number += 1u;
     head = match[0].second;
     auto portion =
@@ -463,7 +463,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
   if (head == nullptr || tail == nullptr || head > tail)
     return Error::Fail;
 
-  std::cmatch match;
+  Mijo::CMatchResults match;
   line_number = 1;
 
   // We only see this header once, as every symbol is mashed into an imaginary ".text" section.
@@ -473,8 +473,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     line_number += 2u;
     head = match[0].second;
     // TODO: detect and split Section Layout subtext by observing the Starting Address
-    auto portion =
-        std::make_unique<SectionLayout>(SectionLayout::Kind::Code, Mijo::SMToSV(match[1]));
+    auto portion = std::make_unique<SectionLayout>(SectionLayout::Kind::Code, match[1].view());
     portion->SetVersionRange(Version::version_3_0_4, Version::Latest);
     const auto error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
@@ -567,7 +566,7 @@ static const std::regex re_section_layout_4column_prologue_3{
 Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const tail,
                                            std::size_t& line_number, const std::string_view name)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   if (std::regex_search(head, tail, match, re_section_layout_3column_prologue_1,
                         std::regex_constants::match_continuous))
@@ -706,7 +705,7 @@ static const std::regex re_memory_map_romram_srecord_binfile_prologue_2{
 Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail,
                                        std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   if (std::regex_search(head, tail, match, re_memory_map_simple_prologue_1_old,
                         std::regex_constants::match_continuous))
@@ -965,7 +964,7 @@ Map::Error Map::ScanForGarbage(const char* const head, const char* const tail)
 {
   if (head < tail)
   {
-    std::cmatch match;
+    Mijo::CMatchResults match;
 
     // These linker map prints are known to exist, but I have never seen them.
     if (std::regex_search(head, tail, match, re_excluded_symbol,
@@ -1040,7 +1039,7 @@ Map::Error Map::SymbolClosure::Scan(  //
     const char*& head, const char* const tail, std::size_t& line_number,
     UnresolvedSymbols& unresolved_symbols)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   NodeBase* curr_node = &m_root;
   int curr_hierarchy_level = 0;
@@ -1050,19 +1049,18 @@ Map::Error Map::SymbolClosure::Scan(  //
     if (std::regex_search(head, tail, match, re_symbol_closure_node_normal,
                           std::regex_constants::match_continuous))
     {
-      const int next_hierarchy_level = Mijo::SMTo<int>(match[1]);
+      const int next_hierarchy_level = match[1].to<int>();
       if (next_hierarchy_level <= 0)
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
         return Error::SymbolClosureHierarchySkip;
-      const std::string_view type = Mijo::SMToSV(match[3]), bind = Mijo::SMToSV(match[4]);
+      const std::string_view type = match[3].view(), bind = match[4].view();
       if (!map_symbol_closure_st_type.contains(type))
         return Error::SymbolClosureInvalidSymbolType;
       if (!map_symbol_closure_st_bind.contains(bind))
         return Error::SymbolClosureInvalidSymbolBind;
-      const std::string_view symbol_name = Mijo::SMToSV(match[2]),
-                             module_name = Mijo::SMToSV(match[5]),
-                             source_name = Mijo::SMToSV(match[6]);
+      const std::string_view symbol_name = match[2].view(), module_name = match[5].view(),
+                             source_name = match[6].view();
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
         curr_node = curr_node->m_parent;
@@ -1077,26 +1075,25 @@ Map::Error Map::SymbolClosure::Scan(  //
       if (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dup_header,
                             std::regex_constants::match_continuous))
       {
-        if (Mijo::SMTo<int>(match[1]) != curr_hierarchy_level)
+        if (match[1].to<int>() != curr_hierarchy_level)
           return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-        if (Mijo::SMToSV(match[2]) != symbol_name)
+        if (match[2].view() != symbol_name)
           return Error::SymbolClosureUnrefDupsNameMismatch;
         line_number += 1u;
         head = match[0].second;
         while (std::regex_search(head, tail, match, re_symbol_closure_node_normal_unref_dups,
                                  std::regex_constants::match_continuous))
         {
-          if (Mijo::SMTo<int>(match[1]) != curr_hierarchy_level)
+          if (match[1].to<int>() != curr_hierarchy_level)
             return Error::SymbolClosureUnrefDupsHierarchyMismatch;
-          const std::string_view unref_dup_type = Mijo::SMToSV(match[2]),
-                                 unref_dup_bind = Mijo::SMToSV(match[3]);
+          const std::string_view unref_dup_type = match[2].view(), unref_dup_bind = match[3].view();
           if (!map_symbol_closure_st_type.contains(unref_dup_type))
             return Error::SymbolClosureInvalidSymbolType;
           if (!map_symbol_closure_st_bind.contains(unref_dup_bind))
             return Error::SymbolClosureInvalidSymbolBind;
           unref_dups.emplace_back(map_symbol_closure_st_type.at(unref_dup_type),
-                                  map_symbol_closure_st_bind.at(unref_dup_bind),
-                                  Mijo::SMToSV(match[4]), Mijo::SMToSV(match[5]));
+                                  map_symbol_closure_st_bind.at(unref_dup_bind), match[4].view(),
+                                  match[5].view());
           line_number += 1u;
           head = match[0].second;
         }
@@ -1137,7 +1134,7 @@ Map::Error Map::SymbolClosure::Scan(  //
     if (std::regex_search(head, tail, match, re_symbol_closure_node_linker_generated,
                           std::regex_constants::match_continuous))
     {
-      const int next_hierarchy_level = Mijo::SMTo<int>(match[1]);
+      const int next_hierarchy_level = match[1].to<int>();
       if (next_hierarchy_level <= 0)
         return Error::SymbolClosureInvalidHierarchy;
       if (curr_hierarchy_level + 1 < next_hierarchy_level)
@@ -1148,7 +1145,7 @@ Map::Error Map::SymbolClosure::Scan(  //
       curr_hierarchy_level = next_hierarchy_level;
 
       // clang-format off
-      curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeLinkerGenerated>(curr_node, Mijo::SMToSV(match[2]))).get();
+      curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeLinkerGenerated>(curr_node, match[2].view())).get();
       // clang-format on
 
       line_number += 1u;
@@ -1314,7 +1311,7 @@ static const std::regex re_code_folding_is_duplicated_new_branch{
 Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const tail,
                                            std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (true)
   {
@@ -1324,17 +1321,16 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                           std::regex_constants::match_continuous))
     {
-      const std::string_view first_name = Mijo::SMToSV(match[1]),
-                             second_name = Mijo::SMToSV(match[2]);
-      const Elf32_Word size = Mijo::SMTo<Elf32_Word>(match[3]);
+      const std::string_view first_name = match[1].view(), second_name = match[2].view();
+      const Elf32_Word size = match[3].to<Elf32_Word>();
       line_number += 2u;
       head = match[0].second;
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
-        if (Mijo::SMToSV(match[1]) != first_name)
+        if (match[1].view() != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
-        if (Mijo::SMToSV(match[2]) != second_name)
+        if (match[2].view() != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
         will_be_replaced = true;
         line_number += 3u;
@@ -1350,18 +1346,17 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_code_merging_was_interchanged,
                           std::regex_constants::match_continuous))
     {
-      const std::string_view first_name = Mijo::SMToSV(match[1]),
-                             second_name = Mijo::SMToSV(match[2]);
-      const Elf32_Word size = Mijo::SMTo<Elf32_Word>(match[3]);
+      const std::string_view first_name = match[1].view(), second_name = match[2].view();
+      const Elf32_Word size = match[3].to<Elf32_Word>();
       was_interchanged = true;
       line_number += 1u;
       head = match[0].second;
       if (std::regex_search(head, tail, match, re_code_merging_will_be_replaced,
                             std::regex_constants::match_continuous))
       {
-        if (Mijo::SMToSV(match[1]) != first_name)
+        if (match[1].view() != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
-        if (Mijo::SMToSV(match[2]) != second_name)
+        if (match[2].view() != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
         will_be_replaced = true;
         line_number += 3u;
@@ -1370,11 +1365,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_merging_is_duplicated,
                             std::regex_constants::match_continuous))
       {
-        if (Mijo::SMToSV(match[1]) != first_name)
+        if (match[1].view() != first_name)
           return Error::EPPC_PatternMatchingMergingFirstNameMismatch;
-        if (Mijo::SMToSV(match[2]) != second_name)
+        if (match[2].view() != second_name)
           return Error::EPPC_PatternMatchingMergingSecondNameMismatch;
-        if (Mijo::SMTo<Elf32_Word>(match[3]) != size)
+        if (match[3].to<Elf32_Word>() != size)
           return Error::EPPC_PatternMatchingMergingSizeMismatch;
         line_number += 2u;
         head = match[0].second;
@@ -1396,7 +1391,7 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
   while (std::regex_search(head, tail, match, re_code_folding_header,
                            std::regex_constants::match_continuous))
   {
-    const std::string_view object_name = Mijo::SMToSV(match[1]);
+    const std::string_view object_name = match[1].view();
     if (m_folding_lookup.contains(object_name))
       Warn::FoldingRepeatObject(line_number + 3u, object_name);
     FoldingUnit& folding_unit = m_folding_units.emplace_back(object_name);
@@ -1409,11 +1404,11 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated,
                             std::regex_constants::match_continuous))
       {
-        const std::string_view first_name = Mijo::SMToSV(match[1]);
+        const std::string_view first_name = match[1].view();
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         const FoldingUnit::Unit& unit = folding_unit.m_units.emplace_back(
-            first_name, Mijo::SMToSV(match[2]), Mijo::SMTo<Elf32_Word>(match[3]), false);
+            first_name, match[2].view(), match[3].to<Elf32_Word>(), false);
         curr_unit_lookup.emplace(unit.m_first_name, unit);
         line_number += 2u;
         head = match[0].second;
@@ -1422,14 +1417,14 @@ Map::Error Map::EPPC_PatternMatching::Scan(const char*& head, const char* const 
       if (std::regex_search(head, tail, match, re_code_folding_is_duplicated_new_branch,
                             std::regex_constants::match_continuous))
       {
-        const std::string_view first_name = Mijo::SMToSV(match[1]);
+        const std::string_view first_name = match[1].view();
         // It is my assumption that these will always match.
-        if (first_name != Mijo::SMToSV(match[4]))
+        if (first_name != match[4].view())
           return Error::EPPC_PatternMatchingFoldingNewBranchFunctionNameMismatch;
         if (curr_unit_lookup.contains(first_name))
           Warn::FoldingOneDefinitionRuleViolation(line_number, first_name, object_name);
         const FoldingUnit::Unit& unit = folding_unit.m_units.emplace_back(
-            first_name, Mijo::SMToSV(match[2]), Mijo::SMTo<Elf32_Word>(match[3]), true);
+            first_name, match[2].view(), match[3].to<Elf32_Word>(), true);
         curr_unit_lookup.emplace(unit.m_first_name, unit);
         line_number += 2u;
         head = match[0].second;
@@ -1537,15 +1532,14 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
                                  std::size_t& line_number)
 
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (true)
   {
     if (std::regex_search(head, tail, match, re_linker_opts_unit_not_near,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Unit::Kind::NotNear, Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]),
-                           Mijo::SMToSV(match[3]));
+      m_units.emplace_back(Unit::Kind::NotNear, match[1].view(), match[2].view(), match[3].view());
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1553,7 +1547,7 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_disassemble_error,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]));
+      m_units.emplace_back(match[1].view(), match[2].view());
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1561,8 +1555,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_address_not_computed,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Unit::Kind::NotComputed, Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]),
-                           Mijo::SMToSV(match[3]));
+      m_units.emplace_back(Unit::Kind::NotComputed, match[1].view(), match[2].view(),
+                           match[3].view());
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1571,8 +1565,8 @@ Map::Error Map::LinkerOpts::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_linker_opts_unit_optimized,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Unit::Kind::Optimized, Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]),
-                           Mijo::SMToSV(match[3]));
+      m_units.emplace_back(Unit::Kind::Optimized, match[1].view(), match[2].view(),
+                           match[3].view());
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1630,7 +1624,7 @@ static const std::regex re_mixed_mode_islands_created_safe{
 Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail,
                                        std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   // TODO: I have literally never seen Mixed Mode Islands.
   // Similar to Branch Islands, this is conjecture.
@@ -1639,7 +1633,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]), false);
+      m_units.emplace_back(match[1].view(), match[2].view(), false);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1647,7 +1641,7 @@ Map::Error Map::MixedModeIslands::Scan(const char*& head, const char* const tail
     if (std::regex_search(head, tail, match, re_mixed_mode_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]), true);
+      m_units.emplace_back(match[1].view(), match[2].view(), true);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1694,7 +1688,7 @@ static const std::regex re_branch_islands_created_safe{
 Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
                                     std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   // TODO: I have only ever seen Branch Islands from Skylanders Swap Force, and on top of that, it
   // was an empty portion. From datamining MWLDEPPC, I can only assume it goes something like this.
@@ -1703,7 +1697,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_branch_islands_created,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]), false);
+      m_units.emplace_back(match[1].view(), match[2].view(), false);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1711,7 +1705,7 @@ Map::Error Map::BranchIslands::Scan(const char*& head, const char* const tail,
     if (std::regex_search(head, tail, match, re_branch_islands_created_safe,
                           std::regex_constants::match_continuous))
     {
-      m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::SMToSV(match[2]), true);
+      m_units.emplace_back(match[1].view(), match[2].view(), true);
       line_number += 1u;
       head = match[0].second;
       continue;
@@ -1936,7 +1930,7 @@ static const std::regex re_section_layout_3column_unit_entry{
 Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const tail,
                                            std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
   ScanningContext scanning_context{*this, line_number, false, false, nullptr, {}, {}};
 
   while (true)
@@ -1945,9 +1939,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = m_units.emplace_back(
-          Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
-          Mijo::XSMTo<Elf32_Addr>(match[3]), Mijo::SMTo<int>(match[4]), Mijo::SMToSV(match[5]),
-          Mijo::SMToSV(match[6]), Mijo::SMToSV(match[7]), scanning_context);
+          match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16), match[3].to<Elf32_Addr>(16),
+          match[4].to<int>(), match[5].view(), match[6].view(), match[7].view(), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -1956,9 +1949,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = m_units.emplace_back(  //
-          Mijo::XSMTo<Elf32_Word>(match[1]), Mijo::SMToSV(match[2]), Mijo::SMToSV(match[3]),
-          Mijo::SMToSV(match[4]), scanning_context);
+      const Unit& unit = m_units.emplace_back(match[1].to<Elf32_Word>(16), match[2].view(),
+                                              match[3].view(), match[4].view(), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -1967,10 +1959,8 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      const std::string_view symbol_name = Mijo::SMToSV(match[4]),
-                             entry_parent_name = Mijo::SMToSV(match[5]),
-                             module_name = Mijo::SMToSV(match[6]),
-                             source_name = Mijo::SMToSV(match[7]);
+      const std::string_view symbol_name = match[4].view(), entry_parent_name = match[5].view(),
+                             module_name = match[6].view(), source_name = match[7].view();
       for (auto parent_unit = m_units.rbegin(), iter_end = m_units.rend();; ++parent_unit)
       {
         if (parent_unit == iter_end)
@@ -1979,10 +1969,10 @@ Map::Error Map::SectionLayout::Scan3Column(const char*& head, const char* const 
           return Error::SectionLayoutOrphanedEntry;
         if (entry_parent_name != parent_unit->m_name)
           continue;
-        const Unit& unit = m_units.emplace_back(
-            Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
-            Mijo::XSMTo<Elf32_Addr>(match[3]), symbol_name, &parent_unit.operator*(), module_name,
-            source_name, scanning_context);
+        const Unit& unit =
+            m_units.emplace_back(match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
+                                 match[3].to<Elf32_Addr>(16), symbol_name, &parent_unit.operator*(),
+                                 module_name, source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
         parent_unit->m_entry_children.push_back(&unit);
         line_number += 1u;
@@ -2014,7 +2004,7 @@ static const std::regex re_section_layout_4column_unit_special{
 Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const tail,
                                            std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
   ScanningContext scanning_context{*this, line_number, false, false, nullptr, {}, {}};
 
   while (true)
@@ -2023,10 +2013,9 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       const Unit& unit = m_units.emplace_back(
-          Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
-          Mijo::XSMTo<Elf32_Addr>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
-          Mijo::SMTo<int>(match[5]), Mijo::SMToSV(match[6]), Mijo::SMToSV(match[7]),
-          Mijo::SMToSV(match[8]), scanning_context);
+          match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16), match[3].to<Elf32_Addr>(16),
+          match[4].to<std::uint32_t>(16), match[5].to<int>(), match[6].view(), match[7].view(),
+          match[8].view(), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -2035,9 +2024,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_unused,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = m_units.emplace_back(  //
-          Mijo::XSMTo<Elf32_Word>(match[1]), Mijo::SMToSV(match[2]), Mijo::SMToSV(match[3]),
-          Mijo::SMToSV(match[4]), scanning_context);
+      const Unit& unit = m_units.emplace_back(match[1].to<Elf32_Word>(16), match[2].view(),
+                                              match[3].view(), match[4].view(), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -2046,10 +2034,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
     if (std::regex_search(head, tail, match, re_section_layout_4column_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      const std::string_view symbol_name = Mijo::SMToSV(match[5]),
-                             entry_parent_name = Mijo::SMToSV(match[6]),
-                             module_name = Mijo::SMToSV(match[7]),
-                             source_name = Mijo::SMToSV(match[8]);
+      const std::string_view symbol_name = match[5].view(), entry_parent_name = match[6].view(),
+                             module_name = match[7].view(), source_name = match[8].view();
       for (auto parent_unit = m_units.rbegin(), iter_end = m_units.rend();; ++parent_unit)
       {
         if (parent_unit == iter_end)
@@ -2059,8 +2045,8 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
         if (entry_parent_name != parent_unit->m_name)
           continue;
         const Unit& unit = m_units.emplace_back(
-            Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
-            Mijo::XSMTo<Elf32_Addr>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]), symbol_name,
+            match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
+            match[3].to<Elf32_Addr>(16), match[4].to<std::uint32_t>(16), symbol_name,
             &parent_unit.operator*(), module_name, source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
         parent_unit->m_entry_children.push_back(&unit);
@@ -2074,23 +2060,21 @@ Map::Error Map::SectionLayout::Scan4Column(const char*& head, const char* const 
                           std::regex_constants::match_continuous))
     {
       // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
-      const std::string_view special_name = Mijo::SMToSV(match[6]);
+      const std::string_view special_name = match[6].view();
       if (special_name == "*fill*")
       {
-        m_units.emplace_back(Mijo::XSMTo<std::uint32_t>(match[1]),
-                             Mijo::XSMTo<Elf32_Word>(match[2]), Mijo::XSMTo<Elf32_Addr>(match[3]),
-                             Mijo::XSMTo<std::uint32_t>(match[4]), Mijo::SMTo<int>(match[5]),
-                             Unit::Trait::Fill1);
+        m_units.emplace_back(match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
+                             match[3].to<Elf32_Addr>(16), match[4].to<std::uint32_t>(16),
+                             match[5].to<int>(), Unit::Trait::Fill1);
         line_number += 1u;
         head = match[0].second;
         continue;
       }
       if (special_name == "**fill**")
       {
-        m_units.emplace_back(Mijo::XSMTo<std::uint32_t>(match[1]),
-                             Mijo::XSMTo<Elf32_Word>(match[2]), Mijo::XSMTo<Elf32_Addr>(match[3]),
-                             Mijo::XSMTo<std::uint32_t>(match[4]), Mijo::SMTo<int>(match[5]),
-                             Unit::Trait::Fill2);
+        m_units.emplace_back(match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
+                             match[3].to<Elf32_Addr>(16), match[4].to<std::uint32_t>(16),
+                             match[5].to<int>(), Unit::Trait::Fill2);
         line_number += 1u;
         head = match[0].second;
         continue;
@@ -2112,7 +2096,7 @@ static const std::regex re_section_layout_tloztp_unit_special{
 Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const tail,
                                           std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
   ScanningContext scanning_context{*this, line_number, false, false, nullptr, {}, {}};
 
   while (true)
@@ -2120,10 +2104,10 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
     if (std::regex_search(head, tail, match, re_section_layout_3column_unit_normal,
                           std::regex_constants::match_continuous))
     {
-      const Unit& unit = m_units.emplace_back(
-          Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
-          Mijo::XSMTo<Elf32_Addr>(match[3]), std::uint32_t{0}, Mijo::SMTo<int>(match[4]),
-          Mijo::SMToSV(match[5]), Mijo::SMToSV(match[6]), Mijo::SMToSV(match[7]), scanning_context);
+      const Unit& unit =
+          m_units.emplace_back(match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
+                               match[3].to<Elf32_Addr>(16), std::uint32_t{0}, match[4].to<int>(),
+                               match[5].view(), match[6].view(), match[7].view(), scanning_context);
       scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
       line_number += 1u;
       head = match[0].second;
@@ -2132,9 +2116,8 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string_view symbol_name = Mijo::SMToSV(match[4]),
-                       entry_parent_name = Mijo::SMToSV(match[5]),
-                       module_name = Mijo::SMToSV(match[6]), source_name = Mijo::SMToSV(match[7]);
+      std::string_view symbol_name = match[4].view(), entry_parent_name = match[5].view(),
+                       module_name = match[6].view(), source_name = match[7].view();
       for (auto parent_unit = m_units.rbegin(), iter_end = m_units.rend();; ++parent_unit)
       {
         if (parent_unit == iter_end)
@@ -2144,9 +2127,9 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
         if (entry_parent_name != parent_unit->m_name)
           continue;
         const Unit& unit = m_units.emplace_back(
-            Mijo::XSMTo<std::uint32_t>(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
-            Mijo::XSMTo<Elf32_Addr>(match[3]), std::uint32_t{0}, symbol_name,
-            &parent_unit.operator*(), module_name, source_name, scanning_context);
+            match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
+            match[3].to<Elf32_Addr>(16), std::uint32_t{0}, symbol_name, &parent_unit.operator*(),
+            module_name, source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
         parent_unit->m_entry_children.push_back(&unit);
         line_number += 1u;
@@ -2159,21 +2142,21 @@ Map::Error Map::SectionLayout::ScanTLOZTP(const char*& head, const char* const t
                           std::regex_constants::match_continuous))
     {
       // Special symbols don't belong to any compilation unit, so they don't go in any lookup.
-      std::string_view special_name = Mijo::SMToSV(match[5]);
+      std::string_view special_name = match[5].view();
       if (special_name == "*fill*")
       {
-        m_units.emplace_back(Mijo::XSMTo<std::uint32_t>(match[1]),
-                             Mijo::XSMTo<Elf32_Word>(match[2]), Mijo::XSMTo<Elf32_Addr>(match[3]),
-                             std::uint32_t{0}, Mijo::SMTo<int>(match[4]), Unit::Trait::Fill1);
+        m_units.emplace_back(match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
+                             match[3].to<Elf32_Addr>(16), std::uint32_t{0}, match[4].to<int>(),
+                             Unit::Trait::Fill1);
         line_number += 1u;
         head = match[0].second;
         continue;
       }
       if (special_name == "**fill**")
       {
-        m_units.emplace_back(Mijo::XSMTo<std::uint32_t>(match[1]),
-                             Mijo::XSMTo<Elf32_Word>(match[2]), Mijo::XSMTo<Elf32_Addr>(match[3]),
-                             std::uint32_t{0}, Mijo::SMTo<int>(match[4]), Unit::Trait::Fill2);
+        m_units.emplace_back(match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
+                             match[3].to<Elf32_Addr>(16), std::uint32_t{0}, match[4].to<int>(),
+                             Unit::Trait::Fill2);
         line_number += 1u;
         head = match[0].second;
         continue;
@@ -2290,14 +2273,13 @@ static const std::regex re_memory_map_unit_normal_simple_old{
 Map::Error Map::MemoryMap::ScanSimple_old(const char*& head, const char* const tail,
                                           std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple_old,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-                                Mijo::XSMTo<Elf32_Word>(match[3]),
-                                Mijo::XSMTo<std::uint32_t>(match[4]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2313,15 +2295,14 @@ static const std::regex re_memory_map_unit_normal_romram_old{
 Map::Error Map::MemoryMap::ScanRomRam_old(const char*& head, const char* const tail,
                                           std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_old,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(
-        Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-        Mijo::XSMTo<Elf32_Word>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
-        Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::XSMTo<std::uint32_t>(match[6]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16),
+                                match[5].to<std::uint32_t>(16), match[6].to<std::uint32_t>(16));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2338,16 +2319,16 @@ static const std::regex re_memory_map_unit_debug_old{
 Map::Error Map::MemoryMap::ScanDebug_old(const char*& head, const char* const tail,
                                          std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug_old,
                            std::regex_constants::match_continuous))
   {
-    const std::csub_match& size = match[2];
+    const Mijo::CSubMatch& size = match[2];
     if (size.length() == 8 && *size.first == '0')  // Make sure it's not just an overflowed value
       SetVersionRange(Version::version_3_0_4, Version::Latest);
-    m_debug_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Word>(size),
-                               Mijo::XSMTo<std::uint32_t>(match[3]));
+    m_debug_units.emplace_back(match[1].view(), size.to<Elf32_Word>(16),
+                               match[3].to<std::uint32_t>(16));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2363,14 +2344,13 @@ static const std::regex re_memory_map_unit_normal_simple{
 Map::Error Map::MemoryMap::ScanSimple(const char*& head, const char* const tail,
                                       std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_simple,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-                                Mijo::XSMTo<Elf32_Word>(match[3]),
-                                Mijo::XSMTo<std::uint32_t>(match[4]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2386,15 +2366,14 @@ static const std::regex re_memory_map_unit_normal_romram{
 Map::Error Map::MemoryMap::ScanRomRam(const char*& head, const char* const tail,
                                       std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(
-        Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-        Mijo::XSMTo<Elf32_Word>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
-        Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::XSMTo<std::uint32_t>(match[6]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16),
+                                match[5].to<std::uint32_t>(16), match[6].to<std::uint32_t>(16));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2410,14 +2389,14 @@ static const std::regex re_memory_map_unit_normal_srecord{
 Map::Error Map::MemoryMap::ScanSRecord(const char*& head, const char* const tail,
                                        std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-                                Mijo::XSMTo<Elf32_Word>(match[3]),
-                                Mijo::XSMTo<std::uint32_t>(match[4]), Mijo::SMTo<int>(match[5]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16),
+                                match[5].to<int>());
     line_number += 1u;
     head = match[0].second;
   }
@@ -2433,15 +2412,14 @@ static const std::regex re_memory_map_unit_normal_binfile{
 Map::Error Map::MemoryMap::ScanBinFile(const char*& head, const char* const tail,
                                        std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_binfile,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-                                Mijo::XSMTo<Elf32_Word>(match[3]),
-                                Mijo::XSMTo<std::uint32_t>(match[4]),
-                                Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::SMToSV(match[6]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16),
+                                match[5].to<std::uint32_t>(16), match[6].view());
     line_number += 1u;
     head = match[0].second;
   }
@@ -2457,16 +2435,15 @@ static const std::regex re_memory_map_unit_normal_romram_srecord{
 Map::Error Map::MemoryMap::ScanRomRamSRecord(const char*& head, const char* const tail,
                                              std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-                                Mijo::XSMTo<Elf32_Word>(match[3]),
-                                Mijo::XSMTo<std::uint32_t>(match[4]),
-                                Mijo::XSMTo<std::uint32_t>(match[5]),
-                                Mijo::XSMTo<std::uint32_t>(match[6]), Mijo::SMTo<int>(match[7]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16),
+                                match[5].to<std::uint32_t>(16), match[6].to<std::uint32_t>(16),
+                                match[7].to<int>());
     line_number += 1u;
     head = match[0].second;
   }
@@ -2482,16 +2459,15 @@ static const std::regex re_memory_map_unit_normal_romram_binfile{
 Map::Error Map::MemoryMap::ScanRomRamBinFile(const char*& head, const char* const tail,
                                              std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_binfile,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(
-        Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-        Mijo::XSMTo<Elf32_Word>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
-        Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::XSMTo<std::uint32_t>(match[6]),
-        Mijo::XSMTo<std::uint32_t>(match[7]), Mijo::SMToSV(match[8]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16),
+                                match[5].to<std::uint32_t>(16), match[6].to<std::uint32_t>(16),
+                                match[7].to<std::uint32_t>(16), match[8].view());
     line_number += 1u;
     head = match[0].second;
   }
@@ -2507,15 +2483,15 @@ static const std::regex re_memory_map_unit_normal_srecord_binfile{
 Map::Error Map::MemoryMap::ScanSRecordBinFile(const char*& head, const char* const tail,
                                               std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-                                Mijo::XSMTo<Elf32_Word>(match[3]),
-                                Mijo::XSMTo<std::uint32_t>(match[4]), Mijo::SMTo<int>(match[5]),
-                                Mijo::XSMTo<std::uint32_t>(match[6]), Mijo::SMToSV(match[7]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16),
+                                match[5].to<int>(), match[6].to<std::uint32_t>(16),
+                                match[7].view());
     line_number += 1u;
     head = match[0].second;
   }
@@ -2531,16 +2507,16 @@ static const std::regex re_memory_map_unit_normal_romram_srecord_binfile{
 Map::Error Map::MemoryMap::ScanRomRamSRecordBinFile(const char*& head, const char* const tail,
                                                     std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_normal_romram_srecord_binfile,
                            std::regex_constants::match_continuous))
   {
-    m_normal_units.emplace_back(
-        Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]),
-        Mijo::XSMTo<Elf32_Word>(match[3]), Mijo::XSMTo<std::uint32_t>(match[4]),
-        Mijo::XSMTo<std::uint32_t>(match[5]), Mijo::XSMTo<std::uint32_t>(match[6]),
-        Mijo::SMTo<int>(match[7]), Mijo::XSMTo<std::uint32_t>(match[8]), Mijo::SMToSV(match[9]));
+    m_normal_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16),
+                                match[3].to<Elf32_Word>(16), match[4].to<std::uint32_t>(16),
+                                match[5].to<std::uint32_t>(16), match[6].to<std::uint32_t>(16),
+                                match[7].to<int>(), match[8].to<std::uint32_t>(16),
+                                match[9].view());
     line_number += 1u;
     head = match[0].second;
   }
@@ -2556,13 +2532,13 @@ static const std::regex re_memory_map_unit_debug{
 Map::Error Map::MemoryMap::ScanDebug(const char*& head, const char* const tail,
                                      std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_memory_map_unit_debug,
                            std::regex_constants::match_continuous))
   {
-    m_debug_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Word>(match[2]),
-                               Mijo::XSMTo<std::uint32_t>(match[3]));
+    m_debug_units.emplace_back(match[1].view(), match[2].to<Elf32_Word>(16),
+                               match[3].to<std::uint32_t>(16));
     line_number += 1u;
     head = match[0].second;
   }
@@ -2827,12 +2803,12 @@ static const std::regex re_linker_generated_symbols_unit{
 Map::Error Map::LinkerGeneratedSymbols::Scan(const char*& head, const char* const tail,
                                              std::size_t& line_number)
 {
-  std::cmatch match;
+  Mijo::CMatchResults match;
 
   while (std::regex_search(head, tail, match, re_linker_generated_symbols_unit,
                            std::regex_constants::match_continuous))
   {
-    m_units.emplace_back(Mijo::SMToSV(match[1]), Mijo::XSMTo<Elf32_Addr>(match[2]));
+    m_units.emplace_back(match[1].view(), match[2].to<Elf32_Addr>(16));
     line_number += 1u;
     head = match[0].second;
   }
