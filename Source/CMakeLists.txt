@@ -7,7 +7,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-c++20-compat -Wno-global-constructors -Wno-exit-time-destructors -Wno-switch-enum -Wno-weak-vtables -Wno-padded -Wno-documentation-unknown-command -Wno-undefined-func-template)
+  add_compile_options(-Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-c++20-compat -Wno-global-constructors -Wno-exit-time-destructors -Wno-switch-enum -Wno-weak-vtables -Wno-padded -Wno-documentation-unknown-command -Wno-undefined-func-template -Wno-unsafe-buffer-usage)
 endif()
 
 add_subdirectory(Core)
