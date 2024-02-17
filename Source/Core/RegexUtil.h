@@ -36,8 +36,8 @@ public:
   using string_type = std::basic_string<value_type>;
   using string_view_type = std::basic_string_view<value_type>;
 
-  operator string_view_type() const noexcept { return {this->first, this->second}; }
   string_view_type view() const noexcept { return {this->first, this->second}; }
+  operator string_view_type() const noexcept { return view(); }
   template <std::integral T>
   std::from_chars_result from_chars(T& value, int base = 10) const noexcept
     requires std::same_as<iterator, const char*>
