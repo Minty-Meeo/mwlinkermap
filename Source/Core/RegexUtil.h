@@ -68,14 +68,14 @@ public:
   T to(int base = 10) const
   {
     T value = {};
-    this->from_chars(value, base);
+    from_chars(value, base);
     return value;
   }
   template <std::floating_point T>
   T to(std::chars_format fmt = std::chars_format::general) const
   {
     T value = {};
-    this->from_chars(value, fmt);
+    from_chars(value, fmt);
     return value;
   }
 };
@@ -112,28 +112,28 @@ public:
   {
     return static_cast<const_reference>(base_type::operator[](idx));
   }
-  string_view_type view(size_type idx) const noexcept { return this->operator[](idx).view(); }
+  string_view_type view(size_type idx) const noexcept { return operator[](idx).view(); }
   template <std::integral T>
   std::from_chars_result from_chars(size_type idx, T& value, int base = 10) const noexcept
   {
-    return this->operator[](idx).from_chars(value, base);
+    return operator[](idx).from_chars(value, base);
   }
   template <std::floating_point T>
   std::from_chars_result
   from_chars(size_type idx, T& value,
              std::chars_format fmt = std::chars_format::general) const noexcept
   {
-    return this->operator[](idx).from_chars(value, fmt);
+    return operator[](idx).from_chars(value, fmt);
   }
   template <std::integral T>
   T to(size_type idx, int base = 10) const
   {
-    return this->operator[](idx).template to<T>(base);
+    return operator[](idx).template to<T>(base);
   }
   template <std::floating_point T>
   T to(size_type idx, std::chars_format fmt = std::chars_format::general) const
   {
-    return this->operator[](idx).template to<T>(fmt);
+    return operator[](idx).template to<T>(fmt);
   }
 };
 
