@@ -267,7 +267,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 2u;
     head = match[0].second;
-    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, match[1].view());
+    const Error error = ScanPrologue_SectionLayout(head, tail, line_number, match[1].view());
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -283,7 +283,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   {
     line_number += 1u;
     head = match[0].second;
-    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, match[1].view());
+    const Error error = ScanPrologue_SectionLayout(head, tail, line_number, match[1].view());
     if (error != Error::None)
       return error;
     goto NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE;
@@ -302,7 +302,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   }
   {
     auto portion = std::make_unique<SymbolClosure>();
-    const auto error = portion->Scan(head, tail, line_number, m_unresolved_symbols);
+    const Error error = portion->Scan(head, tail, line_number, m_unresolved_symbols);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
@@ -310,7 +310,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   }
   {
     auto portion = std::make_unique<EPPC_PatternMatching>();
-    const auto error = portion->Scan(head, tail, line_number);
+    const Error error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
@@ -322,7 +322,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   // eyes of this scan function.
   {
     auto portion = std::make_unique<SymbolClosure>();
-    const auto error = portion->Scan(head, tail, line_number, m_unresolved_symbols);
+    const Error error = portion->Scan(head, tail, line_number, m_unresolved_symbols);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
@@ -335,7 +335,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
   // LinkerOpts), but the Symbol Closure scanning code that just happened handles them well enough.
   {
     auto portion = std::make_unique<LinkerOpts>();
-    const auto error = portion->Scan(head, tail, line_number);
+    const Error error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
@@ -347,7 +347,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     line_number += 2u;
     head = match[0].second;
     auto portion = std::make_unique<MixedModeIslands>();
-    const auto error = portion->Scan(head, tail, line_number);
+    const Error error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     m_mixed_mode_islands = std::move(portion);
@@ -358,7 +358,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     line_number += 2u;
     head = match[0].second;
     auto portion = std::make_unique<BranchIslands>();
-    const auto error = portion->Scan(head, tail, line_number);
+    const Error error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     m_branch_islands = std::move(portion);
@@ -369,7 +369,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     line_number += 2u;
     head = match[0].second;
     auto portion = std::make_unique<LinktimeSizeDecreasingOptimizations>();
-    const auto error = portion->Scan(head, tail, line_number);
+    const Error error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     m_linktime_size_decreasing_optimizations = std::move(portion);
@@ -380,7 +380,7 @@ Map::Error Map::Scan(const char* head, const char* const tail, std::size_t& line
     line_number += 2u;
     head = match[0].second;
     auto portion = std::make_unique<LinktimeSizeIncreasingOptimizations>();
-    const auto error = portion->Scan(head, tail, line_number);
+    const Error error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     m_linktime_size_increasing_optimizations = std::move(portion);
@@ -391,7 +391,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   {
     line_number += 3u;
     head = match[0].second;
-    const auto error = ScanPrologue_SectionLayout(head, tail, line_number, match[1].view());
+    const Error error = ScanPrologue_SectionLayout(head, tail, line_number, match[1].view());
     if (error != Error::None)
       return error;
   }
@@ -400,7 +400,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   {
     line_number += 3u;
     head = match[0].second;
-    const auto error = ScanPrologue_MemoryMap(head, tail, line_number);
+    const Error error = ScanPrologue_MemoryMap(head, tail, line_number);
     if (error != Error::None)
       return error;
   }
@@ -410,7 +410,7 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
     line_number += 3u;
     head = match[0].second;
     auto portion = std::make_unique<LinkerGeneratedSymbols>();
-    const auto error = portion->Scan(head, tail, line_number);
+    const Error error = portion->Scan(head, tail, line_number);
     if (error != Error::None)
       return error;
     m_linker_generated_symbols = std::move(portion);
@@ -446,7 +446,7 @@ Map::Error Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t
     auto portion =
         std::make_unique<SectionLayout>(SectionLayout::ToSectionKind(section_name), section_name);
     portion->SetVersionRange(Version::version_3_0_4, Version::version_3_0_4);
-    const auto error = portion->ScanTLOZTP(head, tail, line_number);
+    const Error error = portion->ScanTLOZTP(head, tail, line_number);
     if (error != Error::None)
       return error;
     m_section_layouts.push_back(std::move(portion));
@@ -476,7 +476,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
     // TODO: detect and split Section Layout subtext by observing the Starting Address
     auto portion = std::make_unique<SectionLayout>(SectionLayout::Kind::Code, match[1].view());
     portion->SetVersionRange(Version::version_3_0_4, Version::Latest);
-    const auto error = portion->Scan4Column(head, tail, line_number);
+    const Error error = portion->Scan4Column(head, tail, line_number);
     if (error != Error::None)
       return error;
     m_section_layouts.push_back(std::move(portion));
@@ -489,7 +489,7 @@ Map::Error Map::ScanSMGalaxy(const char* head, const char* const tail, std::size
   // headerless, CodeWarrior for Wii 1.0 (at minimum) Memory Map can be found.
   {
     auto portion = std::make_unique<MemoryMap>(false, false, false);
-    const auto error = portion->ScanSimple(head, tail, line_number);
+    const Error error = portion->ScanSimple(head, tail, line_number);
     if (error != Error::None)
       return error;
     if (!portion->IsEmpty())
@@ -586,7 +586,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
         head = match[0].second;
         auto portion = std::make_unique<SectionLayout>(SectionLayout::ToSectionKind(name), name);
         portion->SetVersionRange(Version::Unknown, Version::version_2_4_7_build_107);
-        const auto error = portion->Scan3Column(head, tail, line_number);
+        const Error error = portion->Scan3Column(head, tail, line_number);
         if (error != Error::None)
           return error;
         m_section_layouts.push_back(std::move(portion));
@@ -618,7 +618,7 @@ Map::Error Map::ScanPrologue_SectionLayout(const char*& head, const char* const 
         head = match[0].second;
         auto portion = std::make_unique<SectionLayout>(SectionLayout::ToSectionKind(name), name);
         portion->SetVersionRange(Version::version_3_0_4, Version::Latest);
-        const auto error = portion->Scan4Column(head, tail, line_number);
+        const Error error = portion->Scan4Column(head, tail, line_number);
         if (error != Error::None)
           return error;
         m_section_layouts.push_back(std::move(portion));
@@ -719,7 +719,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false);
-      const auto error = portion->ScanSimple_old(head, tail, line_number);
+      const Error error = portion->ScanSimple_old(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
@@ -740,7 +740,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true);
-      const auto error = portion->ScanRomRam_old(head, tail, line_number);
+      const Error error = portion->ScanRomRam_old(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
@@ -761,7 +761,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false, false, false);
-      const auto error = portion->ScanSimple(head, tail, line_number);
+      const Error error = portion->ScanSimple(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
@@ -782,7 +782,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true, false, false);
-      const auto error = portion->ScanRomRam(head, tail, line_number);
+      const Error error = portion->ScanRomRam(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
@@ -803,7 +803,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false, true, false);
-      const auto error = portion->ScanSRecord(head, tail, line_number);
+      const Error error = portion->ScanSRecord(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
@@ -824,7 +824,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false, false, true);
-      const auto error = portion->ScanBinFile(head, tail, line_number);
+      const Error error = portion->ScanBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
@@ -845,7 +845,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true, true, false);
-      const auto error = portion->ScanRomRamSRecord(head, tail, line_number);
+      const Error error = portion->ScanRomRamSRecord(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
@@ -866,7 +866,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true, false, true);
-      const auto error = portion->ScanRomRamBinFile(head, tail, line_number);
+      const Error error = portion->ScanRomRamBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
@@ -887,7 +887,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(false, true, true);
-      const auto error = portion->ScanSRecordBinFile(head, tail, line_number);
+      const Error error = portion->ScanSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
@@ -908,7 +908,7 @@ Map::Error Map::ScanPrologue_MemoryMap(const char*& head, const char* const tail
       line_number += 1u;
       head = match[0].second;
       auto portion = std::make_unique<MemoryMap>(true, true, true);
-      const auto error = portion->ScanRomRamSRecordBinFile(head, tail, line_number);
+      const Error error = portion->ScanRomRamSRecordBinFile(head, tail, line_number);
       if (error != Error::None)
         return error;
       m_memory_map = std::move(portion);
