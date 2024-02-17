@@ -1,6 +1,7 @@
 add_library(mwlinkermap
   MWLinkerMap.cpp
   MWLinkerMap.h
+  PointerUtil.h
   RegexUtil.h
 )
 
