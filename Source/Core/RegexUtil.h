@@ -68,14 +68,14 @@ public:
   T to(int base = 10) const
   {
     T value = {};
-    from_chars(value, base);
+    static_cast<void>(from_chars(value, base));
     return value;
   }
   template <std::floating_point T>
   T to(std::chars_format fmt = std::chars_format::general) const
   {
     T value = {};
-    from_chars(value, fmt);
+    static_cast<void>(from_chars(value, fmt));
     return value;
   }
 };
