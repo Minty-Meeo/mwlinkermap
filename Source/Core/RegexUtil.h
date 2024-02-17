@@ -3,25 +3,19 @@
 #pragma once
 
 #include <charconv>
-#include <concepts>
 #include <iterator>
 #include <memory>
 #include <regex>
 #include <string>
 #include <string_view>
 
+#include "PointerUtil.h"
+
 // https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
 // TODO: Make from_chars methods constexpr after std::from_chars becomes constexpr in C++23.
 
 namespace Mijo
 {
-namespace Detail
-{
-// Adequate detection of std::string::const_iterator and std::string_view::const_iterator
-template <class T, class U>
-concept PointerMemberTypeSameAs = std::same_as<typename T::pointer, U>;
-}
-
 template <class BidirIt>
 class SubMatch : public std::sub_match<BidirIt>
 {
@@ -40,29 +34,14 @@ public:
   operator string_view_type() const noexcept { return view(); }
   template <std::integral T>
   std::from_chars_result from_chars(T& value, int base = 10) const noexcept
-    requires std::same_as<iterator, const char*>
   {
-    return std::from_chars(this->first, this->second, value, base);
-  }
-  template <std::integral T>
-  std::from_chars_result from_chars(T& value, int base = 10) const noexcept
-    requires Detail::PointerMemberTypeSameAs<iterator, const char*>
-  {
-    return std::from_chars(this->first.operator->(), this->second.operator->(), value, base);
+    return std::from_chars(ToPointer(this->first), ToPointer(this->second), value, base);
   }
   template <std::floating_point T>
   std::from_chars_result
   from_chars(T& value, std::chars_format fmt = std::chars_format::general) const noexcept
-    requires std::same_as<iterator, const char*>
   {
-    return std::from_chars(this->first, this->second, value, fmt);
-  }
-  template <std::floating_point T>
-  std::from_chars_result
-  from_chars(T& value, std::chars_format fmt = std::chars_format::general) const noexcept
-    requires Detail::PointerMemberTypeSameAs<iterator, const char*>
-  {
-    return std::from_chars(this->first.operator->(), this->second.operator->(), value, fmt);
+    return std::from_chars(ToPointer(this->first), ToPointer(this->second), value, fmt);
   }
   template <std::integral T>
   T to(int base = 10) const
