@@ -1107,7 +1107,7 @@ Map::Error Map::SymbolClosure::Scan(  //
           curr_node, symbol_name, map_symbol_closure_st_type.at(type),
           map_symbol_closure_st_bind.at(bind), module_name, source_name, std::move(unref_dups))).get();
       // clang-format on
-      const NodeReal& curr_node_real = *std::launder(reinterpret_cast<NodeReal*>(curr_node));
+      const NodeReal& curr_node_real = *static_cast<NodeReal*>(curr_node);
 
       const std::string_view compilation_unit_name =
           GetCompilationUnitName(curr_node_real.m_module_name, curr_node_real.m_source_name);

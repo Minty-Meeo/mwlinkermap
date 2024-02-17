@@ -110,7 +110,7 @@ public:
 
   const_reference operator[](size_type idx) const noexcept
   {
-    return reinterpret_cast<const_reference>(base_type::operator[](idx));
+    return static_cast<const_reference>(base_type::operator[](idx));
   }
   string_view_type view(size_type idx) const noexcept { return this->operator[](idx).view(); }
   template <std::integral T>
