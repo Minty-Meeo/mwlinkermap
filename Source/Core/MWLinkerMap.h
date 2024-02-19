@@ -91,7 +91,7 @@ enum class Bind
 
 struct Map
 {
-  enum class Error
+  enum class ScanError
   {
     None,
     Fail,
@@ -267,7 +267,7 @@ struct Map
     };
 
   private:
-    Error Scan(const char*&, const char*, std::size_t&, UnresolvedSymbols&);
+    ScanError Scan(const char*&, const char*, std::size_t&, UnresolvedSymbols&);
     void Print(std::ostream&, UnresolvedSymbols::const_iterator&, UnresolvedSymbols::const_iterator,
                std::size_t&) const;
 
@@ -387,7 +387,7 @@ struct Map
     };
 
   private:
-    Error Scan(const char*&, const char*, std::size_t&);
+    ScanError Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
     std::list<MergingUnit> m_merging_units;
@@ -444,7 +444,7 @@ struct Map
     const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
-    Error Scan(const char*&, const char*, std::size_t&);
+    ScanError Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
     std::list<Unit> m_units;
@@ -483,7 +483,7 @@ struct Map
     const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
-    Error Scan(const char*&, const char*, std::size_t&);
+    ScanError Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
     std::list<Unit> m_units;
@@ -522,7 +522,7 @@ struct Map
     const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
-    Error Scan(const char*&, const char*, std::size_t&);
+    ScanError Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
     std::list<Unit> m_units;
@@ -533,7 +533,7 @@ struct Map
     friend Map;
 
   private:
-    Error Scan(const char*&, const char*, std::size_t&);
+    ScanError Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
   };
 
@@ -542,7 +542,7 @@ struct Map
     friend Map;
 
   private:
-    Error Scan(const char*&, const char*, std::size_t&);
+    ScanError Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
   };
 
@@ -768,9 +768,9 @@ struct Map
     };
 
   private:
-    Error Scan3Column(const char*&, const char*, std::size_t&);
-    Error Scan4Column(const char*&, const char*, std::size_t&);
-    Error ScanTLOZTP(const char*&, const char*, std::size_t&);
+    ScanError Scan3Column(const char*&, const char*, std::size_t&);
+    ScanError Scan4Column(const char*&, const char*, std::size_t&);
+    ScanError ScanTLOZTP(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
     std::list<Unit> m_units;
@@ -923,18 +923,18 @@ struct Map
     bool m_has_bin_file;  // Enabled by '-genbinary keyword' option
 
   private:
-    Error ScanSimple_old(const char*&, const char*, std::size_t&);
-    Error ScanRomRam_old(const char*&, const char*, std::size_t&);
-    Error ScanDebug_old(const char*&, const char*, std::size_t&);
-    Error ScanSimple(const char*&, const char*, std::size_t&);
-    Error ScanRomRam(const char*&, const char*, std::size_t&);
-    Error ScanSRecord(const char*&, const char*, std::size_t&);
-    Error ScanBinFile(const char*&, const char*, std::size_t&);
-    Error ScanRomRamSRecord(const char*&, const char*, std::size_t&);
-    Error ScanRomRamBinFile(const char*&, const char*, std::size_t&);
-    Error ScanSRecordBinFile(const char*&, const char*, std::size_t&);
-    Error ScanRomRamSRecordBinFile(const char*&, const char*, std::size_t&);
-    Error ScanDebug(const char*&, const char*, std::size_t&);
+    ScanError ScanSimple_old(const char*&, const char*, std::size_t&);
+    ScanError ScanRomRam_old(const char*&, const char*, std::size_t&);
+    ScanError ScanDebug_old(const char*&, const char*, std::size_t&);
+    ScanError ScanSimple(const char*&, const char*, std::size_t&);
+    ScanError ScanRomRam(const char*&, const char*, std::size_t&);
+    ScanError ScanSRecord(const char*&, const char*, std::size_t&);
+    ScanError ScanBinFile(const char*&, const char*, std::size_t&);
+    ScanError ScanRomRamSRecord(const char*&, const char*, std::size_t&);
+    ScanError ScanRomRamBinFile(const char*&, const char*, std::size_t&);
+    ScanError ScanSRecordBinFile(const char*&, const char*, std::size_t&);
+    ScanError ScanRomRamSRecordBinFile(const char*&, const char*, std::size_t&);
+    ScanError ScanDebug(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
     void PrintSimple_old(std::ostream&, std::size_t&) const;
     void PrintRomRam_old(std::ostream&, std::size_t&) const;
@@ -974,18 +974,18 @@ struct Map
     const std::list<Unit>& GetUnits() const noexcept { return m_units; }
 
   private:
-    Error Scan(const char*&, const char*, std::size_t&);
+    ScanError Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
 
     std::list<Unit> m_units;
   };
 
-  Error Scan(std::span<const char>, std::size_t&);
-  Error Scan(const char*, const char*, std::size_t&);
-  Error ScanTLOZTP(std::span<const char>, std::size_t&);
-  Error ScanTLOZTP(const char*, const char*, std::size_t&);
-  Error ScanSMGalaxy(std::span<const char>, std::size_t&);
-  Error ScanSMGalaxy(const char*, const char*, std::size_t&);
+  ScanError Scan(std::span<const char>, std::size_t&);
+  ScanError Scan(const char*, const char*, std::size_t&);
+  ScanError ScanTLOZTP(std::span<const char>, std::size_t&);
+  ScanError ScanTLOZTP(const char*, const char*, std::size_t&);
+  ScanError ScanSMGalaxy(std::span<const char>, std::size_t&);
+  ScanError ScanSMGalaxy(const char*, const char*, std::size_t&);
   void Print(std::ostream&, std::size_t&) const;
   Version GetMinVersion() const noexcept
   {
@@ -1066,9 +1066,10 @@ struct Map
   };
 
 private:
-  Error ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&, std::string_view);
-  Error ScanPrologue_MemoryMap(const char*&, const char*, std::size_t&);
-  Error ScanForGarbage(const char*, const char*);
+  ScanError ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&,
+                                       std::string_view);
+  ScanError ScanPrologue_MemoryMap(const char*&, const char*, std::size_t&);
+  ScanError ScanForGarbage(const char*, const char*);
   static void PrintUnresolvedSymbols(std::ostream&, UnresolvedSymbols::const_iterator&,
                                      UnresolvedSymbols::const_iterator, std::size_t&);
 

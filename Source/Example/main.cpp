@@ -37,7 +37,7 @@ static void tempfunc(const char* name, int choice)
   MWLinker::Map::Warn::DisableAll();
 
   std::size_t scan_line_number = 0;
-  MWLinker::Map::Error error = MWLinker::Map::Error::None;
+  MWLinker::Map::ScanError error = MWLinker::Map::ScanError::None;
   std::array<std::chrono::milliseconds, TIME_ATTACK_COUNT> time_attack{};
   for (std::size_t i = 0; i < TIME_ATTACK_COUNT; ++i)
   {
