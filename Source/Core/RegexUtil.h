@@ -91,6 +91,14 @@ public:
   {
     return static_cast<const_reference>(base_type::operator[](idx));
   }
+  const_reference prefix() const noexcept
+  {
+    return static_cast<const_reference>(base_type::prefix());
+  }
+  const_reference suffix() const noexcept
+  {
+    return static_cast<const_reference>(base_type::suffix());
+  }
   string_view_type view(size_type idx) const noexcept { return operator[](idx).view(); }
   template <std::integral T>
   std::from_chars_result from_chars(size_type idx, T& value, int base = 10) const noexcept
