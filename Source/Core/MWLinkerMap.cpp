@@ -240,9 +240,10 @@ static const std::unordered_map<std::string_view, Map::SectionLayout::Kind> map_
 
 Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string_view section_name)
 {
-  if (map_section_layout_kind.contains(section_name))
-    return map_section_layout_kind.at(section_name);
-  return Map::SectionLayout::Kind::Unknown;
+  const auto iter = map_section_layout_kind.find(section_name);
+  if (iter == map_section_layout_kind.end())
+    return Map::SectionLayout::Kind::Unknown;
+  return iter->second;
 }
 
 Map::ScanError Map::Scan(const std::span<const char> view, std::size_t& line_number)
