@@ -1000,11 +1000,11 @@ struct Map
     std::list<Unit> m_units;
   };
 
-  ScanError Scan(std::span<const char> view, std::size_t& line_number);
+  ScanError Scan(std::span<const char> span, std::size_t& line_number);
   ScanError Scan(const char* head, const char* tail, std::size_t& line_number);
-  ScanError ScanTLOZTP(std::span<const char> view, std::size_t& line_number);
+  ScanError ScanTLOZTP(std::span<const char> span, std::size_t& line_number);
   ScanError ScanTLOZTP(const char* head, const char* tail, std::size_t& line_number);
-  ScanError ScanSMGalaxy(std::span<const char> view, std::size_t& line_number);
+  ScanError ScanSMGalaxy(std::span<const char> span, std::size_t& line_number);
   ScanError ScanSMGalaxy(const char* head, const char* tail, std::size_t& line_number);
   void Print(std::ostream& stream, std::size_t& line_number) const;
   Version GetMinVersion() const noexcept

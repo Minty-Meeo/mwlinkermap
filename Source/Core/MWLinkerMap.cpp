@@ -246,9 +246,9 @@ Map::SectionLayout::Kind Map::SectionLayout::ToSectionKind(const std::string_vie
   return iter->second;
 }
 
-Map::ScanError Map::Scan(const std::span<const char> view, std::size_t& line_number)
+Map::ScanError Map::Scan(const std::span<const char> span, std::size_t& line_number)
 {
-  return Scan(view.data(), view.data() + view.size(), line_number);
+  return Scan(span.data(), span.data() + span.size(), line_number);
 }
 
 Map::ScanError Map::Scan(const char* head, const char* const tail, std::size_t& line_number)
@@ -438,9 +438,9 @@ NINTENDO_EAD_TRIMMED_LINKER_MAPS_GOTO_HERE:
   return ScanForGarbage(head, tail);
 }
 
-Map::ScanError Map::ScanTLOZTP(const std::span<const char> view, std::size_t& line_number)
+Map::ScanError Map::ScanTLOZTP(const std::span<const char> span, std::size_t& line_number)
 {
-  return ScanTLOZTP(view.data(), view.data() + view.size(), line_number);
+  return ScanTLOZTP(span.data(), span.data() + span.size(), line_number);
 }
 
 Map::ScanError Map::ScanTLOZTP(const char* head, const char* const tail, std::size_t& line_number)
@@ -473,9 +473,9 @@ Map::ScanError Map::ScanTLOZTP(const char* head, const char* const tail, std::si
   return ScanForGarbage(head, tail);
 }
 
-Map::ScanError Map::ScanSMGalaxy(const std::span<const char> view, std::size_t& line_number)
+Map::ScanError Map::ScanSMGalaxy(const std::span<const char> span, std::size_t& line_number)
 {
-  return ScanSMGalaxy(view.data(), view.data() + view.size(), line_number);
+  return ScanSMGalaxy(span.data(), span.data() + span.size(), line_number);
 }
 
 Map::ScanError Map::ScanSMGalaxy(const char* head, const char* const tail, std::size_t& line_number)
