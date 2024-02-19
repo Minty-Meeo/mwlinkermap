@@ -169,13 +169,15 @@ struct Map
 
       const NodeBase* GetParent() { return m_parent; }
       const std::list<std::unique_ptr<NodeBase>>& GetChildren() { return m_children; }
-      static constexpr std::string_view ToName(Type) noexcept;
-      static constexpr std::string_view ToName(Bind) noexcept;
+      static constexpr std::string_view ToName(Type st_type) noexcept;
+      static constexpr std::string_view ToName(Bind st_bind) noexcept;
 
     private:
-      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
-                         UnresolvedSymbols::const_iterator, std::size_t&) const;
-      static void PrintPrefix(std::ostream&, int);
+      virtual void Print(std::ostream& stream, int hierarchy_level,
+                         UnresolvedSymbols::const_iterator& unresolved_head,
+                         UnresolvedSymbols::const_iterator unresolved_tail,
+                         std::size_t& line_number) const;
+      static void PrintPrefix(std::ostream& stream, int hierarchy_level);
 
       NodeBase* m_parent;
       std::list<std::unique_ptr<NodeBase>> m_children;
@@ -199,7 +201,7 @@ struct Map
         std::string m_source_name;
 
       private:
-        void Print(std::ostream&, int, std::size_t&) const;
+        void Print(std::ostream& stream, int hierarchy_level, std::size_t& line_number) const;
       };
 
       explicit NodeReal(NodeBase* parent, std::string_view name, Type type, Bind bind,
@@ -223,8 +225,10 @@ struct Map
       std::list<UnreferencedDuplicate> m_unref_dups;
 
     private:
-      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
-                         UnresolvedSymbols::const_iterator, std::size_t&) const override;
+      virtual void Print(std::ostream& stream, int hierarchy_level,
+                         UnresolvedSymbols::const_iterator& unresolved_head,
+                         UnresolvedSymbols::const_iterator unresolved_tail,
+                         std::size_t& line_number) const override;
     };
 
     struct NodeLinkerGenerated final : NodeBase
@@ -238,8 +242,10 @@ struct Map
       std::string m_name;
 
     private:
-      virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
-                         UnresolvedSymbols::const_iterator, std::size_t&) const override;
+      virtual void Print(std::ostream& stream, int hierarchy_level,
+                         UnresolvedSymbols::const_iterator& unresolved_head,
+                         UnresolvedSymbols::const_iterator unresolved_tail,
+                         std::size_t& line_number) const override;
     };
 
     using NodeLookup = std::unordered_multimap<std::string_view, const NodeReal&>;
@@ -262,14 +268,17 @@ struct Map
       static bool do_warn_sym_on_flag_detected;
 
     private:
-      static void OneDefinitionRuleViolation(std::size_t, std::string_view, std::string_view);
-      static void SymOnFlagDetected(std::size_t, std::string_view);
+      static void OneDefinitionRuleViolation(std::size_t line_number, std::string_view symbol_name,
+                                             std::string_view compilation_unit_name);
+      static void SymOnFlagDetected(std::size_t line_number,
+                                    std::string_view compilation_unit_name);
     };
 
   private:
-    ScanError Scan(const char*&, const char*, std::size_t&, UnresolvedSymbols&);
-    void Print(std::ostream&, UnresolvedSymbols::const_iterator&, UnresolvedSymbols::const_iterator,
-               std::size_t&) const;
+    ScanError Scan(const char*& head, const char* tail, std::size_t& line_number,
+                   UnresolvedSymbols& unresolved_symbols);
+    void Print(std::ostream& stream, UnresolvedSymbols::const_iterator& unresolved_head,
+               UnresolvedSymbols::const_iterator unresolved_tail, std::size_t& line_number) const;
 
     NodeBase m_root;
     ModuleLookup m_lookup;
@@ -306,7 +315,7 @@ struct Map
       bool m_was_interchanged;
 
     private:
-      void Print(std::ostream&, std::size_t&) const;
+      void Print(std::ostream& stream, std::size_t& line_number) const;
     };
 
     struct FoldingUnit
@@ -330,7 +339,7 @@ struct Map
         bool m_new_branch_function;
 
       private:
-        void Print(std::ostream&, std::size_t&) const;
+        void Print(std::ostream& stream, std::size_t& line_number) const;
       };
 
       using UnitLookup = std::unordered_multimap<std::string_view, const Unit&>;
@@ -343,7 +352,7 @@ struct Map
       std::string m_object_name;
 
     private:
-      void Print(std::ostream&, std::size_t&) const;
+      void Print(std::ostream& stream, std::size_t& line_number) const;
 
       std::list<Unit> m_units;
     };
@@ -380,15 +389,17 @@ struct Map
       static bool do_warn_folding_odr_violation;
 
     private:
-      static void MergingOneDefinitionRuleViolation(std::size_t, std::string_view);
-      static void FoldingRepeatObject(std::size_t, std::string_view);
-      static void FoldingOneDefinitionRuleViolation(std::size_t, std::string_view,
-                                                    std::string_view);
+      static void MergingOneDefinitionRuleViolation(std::size_t line_number,
+                                                    std::string_view symbol_name);
+      static void FoldingRepeatObject(std::size_t line_number, std::string_view object_name);
+      static void FoldingOneDefinitionRuleViolation(std::size_t line_number,
+                                                    std::string_view symbol_name,
+                                                    std::string_view object_name);
     };
 
   private:
-    ScanError Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
+    ScanError Scan(const char*& head, const char* tail, std::size_t& line_number);
+    void Print(std::ostream& stream, std::size_t& line_number) const;
 
     std::list<MergingUnit> m_merging_units;
     std::list<FoldingUnit> m_folding_units;
@@ -432,7 +443,7 @@ struct Map
       std::string m_reference_name;
 
     private:
-      void Print(std::ostream&, std::size_t&) const;
+      void Print(std::ostream& stream, std::size_t& line_number) const;
     };
 
     explicit LinkerOpts() noexcept
@@ -444,8 +455,8 @@ struct Map
     const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
-    ScanError Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
+    ScanError Scan(const char*& head, const char* tail, std::size_t& line_number);
+    void Print(std::ostream& stream, std::size_t& line_number) const;
 
     std::list<Unit> m_units;
   };
@@ -471,7 +482,7 @@ struct Map
       bool m_is_safe;
 
     private:
-      void Print(std::ostream&, std::size_t&) const;
+      void Print(std::ostream& stream, std::size_t& line_number) const;
     };
 
     explicit BranchIslands() noexcept
@@ -483,8 +494,8 @@ struct Map
     const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
-    ScanError Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
+    ScanError Scan(const char*& head, const char* tail, std::size_t& line_number);
+    void Print(std::ostream& stream, std::size_t& line_number) const;
 
     std::list<Unit> m_units;
   };
@@ -510,7 +521,7 @@ struct Map
       bool m_is_safe;
 
     private:
-      void Print(std::ostream&, std::size_t&) const;
+      void Print(std::ostream& stream, std::size_t& line_number) const;
     };
 
     explicit MixedModeIslands() noexcept
@@ -522,8 +533,8 @@ struct Map
     const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
-    ScanError Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
+    ScanError Scan(const char*& head, const char* tail, std::size_t& line_number);
+    void Print(std::ostream& stream, std::size_t& line_number) const;
 
     std::list<Unit> m_units;
   };
@@ -533,8 +544,8 @@ struct Map
     friend Map;
 
   private:
-    ScanError Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
+    ScanError Scan(const char*& head, const char* tail, std::size_t& line_number);
+    void Print(std::ostream& stream, std::size_t& line_number) const;
   };
 
   struct LinktimeSizeIncreasingOptimizations final : PortionBase
@@ -542,8 +553,8 @@ struct Map
     friend Map;
 
   private:
-    ScanError Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
+    ScanError Scan(const char*& head, const char* tail, std::size_t& line_number);
+    void Print(std::ostream& stream, std::size_t& line_number) const;
   };
 
   struct SectionLayout final : PortionBase
@@ -694,7 +705,7 @@ struct Map
 
       const Unit* GetEntryParent() { return m_entry_parent; }
       const std::list<const Unit*>& GetEntryChildren() { return m_entry_children; }
-      static constexpr std::string_view ToSpecialName(Trait);
+      static constexpr std::string_view ToSpecialName(Trait unit_trait);
 
       Kind m_unit_kind;
       std::uint32_t m_starting_address;
@@ -720,10 +731,10 @@ struct Map
       Trait m_unit_trait;
 
     private:
-      void Print3Column(std::ostream&, std::size_t&) const;
-      void Print4Column(std::ostream&, std::size_t&) const;
-      Unit::Trait DeduceUsualSubtext(ScanningContext&);
-      Unit::Trait DeduceEntrySubtext(ScanningContext&);
+      void Print3Column(std::ostream& stream, std::size_t& line_number) const;
+      void Print4Column(std::ostream& stream, std::size_t& line_number) const;
+      Unit::Trait DeduceUsualSubtext(ScanningContext& scanning_context);
+      Unit::Trait DeduceEntrySubtext(ScanningContext& scanning_context);
     };
 
     explicit SectionLayout(Kind section_kind, std::string_view name)
@@ -734,7 +745,7 @@ struct Map
     inline bool IsEmpty() const noexcept { return m_units.empty(); }
     const std::list<Unit>& GetUnits() const noexcept { return m_units; }
     const ModuleLookup& GetModuleLookup() const noexcept { return m_lookup; }
-    static Kind ToSectionKind(std::string_view);
+    static Kind ToSectionKind(std::string_view section_name);
 
     Kind m_section_kind;
     std::string m_name;
@@ -759,19 +770,25 @@ struct Map
       static bool do_warn_lcomm_after_comm;
 
     private:
-      static void RepeatCompilationUnit(std::size_t, std::string_view, std::string_view);
-      static void OneDefinitionRuleViolation(std::size_t, std::string_view, std::string_view,
-                                             std::string_view);
-      static void SymOnFlagDetected(std::size_t, std::string_view, std::string_view);
-      static void CommonOnFlagDetected(std::size_t, std::string_view, std::string_view);
-      static void LCommAfterComm(std::size_t);
+      static void RepeatCompilationUnit(std::size_t line_number,
+                                        std::string_view compilation_unit_name,
+                                        std::string_view section_name);
+      static void OneDefinitionRuleViolation(std::size_t line_number, std::string_view symbol_name,
+                                             std::string_view compilation_unit_name,
+                                             std::string_view section_name);
+      static void SymOnFlagDetected(std::size_t line_number, std::string_view compilation_unit_name,
+                                    std::string_view section_name);
+      static void CommonOnFlagDetected(std::size_t line_number,
+                                       std::string_view compilation_unit_name,
+                                       std::string_view section_name);
+      static void LCommAfterComm(std::size_t line_number);
     };
 
   private:
-    ScanError Scan3Column(const char*&, const char*, std::size_t&);
-    ScanError Scan4Column(const char*&, const char*, std::size_t&);
-    ScanError ScanTLOZTP(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
+    ScanError Scan3Column(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError Scan4Column(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanTLOZTP(const char*& head, const char* tail, std::size_t& line_number);
+    void Print(std::ostream& stream, std::size_t& line_number) const;
 
     std::list<Unit> m_units;
     ModuleLookup m_lookup;
@@ -872,16 +889,16 @@ struct Map
       std::string m_bin_file_name;
 
     private:
-      void PrintSimple_old(std::ostream&, std::size_t&) const;
-      void PrintRomRam_old(std::ostream&, std::size_t&) const;
-      void PrintSimple(std::ostream&, std::size_t&) const;
-      void PrintRomRam(std::ostream&, std::size_t&) const;
-      void PrintSRecord(std::ostream&, std::size_t&) const;
-      void PrintBinFile(std::ostream&, std::size_t&) const;
-      void PrintRomRamSRecord(std::ostream&, std::size_t&) const;
-      void PrintRomRamBinFile(std::ostream&, std::size_t&) const;
-      void PrintSRecordBinFile(std::ostream&, std::size_t&) const;
-      void PrintRomRamSRecordBinFile(std::ostream&, std::size_t&) const;
+      void PrintSimple_old(std::ostream& stream, std::size_t& line_number) const;
+      void PrintRomRam_old(std::ostream& stream, std::size_t& line_number) const;
+      void PrintSimple(std::ostream& stream, std::size_t& line_number) const;
+      void PrintRomRam(std::ostream& stream, std::size_t& line_number) const;
+      void PrintSRecord(std::ostream& stream, std::size_t& line_number) const;
+      void PrintBinFile(std::ostream& stream, std::size_t& line_number) const;
+      void PrintRomRamSRecord(std::ostream& stream, std::size_t& line_number) const;
+      void PrintRomRamBinFile(std::ostream& stream, std::size_t& line_number) const;
+      void PrintSRecordBinFile(std::ostream& stream, std::size_t& line_number) const;
+      void PrintRomRamSRecordBinFile(std::ostream& stream, std::size_t& line_number) const;
     };
 
     struct UnitDebug
@@ -898,9 +915,9 @@ struct Map
       std::uint32_t m_file_offset;
 
     private:
-      void Print_older(std::ostream&, std::size_t&) const;
-      void Print_old(std::ostream&, std::size_t&) const;
-      void Print(std::ostream&, std::size_t&) const;
+      void Print_older(std::ostream& stream, std::size_t& line_number) const;
+      void Print_old(std::ostream& stream, std::size_t& line_number) const;
+      void Print(std::ostream& stream, std::size_t& line_number) const;
     };
 
     explicit MemoryMap(bool has_rom_ram)  // ctor for old memory map
@@ -923,31 +940,32 @@ struct Map
     bool m_has_bin_file;  // Enabled by '-genbinary keyword' option
 
   private:
-    ScanError ScanSimple_old(const char*&, const char*, std::size_t&);
-    ScanError ScanRomRam_old(const char*&, const char*, std::size_t&);
-    ScanError ScanDebug_old(const char*&, const char*, std::size_t&);
-    ScanError ScanSimple(const char*&, const char*, std::size_t&);
-    ScanError ScanRomRam(const char*&, const char*, std::size_t&);
-    ScanError ScanSRecord(const char*&, const char*, std::size_t&);
-    ScanError ScanBinFile(const char*&, const char*, std::size_t&);
-    ScanError ScanRomRamSRecord(const char*&, const char*, std::size_t&);
-    ScanError ScanRomRamBinFile(const char*&, const char*, std::size_t&);
-    ScanError ScanSRecordBinFile(const char*&, const char*, std::size_t&);
-    ScanError ScanRomRamSRecordBinFile(const char*&, const char*, std::size_t&);
-    ScanError ScanDebug(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
-    void PrintSimple_old(std::ostream&, std::size_t&) const;
-    void PrintRomRam_old(std::ostream&, std::size_t&) const;
-    void PrintDebug_old(std::ostream&, std::size_t&) const;
-    void PrintSimple(std::ostream&, std::size_t&) const;
-    void PrintRomRam(std::ostream&, std::size_t&) const;
-    void PrintSRecord(std::ostream&, std::size_t&) const;
-    void PrintBinFile(std::ostream&, std::size_t&) const;
-    void PrintRomRamSRecord(std::ostream&, std::size_t&) const;
-    void PrintRomRamBinFile(std::ostream&, std::size_t&) const;
-    void PrintSRecordBinFile(std::ostream&, std::size_t&) const;
-    void PrintRomRamSRecordBinFile(std::ostream&, std::size_t&) const;
-    void PrintDebug(std::ostream&, std::size_t&) const;
+    ScanError ScanSimple_old(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanRomRam_old(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanDebug_old(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanSimple(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanRomRam(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanSRecord(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanBinFile(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanRomRamSRecord(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanRomRamBinFile(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanSRecordBinFile(const char*& head, const char* tail, std::size_t& line_number);
+    ScanError ScanRomRamSRecordBinFile(const char*& head, const char* tail,
+                                       std::size_t& line_number);
+    ScanError ScanDebug(const char*& head, const char* tail, std::size_t& line_number);
+    void Print(std::ostream& stream, std::size_t& line_number) const;
+    void PrintSimple_old(std::ostream& stream, std::size_t& line_number) const;
+    void PrintRomRam_old(std::ostream& stream, std::size_t& line_number) const;
+    void PrintDebug_old(std::ostream& stream, std::size_t& line_number) const;
+    void PrintSimple(std::ostream& stream, std::size_t& line_number) const;
+    void PrintRomRam(std::ostream& stream, std::size_t& line_number) const;
+    void PrintSRecord(std::ostream& stream, std::size_t& line_number) const;
+    void PrintBinFile(std::ostream& stream, std::size_t& line_number) const;
+    void PrintRomRamSRecord(std::ostream& stream, std::size_t& line_number) const;
+    void PrintRomRamBinFile(std::ostream& stream, std::size_t& line_number) const;
+    void PrintSRecordBinFile(std::ostream& stream, std::size_t& line_number) const;
+    void PrintRomRamSRecordBinFile(std::ostream& stream, std::size_t& line_number) const;
+    void PrintDebug(std::ostream& stream, std::size_t& line_number) const;
 
     std::list<UnitNormal> m_normal_units;
     std::list<UnitDebug> m_debug_units;
@@ -967,26 +985,26 @@ struct Map
       Elf32_Addr m_value;
 
     private:
-      void Print(std::ostream&, std::size_t&) const;
+      void Print(std::ostream& stream, std::size_t& line_number) const;
     };
 
     inline bool IsEmpty() const noexcept { return m_units.empty(); }
     const std::list<Unit>& GetUnits() const noexcept { return m_units; }
 
   private:
-    ScanError Scan(const char*&, const char*, std::size_t&);
-    void Print(std::ostream&, std::size_t&) const;
+    ScanError Scan(const char*& head, const char* tail, std::size_t& line_number);
+    void Print(std::ostream& stream, std::size_t& line_number) const;
 
     std::list<Unit> m_units;
   };
 
-  ScanError Scan(std::span<const char>, std::size_t&);
-  ScanError Scan(const char*, const char*, std::size_t&);
-  ScanError ScanTLOZTP(std::span<const char>, std::size_t&);
-  ScanError ScanTLOZTP(const char*, const char*, std::size_t&);
-  ScanError ScanSMGalaxy(std::span<const char>, std::size_t&);
-  ScanError ScanSMGalaxy(const char*, const char*, std::size_t&);
-  void Print(std::ostream&, std::size_t&) const;
+  ScanError Scan(std::span<const char> view, std::size_t& line_number);
+  ScanError Scan(const char* head, const char* tail, std::size_t& line_number);
+  ScanError ScanTLOZTP(std::span<const char> view, std::size_t& line_number);
+  ScanError ScanTLOZTP(const char* head, const char* tail, std::size_t& line_number);
+  ScanError ScanSMGalaxy(std::span<const char> view, std::size_t& line_number);
+  ScanError ScanSMGalaxy(const char* head, const char* tail, std::size_t& line_number);
+  void Print(std::ostream& stream, std::size_t& line_number) const;
   Version GetMinVersion() const noexcept
   {
     Version min_version = std::max({
@@ -1066,12 +1084,13 @@ struct Map
   };
 
 private:
-  ScanError ScanPrologue_SectionLayout(const char*&, const char* const, std::size_t&,
-                                       std::string_view);
-  ScanError ScanPrologue_MemoryMap(const char*&, const char*, std::size_t&);
-  ScanError ScanForGarbage(const char*, const char*);
-  static void PrintUnresolvedSymbols(std::ostream&, UnresolvedSymbols::const_iterator&,
-                                     UnresolvedSymbols::const_iterator, std::size_t&);
+  ScanError ScanPrologue_SectionLayout(const char*& head, const char* tail,
+                                       std::size_t& line_number, std::string_view name);
+  ScanError ScanPrologue_MemoryMap(const char*& head, const char* tail, std::size_t& line_number);
+  ScanError ScanForGarbage(const char* head, const char* tail);
+  static void PrintUnresolvedSymbols(std::ostream& stream, UnresolvedSymbols::const_iterator& head,
+                                     UnresolvedSymbols::const_iterator tail,
+                                     std::size_t& line_number);
 
   std::string m_entry_point_name;
   std::optional<SymbolClosure> m_normal_symbol_closure;
