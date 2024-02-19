@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <span>
 #include <string>
@@ -127,18 +128,9 @@ struct Map
   {
     friend Map;
 
-    virtual ~PortionBase() = default;
+    constexpr bool IsEmpty() const noexcept { return true; }
     constexpr Version GetMinVersion() const noexcept { return m_min_version; }
     constexpr Version GetMaxVersion() const noexcept { return m_max_version; }
-    constexpr static Version GetMinVersion(PortionBase* portion)
-    {
-      return portion ? portion->GetMinVersion() : Version::Unknown;
-    }
-    constexpr static Version GetMaxVersion(PortionBase* portion)
-    {
-      return portion ? portion->GetMaxVersion() : Version::Latest;
-    }
-    virtual bool IsEmpty() const noexcept = 0;
 
   private:
     constexpr void SetVersionRange(const Version min_version, const Version max_version) noexcept
@@ -170,6 +162,11 @@ struct Map
       explicit NodeBase(NodeBase* parent) : m_parent(parent) {}
       virtual ~NodeBase() = default;
 
+      NodeBase(const NodeBase&) = delete;
+      NodeBase& operator=(const NodeBase&) = delete;
+      NodeBase(NodeBase&&) = default;
+      NodeBase& operator=(NodeBase&&) = default;
+
       const NodeBase* GetParent() { return m_parent; }
       const std::list<std::unique_ptr<NodeBase>>& GetChildren() { return m_children; }
       static constexpr std::string_view ToName(Type) noexcept;
@@ -196,10 +193,10 @@ struct Map
         {
         }
 
-        const Type m_type;
-        const Bind m_bind;
-        const std::string m_module_name;
-        const std::string m_source_name;
+        Type m_type;
+        Bind m_bind;
+        std::string m_module_name;
+        std::string m_source_name;
 
       private:
         void Print(std::ostream&, int, std::size_t&) const;
@@ -214,16 +211,16 @@ struct Map
       }
       virtual ~NodeReal() override = default;
 
-      const std::string m_name;
-      const Type m_type;
-      const Bind m_bind;
+      std::string m_name;
+      Type m_type;
+      Bind m_bind;
       // Static library or object name
-      const std::string m_module_name;
+      std::string m_module_name;
       // When linking a static library, this is either:
       // A) The name of the STT_FILE symbol from the relevant object in the static library.
       // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
-      const std::string m_source_name;
-      const std::list<UnreferencedDuplicate> m_unref_dups;
+      std::string m_source_name;
+      std::list<UnreferencedDuplicate> m_unref_dups;
 
     private:
       virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
@@ -238,7 +235,7 @@ struct Map
       }
       virtual ~NodeLinkerGenerated() override = default;
 
-      const std::string m_name;
+      std::string m_name;
 
     private:
       virtual void Print(std::ostream&, int, UnresolvedSymbols::const_iterator&,
@@ -248,10 +245,7 @@ struct Map
     using NodeLookup = std::unordered_multimap<std::string_view, const NodeReal&>;
     using ModuleLookup = std::unordered_map<std::string_view, NodeLookup>;
 
-    explicit SymbolClosure() = default;
-    virtual ~SymbolClosure() override = default;
-
-    virtual bool IsEmpty() const noexcept override { return m_root.m_children.empty(); }
+    inline bool IsEmpty() const noexcept { return m_root.m_children.empty(); }
     const ModuleLookup& GetModuleLookup() { return m_lookup; }
 
     struct Warn
@@ -299,17 +293,17 @@ struct Map
       {
       }
 
-      const std::string m_first_name;
-      const std::string m_second_name;
-      const Elf32_Word m_size;
+      std::string m_first_name;
+      std::string m_second_name;
+      Elf32_Word m_size;
       // If the conditions are right (e.g. the function is more than just a BLR instruction), then
       // one function is replaced with a branch to the other function, saving space at the cost of a
       // tiny amount of overhead. This is by far the more common code merging technique.
-      const bool m_will_be_replaced;
+      bool m_will_be_replaced;
       // Rarely, a function can be marked for removal when a duplicate of it is elsewhere in the
       // binary. All references to it are then redirected to the duplicate. Even rarer than that,
       // sometimes the linker can change its mind and replace it with a branch instead.
-      const bool m_was_interchanged;
+      bool m_was_interchanged;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
@@ -330,10 +324,10 @@ struct Map
         {
         }
 
-        const std::string m_first_name;
-        const std::string m_second_name;
-        const Elf32_Word m_size;
-        const bool m_new_branch_function;
+        std::string m_first_name;
+        std::string m_second_name;
+        Elf32_Word m_size;
+        bool m_new_branch_function;
 
       private:
         void Print(std::ostream&, std::size_t&) const;
@@ -346,7 +340,7 @@ struct Map
 
       const std::list<Unit>& GetUnits() { return m_units; }
 
-      const std::string m_object_name;
+      std::string m_object_name;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
@@ -356,13 +350,12 @@ struct Map
 
     using MergingUnitLookup = std::unordered_multimap<std::string_view, const MergingUnit&>;
 
-    explicit EPPC_PatternMatching()
+    explicit EPPC_PatternMatching() noexcept
     {
       SetVersionRange(Version::version_4_2_build_142, Version::Latest);
     }
-    virtual ~EPPC_PatternMatching() override = default;
 
-    virtual bool IsEmpty() const noexcept override
+    inline bool IsEmpty() const noexcept
     {
       return m_merging_units.empty() || m_folding_units.empty();
     }
@@ -433,19 +426,21 @@ struct Map
       {
       }
 
-      const Kind m_unit_kind;
-      const std::string m_module_name;
-      const std::string m_name;
-      const std::string m_reference_name;
+      Kind m_unit_kind;
+      std::string m_module_name;
+      std::string m_name;
+      std::string m_reference_name;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
     };
 
-    explicit LinkerOpts() { SetVersionRange(Version::version_4_2_build_142, Version::Latest); }
-    virtual ~LinkerOpts() override = default;
+    explicit LinkerOpts() noexcept
+    {
+      SetVersionRange(Version::version_4_2_build_142, Version::Latest);
+    }
 
-    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    inline bool IsEmpty() const noexcept { return m_units.empty(); }
     const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
@@ -471,18 +466,20 @@ struct Map
       {
       }
 
-      const std::string m_first_name;
-      const std::string m_second_name;
-      const bool m_is_safe;
+      std::string m_first_name;
+      std::string m_second_name;
+      bool m_is_safe;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
     };
 
-    explicit BranchIslands() { SetVersionRange(Version::version_4_1_build_51213, Version::Latest); }
-    virtual ~BranchIslands() override = default;
+    explicit BranchIslands() noexcept
+    {
+      SetVersionRange(Version::version_4_1_build_51213, Version::Latest);
+    }
 
-    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    inline bool IsEmpty() const noexcept { return m_units.empty(); }
     const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
@@ -508,21 +505,20 @@ struct Map
       {
       }
 
-      const std::string m_first_name;
-      const std::string m_second_name;
-      const bool m_is_safe;
+      std::string m_first_name;
+      std::string m_second_name;
+      bool m_is_safe;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
     };
 
-    explicit MixedModeIslands()
+    explicit MixedModeIslands() noexcept
     {
       SetVersionRange(Version::version_4_1_build_51213, Version::Latest);
     }
-    virtual ~MixedModeIslands() override = default;
 
-    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    inline bool IsEmpty() const noexcept { return m_units.empty(); }
     const std::list<Unit>& GetUnits() { return m_units; }
 
   private:
@@ -536,11 +532,6 @@ struct Map
   {
     friend Map;
 
-    explicit LinktimeSizeDecreasingOptimizations() = default;
-    virtual ~LinktimeSizeDecreasingOptimizations() override = default;
-
-    virtual bool IsEmpty() const noexcept override { return true; }
-
   private:
     Error Scan(const char*&, const char*, std::size_t&);
     void Print(std::ostream&, std::size_t&) const;
@@ -549,11 +540,6 @@ struct Map
   struct LinktimeSizeIncreasingOptimizations final : PortionBase
   {
     friend Map;
-
-    explicit LinktimeSizeIncreasingOptimizations() = default;
-    virtual ~LinktimeSizeIncreasingOptimizations() override = default;
-
-    virtual bool IsEmpty() const noexcept override { return true; }
 
   private:
     Error Scan(const char*&, const char*, std::size_t&);
@@ -649,9 +635,9 @@ struct Map
       // UNUSED symbols
       explicit Unit(Elf32_Word size, std::string_view name, std::string_view module_name,
                     std::string_view source_name, ScanningContext& scanning_context)
-          : m_unit_kind(Kind::Unused), m_starting_address{},
-            m_size(size), m_virtual_address{}, m_file_offset{}, m_alignment{}, m_name(name),
-            m_entry_parent(nullptr), m_module_name(module_name), m_source_name(source_name),
+          : m_unit_kind(Kind::Unused), m_starting_address{}, m_size(size), m_virtual_address{},
+            m_file_offset{}, m_alignment{}, m_name(name), m_entry_parent(nullptr),
+            m_module_name(module_name), m_source_name(source_name),
             m_unit_trait(DeduceUsualSubtext(scanning_context))
       {
       }
@@ -710,28 +696,28 @@ struct Map
       const std::list<const Unit*>& GetEntryChildren() { return m_entry_children; }
       static constexpr std::string_view ToSpecialName(Trait);
 
-      const Kind m_unit_kind;
-      const std::uint32_t m_starting_address;
-      const Elf32_Word m_size;
-      const Elf32_Addr m_virtual_address;
-      const std::uint32_t m_file_offset;
-      const int m_alignment;
-      const std::string m_name;
+      Kind m_unit_kind;
+      std::uint32_t m_starting_address;
+      Elf32_Word m_size;
+      Elf32_Addr m_virtual_address;
+      std::uint32_t m_file_offset;
+      int m_alignment;
+      std::string m_name;
 
     private:
       // Doubly-linked relationship between entry symbols and their host.
-      const Unit* const m_entry_parent;
+      const Unit* m_entry_parent;
       // Doubly-linked relationship between entry symbols and their host.
       std::list<const Unit*> m_entry_children;
 
     public:
       // Static library or object name
-      const std::string m_module_name;
+      std::string m_module_name;
       // When linking a static library, this is either:
       // A) The name of the STT_FILE symbol from the relevant object in the static library.
       // B) The name of the relevant object in the static library (as early as CW for GCN 2.7).
-      const std::string m_source_name;
-      const Trait m_unit_trait;
+      std::string m_source_name;
+      Trait m_unit_trait;
 
     private:
       void Print3Column(std::ostream&, std::size_t&) const;
@@ -744,15 +730,14 @@ struct Map
         : m_section_kind(section_kind), m_name(name)
     {
     }
-    virtual ~SectionLayout() override = default;
 
-    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    inline bool IsEmpty() const noexcept { return m_units.empty(); }
     const std::list<Unit>& GetUnits() const noexcept { return m_units; }
     const ModuleLookup& GetModuleLookup() const noexcept { return m_lookup; }
     static Kind ToSectionKind(std::string_view);
 
-    const Kind m_section_kind;
-    const std::string m_name;
+    Kind m_section_kind;
+    std::string m_name;
 
     struct Warn
     {
@@ -834,8 +819,8 @@ struct Map
                           std::uint32_t ram_buffer_address, int s_record_line)
           : m_name(name), m_starting_address(starting_address), m_size(size),
             m_file_offset(file_offset), m_rom_address(rom_address),
-            m_ram_buffer_address(ram_buffer_address),
-            m_srecord_line(s_record_line), m_bin_file_offset{}
+            m_ram_buffer_address(ram_buffer_address), m_srecord_line(s_record_line),
+            m_bin_file_offset{}
       {
       }
       explicit UnitNormal(std::string_view name, Elf32_Addr starting_address, Elf32_Word size,
@@ -876,15 +861,15 @@ struct Map
       {
       }
 
-      const std::string m_name;
-      const Elf32_Addr m_starting_address;
-      const Elf32_Word m_size;
-      const std::uint32_t m_file_offset;
-      const std::uint32_t m_rom_address;
-      const std::uint32_t m_ram_buffer_address;
-      const int m_srecord_line;
-      const std::uint32_t m_bin_file_offset;
-      const std::string m_bin_file_name;
+      std::string m_name;
+      Elf32_Addr m_starting_address;
+      Elf32_Word m_size;
+      std::uint32_t m_file_offset;
+      std::uint32_t m_rom_address;
+      std::uint32_t m_ram_buffer_address;
+      int m_srecord_line;
+      std::uint32_t m_bin_file_offset;
+      std::string m_bin_file_name;
 
     private:
       void PrintSimple_old(std::ostream&, std::size_t&) const;
@@ -908,9 +893,9 @@ struct Map
       {
       }
 
-      const std::string m_name;
-      const Elf32_Word m_size;
-      const std::uint32_t m_file_offset;
+      std::string m_name;
+      Elf32_Word m_size;
+      std::uint32_t m_file_offset;
 
     private:
       void Print_older(std::ostream&, std::size_t&) const;
@@ -928,18 +913,14 @@ struct Map
     {
       SetVersionRange(Version::version_4_2_build_142, Version::Latest);
     }
-    virtual ~MemoryMap() override = default;
 
-    virtual bool IsEmpty() const noexcept override
-    {
-      return m_normal_units.empty() || m_debug_units.empty();
-    }
+    inline bool IsEmpty() const noexcept { return m_normal_units.empty() || m_debug_units.empty(); }
     const std::list<UnitNormal>& GetNormalUnits() const noexcept { return m_normal_units; }
     const std::list<UnitDebug>& GetDebugUnits() const noexcept { return m_debug_units; }
 
-    const bool m_has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
-    const bool m_has_s_record;  // Enabled by '-srec [filename]' option
-    const bool m_has_bin_file;  // Enabled by '-genbinary keyword' option
+    bool m_has_rom_ram;   // Enabled by '-romaddr addr' and '-rambuffer addr' options
+    bool m_has_s_record;  // Enabled by '-srec [filename]' option
+    bool m_has_bin_file;  // Enabled by '-genbinary keyword' option
 
   private:
     Error ScanSimple_old(const char*&, const char*, std::size_t&);
@@ -982,17 +963,14 @@ struct Map
 
       explicit Unit(std::string_view name, Elf32_Addr value) : m_name(name), m_value(value) {}
 
-      const std::string m_name;
-      const Elf32_Addr m_value;
+      std::string m_name;
+      Elf32_Addr m_value;
 
     private:
       void Print(std::ostream&, std::size_t&) const;
     };
 
-    explicit LinkerGeneratedSymbols() = default;
-    virtual ~LinkerGeneratedSymbols() override = default;
-
-    virtual bool IsEmpty() const noexcept override { return m_units.empty(); }
+    inline bool IsEmpty() const noexcept { return m_units.empty(); }
     const std::list<Unit>& GetUnits() const noexcept { return m_units; }
 
   private:
@@ -1012,63 +990,65 @@ struct Map
   Version GetMinVersion() const noexcept
   {
     Version min_version = std::max({
-        PortionBase::GetMinVersion(m_normal_symbol_closure.get()),
-        PortionBase::GetMinVersion(m_eppc_pattern_matching.get()),
-        PortionBase::GetMinVersion(m_dwarf_symbol_closure.get()),
-        PortionBase::GetMinVersion(m_linker_opts.get()),
-        PortionBase::GetMinVersion(m_mixed_mode_islands.get()),
-        PortionBase::GetMinVersion(m_branch_islands.get()),
-        PortionBase::GetMinVersion(m_linktime_size_decreasing_optimizations.get()),
-        PortionBase::GetMinVersion(m_linktime_size_increasing_optimizations.get()),
-        PortionBase::GetMinVersion(m_memory_map.get()),
-        PortionBase::GetMinVersion(m_linker_generated_symbols.get()),
+        m_normal_symbol_closure ? m_normal_symbol_closure->GetMinVersion() : Version::Unknown,
+        m_eppc_pattern_matching ? m_eppc_pattern_matching->GetMinVersion() : Version::Unknown,
+        m_dwarf_symbol_closure ? m_dwarf_symbol_closure->GetMinVersion() : Version::Unknown,
+        m_linker_opts ? m_linker_opts->GetMinVersion() : Version::Unknown,
+        m_mixed_mode_islands ? m_mixed_mode_islands->GetMinVersion() : Version::Unknown,
+        m_branch_islands ? m_branch_islands->GetMinVersion() : Version::Unknown,
+        m_linktime_size_decreasing_optimizations ?
+            m_linktime_size_decreasing_optimizations->GetMinVersion() :
+            Version::Unknown,
+        m_linktime_size_increasing_optimizations ?
+            m_linktime_size_increasing_optimizations->GetMinVersion() :
+            Version::Unknown,
+        m_memory_map ? m_memory_map->GetMinVersion() : Version::Unknown,
+        m_linker_generated_symbols ? m_linker_generated_symbols->GetMinVersion() : Version::Unknown,
     });
     for (const auto& section_layout : m_section_layouts)
-      min_version = std::max(PortionBase::GetMinVersion(section_layout.get()), min_version);
+      min_version = std::max((section_layout.GetMinVersion()), min_version);
     return min_version;
   }
   Version GetMaxVersion() const noexcept
   {
     Version max_version = std::min({
-        PortionBase::GetMaxVersion(m_normal_symbol_closure.get()),
-        PortionBase::GetMaxVersion(m_eppc_pattern_matching.get()),
-        PortionBase::GetMaxVersion(m_dwarf_symbol_closure.get()),
-        PortionBase::GetMaxVersion(m_linker_opts.get()),
-        PortionBase::GetMaxVersion(m_mixed_mode_islands.get()),
-        PortionBase::GetMaxVersion(m_branch_islands.get()),
-        PortionBase::GetMaxVersion(m_linktime_size_decreasing_optimizations.get()),
-        PortionBase::GetMaxVersion(m_linktime_size_increasing_optimizations.get()),
-        PortionBase::GetMaxVersion(m_memory_map.get()),
-        PortionBase::GetMaxVersion(m_linker_generated_symbols.get()),
+        m_normal_symbol_closure ? m_normal_symbol_closure->GetMaxVersion() : Version::Latest,
+        m_eppc_pattern_matching ? m_eppc_pattern_matching->GetMaxVersion() : Version::Latest,
+        m_dwarf_symbol_closure ? m_dwarf_symbol_closure->GetMaxVersion() : Version::Latest,
+        m_linker_opts ? m_linker_opts->GetMaxVersion() : Version::Latest,
+        m_mixed_mode_islands ? m_mixed_mode_islands->GetMaxVersion() : Version::Latest,
+        m_branch_islands ? m_branch_islands->GetMaxVersion() : Version::Latest,
+        m_linktime_size_decreasing_optimizations ?
+            m_linktime_size_decreasing_optimizations->GetMaxVersion() :
+            Version::Latest,
+        m_linktime_size_increasing_optimizations ?
+            m_linktime_size_increasing_optimizations->GetMaxVersion() :
+            Version::Latest,
+        m_memory_map ? m_memory_map->GetMaxVersion() : Version::Latest,
+        m_linker_generated_symbols ? m_linker_generated_symbols->GetMaxVersion() : Version::Latest,
     });
     for (const auto& section_layout : m_section_layouts)
-      max_version = std::min(PortionBase::GetMaxVersion(section_layout.get()), max_version);
+      max_version = std::min(section_layout.GetMaxVersion(), max_version);
     return max_version;
   }
 
   const std::string& GetEntryPointName() const noexcept { return m_entry_point_name; }
-  const std::unique_ptr<SymbolClosure>& GetNormalSymbolClosure() const noexcept
+  const std::optional<SymbolClosure>& GetNormalSymbolClosure() const noexcept
   {
     return m_normal_symbol_closure;
   }
-  const std::unique_ptr<EPPC_PatternMatching>& GetEPPC_PatternMatching() const noexcept
+  const std::optional<EPPC_PatternMatching>& GetEPPC_PatternMatching() const noexcept
   {
     return m_eppc_pattern_matching;
   }
-  const std::unique_ptr<SymbolClosure>& GetDwarfSymbolClosure() const noexcept
+  const std::optional<SymbolClosure>& GetDwarfSymbolClosure() const noexcept
   {
     return m_dwarf_symbol_closure;
   }
   const UnresolvedSymbols& GetUnresolvedSymbols() const noexcept { return m_unresolved_symbols; }
-  const std::list<std::unique_ptr<SectionLayout>>& GetSectionLayouts() const noexcept
-  {
-    return m_section_layouts;
-  }
-  const std::unique_ptr<MemoryMap>& GetMemoryMap() const noexcept  //
-  {
-    return m_memory_map;
-  }
-  const std::unique_ptr<LinkerGeneratedSymbols>& GetLinkerGeneratedSymbols() const noexcept
+  const std::list<SectionLayout>& GetSectionLayouts() const noexcept { return m_section_layouts; }
+  const std::optional<MemoryMap>& GetMemoryMap() const noexcept { return m_memory_map; }
+  const std::optional<LinkerGeneratedSymbols>& GetLinkerGeneratedSymbols() const noexcept
   {
     return m_linker_generated_symbols;
   }
@@ -1093,17 +1073,17 @@ private:
                                      UnresolvedSymbols::const_iterator, std::size_t&);
 
   std::string m_entry_point_name;
-  std::unique_ptr<SymbolClosure> m_normal_symbol_closure;
-  std::unique_ptr<EPPC_PatternMatching> m_eppc_pattern_matching;
-  std::unique_ptr<SymbolClosure> m_dwarf_symbol_closure;
+  std::optional<SymbolClosure> m_normal_symbol_closure;
+  std::optional<EPPC_PatternMatching> m_eppc_pattern_matching;
+  std::optional<SymbolClosure> m_dwarf_symbol_closure;
   UnresolvedSymbols m_unresolved_symbols;
-  std::unique_ptr<LinkerOpts> m_linker_opts;
-  std::unique_ptr<MixedModeIslands> m_mixed_mode_islands;
-  std::unique_ptr<BranchIslands> m_branch_islands;
-  std::unique_ptr<LinktimeSizeDecreasingOptimizations> m_linktime_size_decreasing_optimizations;
-  std::unique_ptr<LinktimeSizeIncreasingOptimizations> m_linktime_size_increasing_optimizations;
-  std::list<std::unique_ptr<SectionLayout>> m_section_layouts;
-  std::unique_ptr<MemoryMap> m_memory_map;
-  std::unique_ptr<LinkerGeneratedSymbols> m_linker_generated_symbols;
+  std::optional<LinkerOpts> m_linker_opts;
+  std::optional<MixedModeIslands> m_mixed_mode_islands;
+  std::optional<BranchIslands> m_branch_islands;
+  std::optional<LinktimeSizeDecreasingOptimizations> m_linktime_size_decreasing_optimizations;
+  std::optional<LinktimeSizeIncreasingOptimizations> m_linktime_size_increasing_optimizations;
+  std::list<SectionLayout> m_section_layouts;
+  std::optional<MemoryMap> m_memory_map;
+  std::optional<LinkerGeneratedSymbols> m_linker_generated_symbols;
 };
 }  // namespace MWLinker
