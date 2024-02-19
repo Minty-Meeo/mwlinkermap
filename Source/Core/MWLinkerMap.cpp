@@ -1105,7 +1105,7 @@ Map::ScanError Map::SymbolClosure::Scan(  //
                              source_name = match[6].view();
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
-        curr_node = curr_node->m_parent;
+        curr_node = curr_node->GetParent();
       curr_hierarchy_level = next_hierarchy_level;
 
       const std::size_t line_number_backup = line_number;  // unfortunate
@@ -1145,7 +1145,7 @@ Map::ScanError Map::SymbolClosure::Scan(  //
       }
 
       // clang-format off
-      curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeReal>(
+      curr_node = curr_node->GetChildren().emplace_back(std::make_unique<NodeReal>(
           curr_node, symbol_name, map_symbol_closure_st_type.at(type),
           map_symbol_closure_st_bind.at(bind), module_name, source_name, std::move(unref_dups))).get();
       // clang-format on
@@ -1167,7 +1167,8 @@ Map::ScanError Map::SymbolClosure::Scan(  //
       if (symbol_name == "_dtors$99" && module_name == "Linker Generated Symbol File")
       {
         // Create a dummy node for hierarchy level 2.
-        curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeBase>(curr_node)).get();
+        curr_node =
+            curr_node->GetChildren().emplace_back(std::make_unique<NodeBase>(curr_node)).get();
         ++curr_hierarchy_level;
         SetVersionRange(Version::version_3_0_4, Version::Latest);
       }
@@ -1183,11 +1184,11 @@ Map::ScanError Map::SymbolClosure::Scan(  //
         return ScanError::SymbolClosureHierarchySkip;
 
       for (int i = curr_hierarchy_level + 1; i > next_hierarchy_level; --i)
-        curr_node = curr_node->m_parent;
+        curr_node = curr_node->GetParent();
       curr_hierarchy_level = next_hierarchy_level;
 
       // clang-format off
-      curr_node = curr_node->m_children.emplace_back(std::make_unique<NodeLinkerGenerated>(curr_node, match[2].view())).get();
+      curr_node = curr_node->GetChildren().emplace_back(std::make_unique<NodeLinkerGenerated>(curr_node, match[2].view())).get();
       // clang-format on
 
       line_number += 1u;
@@ -1281,7 +1282,7 @@ void Map::SymbolClosure::NodeBase::Print(std::ostream& stream, const int hierarc
   // This handles pre-print and mid-print unresolved symbols. Assuming the symbol closure exists at
   // the right time, this will also handle post-print unresolved symbols.
   Map::PrintUnresolvedSymbols(stream, unresolved_head, unresolved_tail, line_number);
-  for (const auto& node : m_children)
+  for (const auto& node : GetChildren())
     node->Print(stream, hierarchy_level + 1, unresolved_head, unresolved_tail, line_number);
 }
 

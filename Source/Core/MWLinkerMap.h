@@ -167,12 +167,14 @@ struct Map
       NodeBase(NodeBase&&) = default;
       NodeBase& operator=(NodeBase&&) = default;
 
-      const NodeBase* GetParent() { return m_parent; }
-      const std::list<std::unique_ptr<NodeBase>>& GetChildren() { return m_children; }
+      const NodeBase* GetParent() const { return m_parent; }
+      const std::list<std::unique_ptr<NodeBase>>& GetChildren() const { return m_children; }
       static constexpr std::string_view ToName(Type st_type) noexcept;
       static constexpr std::string_view ToName(Bind st_bind) noexcept;
 
     private:
+      NodeBase* GetParent() { return m_parent; }
+      std::list<std::unique_ptr<NodeBase>>& GetChildren() { return m_children; }
       virtual void Print(std::ostream& stream, int hierarchy_level,
                          UnresolvedSymbols::const_iterator& unresolved_head,
                          UnresolvedSymbols::const_iterator unresolved_tail,
