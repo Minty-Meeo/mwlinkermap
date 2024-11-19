@@ -9,8 +9,6 @@
 #include <string>
 #include <string_view>
 
-#include "PointerUtil.h"
-
 // https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
 // TODO: Make from_chars methods constexpr after std::from_chars becomes constexpr in C++23.
 
@@ -35,13 +33,14 @@ public:
   template <std::integral T>
   std::from_chars_result from_chars(T& value, int base = 10) const noexcept
   {
-    return std::from_chars(ToPointer(this->first), ToPointer(this->second), value, base);
+    return std::from_chars(std::to_address(this->first), std::to_address(this->second), value,
+                           base);
   }
   template <std::floating_point T>
   std::from_chars_result
   from_chars(T& value, std::chars_format fmt = std::chars_format::general) const noexcept
   {
-    return std::from_chars(ToPointer(this->first), ToPointer(this->second), value, fmt);
+    return std::from_chars(std::to_address(this->first), std::to_address(this->second), value, fmt);
   }
   template <std::integral T>
   T to(int base = 10) const

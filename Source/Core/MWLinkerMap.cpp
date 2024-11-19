@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <new>
 #include <ostream>
 #include <ranges>
@@ -20,7 +21,6 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
-#include "PointerUtil.h"
 #include "RegexUtil.h"
 
 // Metrowerks linker maps should be considered binary files containing text with CRLF line endings.
@@ -2014,7 +2014,7 @@ Map::ScanError Map::SectionLayout::Scan3Column(const char*& head, const char* co
           continue;
         const Unit& unit = m_units.emplace_back(
             match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
-            match[3].to<Elf32_Addr>(16), symbol_name, Mijo::ToPointer(parent_unit), module_name,
+            match[3].to<Elf32_Addr>(16), symbol_name, std::to_address(parent_unit), module_name,
             source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
         parent_unit->m_entry_children.push_back(&unit);
@@ -2090,7 +2090,7 @@ Map::ScanError Map::SectionLayout::Scan4Column(const char*& head, const char* co
         const Unit& unit = m_units.emplace_back(
             match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
             match[3].to<Elf32_Addr>(16), match[4].to<std::uint32_t>(16), symbol_name,
-            Mijo::ToPointer(parent_unit), module_name, source_name, scanning_context);
+            std::to_address(parent_unit), module_name, source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
         parent_unit->m_entry_children.push_back(&unit);
         line_number += 1u;
@@ -2172,7 +2172,7 @@ Map::ScanError Map::SectionLayout::ScanTLOZTP(const char*& head, const char* con
         const Unit& unit = m_units.emplace_back(
             match[1].to<std::uint32_t>(16), match[2].to<Elf32_Word>(16),
             match[3].to<Elf32_Addr>(16), std::uint32_t{0}, symbol_name,
-            Mijo::ToPointer(parent_unit), module_name, source_name, scanning_context);
+            std::to_address(parent_unit), module_name, source_name, scanning_context);
         scanning_context.m_curr_unit_lookup->emplace(unit.m_name, unit);
         parent_unit->m_entry_children.push_back(&unit);
         line_number += 1u;
