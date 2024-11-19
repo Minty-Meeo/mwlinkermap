@@ -2159,8 +2159,8 @@ Map::ScanError Map::SectionLayout::ScanTLOZTP(const char*& head, const char* con
     if (std::regex_search(head, tail, match, re_section_layout_tloztp_unit_entry,
                           std::regex_constants::match_continuous))
     {
-      std::string_view symbol_name = match[4].view(), entry_parent_name = match[5].view(),
-                       module_name = match[6].view(), source_name = match[7].view();
+      const std::string_view symbol_name = match[4].view(), entry_parent_name = match[5].view(),
+                             module_name = match[6].view(), source_name = match[7].view();
       for (auto parent_unit = m_units.rbegin(), iter_end = m_units.rend();; ++parent_unit)
       {
         if (parent_unit == iter_end)
