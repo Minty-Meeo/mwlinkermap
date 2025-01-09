@@ -3,11 +3,13 @@
 #pragma once
 
 #include <charconv>
+#include <concepts>
 #include <iterator>
 #include <memory>
 #include <regex>
 #include <string>
 #include <string_view>
+#include <utility>
 
 // https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
 // TODO: Make from_chars methods constexpr after std::from_chars becomes constexpr in C++23.
@@ -31,12 +33,14 @@ public:
   string_view_type view() const noexcept { return {this->first, this->second}; }
   operator string_view_type() const noexcept { return view(); }
   template <std::integral T>
+    requires std::same_as<decltype(std::to_address(std::declval<iterator>())), const char*>
   std::from_chars_result from_chars(T& value, int base = 10) const noexcept
   {
     return std::from_chars(std::to_address(this->first), std::to_address(this->second), value,
                            base);
   }
   template <std::floating_point T>
+    requires std::same_as<decltype(std::to_address(std::declval<iterator>())), const char*>
   std::from_chars_result
   from_chars(T& value, std::chars_format fmt = std::chars_format::general) const noexcept
   {
@@ -100,11 +104,13 @@ public:
   }
   string_view_type view(size_type idx) const noexcept { return operator[](idx).view(); }
   template <std::integral T>
+    requires std::same_as<decltype(std::to_address(std::declval<iterator>())), const char*>
   std::from_chars_result from_chars(size_type idx, T& value, int base = 10) const noexcept
   {
     return operator[](idx).from_chars(value, base);
   }
   template <std::floating_point T>
+    requires std::same_as<decltype(std::to_address(std::declval<iterator>())), const char*>
   std::from_chars_result
   from_chars(size_type idx, T& value,
              std::chars_format fmt = std::chars_format::general) const noexcept
